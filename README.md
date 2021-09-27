@@ -1,0 +1,2 @@
+AUTHOR: Aji Palar
+LICENSE: LGPL 2.1
