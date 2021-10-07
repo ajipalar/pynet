@@ -20,6 +20,8 @@ print(Emax)
 
 Edge = NewType('Edge', (int, int))
 
+adj_matrix = np.zeros((V, V), dtype=np.int64)
+
 def enumerate_ordered_vertex_pairs(V: int) -> Iterable[Edge]:
     a = np.arange(V, dtype=np.int64) + 1
     ordered_pairs = np.zeros((Emax, 2), dtype=np.int64)
