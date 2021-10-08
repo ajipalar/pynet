@@ -8,6 +8,7 @@ from typing import List, Tuple, NewType, Iterable
 import numpy as np
 from jax import jit
 import jax; jax.config.update('jax_platform_name', 'cpu')
+import igraph as ig
 #Representation
 
 #Number of vertices, proteins, ligands
@@ -34,3 +35,6 @@ def enumerate_ordered_vertex_pairs(V: int) -> Iterable[Edge]:
 
 j_enumerate_ordered_pairs = jit(enumerate_ordered_vertex_pairs)(V)
 ordered_pairs = enumerate_ordered_vertex_pairs(V)
+
+g = ig.Graph(V)
+
