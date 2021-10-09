@@ -1,8 +1,7 @@
 import jax.numpy as jnp
 from jax import jit, grad
 import jax
-
-print(f"Device f{jax.devices()[0]}")
+#print(f"Device f{jax.devices()[0]}")
 
 AM = jnp.array([[0, 1, 0, 1],
                 [1, 0, 1, 0],
@@ -31,4 +30,4 @@ print(f"Updated Array\n{AM}")
 for i in range(len(AM)-1):
     AM = sub_e(i, i+1, AM)
 print(f"Updated after sub\n{AM}")
-     
+
