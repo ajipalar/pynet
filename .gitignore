@@ -5,3 +5,5 @@ cmake-build-debug
 *.xlsx
 *.xls
 *.ipynb_checkpoints
+*.swp
+*.swo
