@@ -4,3 +4,4 @@ cmake-build-debug
 *.py~
 *.xlsx
 *.xls
+*.ipynb_checkpoints
