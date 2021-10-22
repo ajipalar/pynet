@@ -3,6 +3,9 @@ import jax.numpy as jnp
 from typing import NewType
 
 Dist = NewType('Dist', float)
+EdgeID = NewType('EID', int)
+VertexID = NewType('VID', int)
+
 A = np.zeros((10,10), dtype=np.int32)
 A[0, 1] = 1
 A[1, 2] = 1
@@ -138,7 +141,7 @@ def get_edge_from_id(eid, vmax):
         c+=1
     return s, eid
 
-def src_from_eid(eid, v):
+def src_from_eid(eid: EdgeID, v) -> VertexID:
     """
     How many times does v go into eid?
     """
