@@ -1,0 +1,2 @@
+RUN_ALL_NET_TEST = False
+PRINT_MODULE_INFO = False
