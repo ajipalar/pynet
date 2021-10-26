@@ -1,6 +1,6 @@
 import config
 import utilities.utils as utils
-from testoptions import decorate_print_test_results
+from .testoptions import decorate_print_test_results
 
 if config.PRINT_MODULE_INFO:
     utils.moduleinfo(locals())
@@ -46,7 +46,7 @@ def run_tests():
     test_list = [test_get_dataset_overlap]
     for test in test_list:
         if config.PRINT_TEST_RESULTS:
-           test = decorate_print_test_results(test)
+           test = decorate_print_test_results(test, __name__)
         test()
 
 if __name__ == "main":
