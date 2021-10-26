@@ -10,19 +10,30 @@ if __name__ != "__main__":
 import sys
 import numpy as np
 
+def decorate_print_test_results(test):
+    """
+    Decorate a funciton to add printing
+    """
+    def internal():
+        print(f'Testing {test.__name__}')
+        test()
+        print("Passed!")
+    return internal
+
 def test_get_dataset_overlap():
     a = {'a', 'b', 'c'}
     b = {'a', 'b', 'c'}
     c = {'a', 1}
-    d = {}
+    d = set()
     e = {1, 2, 3}
     f = {6, 7, 8}
     g = {'A', 'B', 'C'}
-    h = {}
+    h = set()
     l = [a, b, c, d, e, f, g, h]
     k = 'abcdefgh'
 
     dataset_dict = dict(zip(k, l ))
+    
     m = get_dataset_overlap(dataset_dict, dataset_names=dataset_dict.keys())
 
     #Check that the diagonal elements of the matrix are equal to the length of the ipput
@@ -39,7 +50,11 @@ def test_get_dataset_overlap():
         assert m[0, i] == a_inter[i]
 
 def run_tests():
-    test_get_dataset_overlap()
+    test_list = [test_get_dataset_overlap]
+    for test in test_list:
+        if config.PRINT_TEST_RESULTS:
+           test = decorate_print_test_results(test)
+        test()
 
 if __name__ == "main":
     run_tests()
