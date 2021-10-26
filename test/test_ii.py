@@ -1,5 +1,7 @@
 import config
 import utilities.utils as utils
+from testoptions import decorate_print_test_results
+
 if config.PRINT_MODULE_INFO:
     utils.moduleinfo(locals())
    
@@ -10,15 +12,6 @@ if __name__ != "__main__":
 import sys
 import numpy as np
 
-def decorate_print_test_results(test):
-    """
-    Decorate a funciton to add printing
-    """
-    def internal():
-        print(f'Testing {test.__name__}')
-        test()
-        print("Passed!")
-    return internal
 
 def test_get_dataset_overlap():
     a = {'a', 'b', 'c'}
