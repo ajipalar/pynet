@@ -11,13 +11,24 @@ from scipy.stats import f_oneway
 from statsmodels.stats.multitest import fdrcorrection
 import utilities.utils as utils
 import config
+import pathlib
+
+src = pathlib.Path("~/Projects/pynet")
+
 if config.PRINT_MODULE_INFO:
     utils.moduleinfo(locals())
 
 def read_lip_data():
-    dpath_lip = "../data/sars-cov-2-LiP/20210430_084806_lgillet_SARS2_NSP9_LiP_SpecLib_Report.xls"
-    dpath_TC = "../data/sars-cov-2-LiP/20210430_084629_lgillet_SARS2_NSP9_TC_SpecLib_Report.xls"
+    "Read the LiP data into a pandas data frame"
+    dpath_lip = src / "data/sars-cov-2-LiP/20210430_084806_lgillet_SARS2_NSP9_LiP_SpecLib_Report.xls"
+    #dpath_TC = "../data/sars-cov-2-LiP/20210430_084629_lgillet_SARS2_NSP9_TC_SpecLib_Report.xls"
     return pd.read_csv(dpath_lip, delimiter="\t")
+
+
+
+def format_lip_data(df):
+    df.rename({'PG.ProteinAccessions':'uids'})
+    return df
 
 def summarize_lip_data():
     return nproteins, npeptides

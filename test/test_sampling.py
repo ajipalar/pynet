@@ -49,7 +49,17 @@ def test_edge_id():
                 assert eid < Emax
                 if (i == v  - 1) and (t==v):
                     assert eid == Emax
-                
+
+def test_plot_dataset_overlap():
+    a = {'a', 'b', 'c'}
+    b = {'a', 'b', 'c'}
+    c = {'a', 1}
+    d = {}
+    e = {1, 2, 3}
+    f = {6, 7, 8}
+    g = {'A', 'B', 'C'}
+    h = {}
+
          
           
                 
