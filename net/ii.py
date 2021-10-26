@@ -1,12 +1,18 @@
-#Author Aji Palar
-#Data I/O, Data formatting and preprocessing
-#Creation and handling of input information data structres used during modeling
+"""
+Author Aji Palar
+Input Information
+Module for handling data I/O and preprocessing
+"""
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import f_oneway
 from statsmodels.stats.multitest import fdrcorrection
+import utilities.utils as utils
+import config
+if config.PRINT_MODULE_INFO:
+    utils.moduleinfo(locals())
 
 def read_lip_data():
     dpath_lip = "../data/sars-cov-2-LiP/20210430_084806_lgillet_SARS2_NSP9_LiP_SpecLib_Report.xls"
@@ -23,6 +29,9 @@ def summarize_stuk_data():
     return nAPMSproteins, nRNAgenes, nUbiquit, nPhos
 
 def overlap(a, b):
+    """
+    Returns the magnitude of the intersection between two sets
+    """
     return len(a.intersection(b))
 def get_dataset_overlap(dataset_dict, dataset_names=None):
     """

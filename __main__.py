@@ -1,7 +1,6 @@
 import sys
-import config
 import argparse
-import utilities.utils as utils
+import config
 
 parser = argparse.ArgumentParser(description='Debug the runscript')
 parser.add_argument('-t', '-test', help='run all tests', action='store_const', const=True)
@@ -11,9 +10,10 @@ args = parser.parse_args()
 if __name__ == "__main__":
     if args.m:
        config.PRINT_MODULE_INFO = True
+       import utilities.utils as utils
        utils.moduleinfo(locals())
     if args.t:
         #Enable the cross module global testing
         config.RUN_ALL_NET_TESTS = True
-        from test import test_inputinformation as tii
+        from test import test_ii as tii
         tii.run_tests()

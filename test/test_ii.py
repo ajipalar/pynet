@@ -1,10 +1,14 @@
-print(f'Name: {__name__}')
-print(f"Package: {__package__}")
-import sys
-print(sys.path)
+import config
+import utilities.utils as utils
+if config.PRINT_MODULE_INFO:
+    utils.moduleinfo(locals())
+   
 
+if __name__ != "__main__":
+    assert config.RUN_ALL_NET_TESTS == True
+    from net.ii import get_dataset_overlap
+import sys
 import numpy as np
-from ..net.inputinformation import get_dataset_overlap
 
 def test_get_dataset_overlap():
     a = {'a', 'b', 'c'}
@@ -19,7 +23,7 @@ def test_get_dataset_overlap():
     k = 'abcdefgh'
 
     dataset_dict = dict(zip(k, l ))
-    m = ii.get_dataset_overlap(dataset_dict, dataset_names=dataset_dict.keys())
+    m = get_dataset_overlap(dataset_dict, dataset_names=dataset_dict.keys())
 
     #Check that the diagonal elements of the matrix are equal to the length of the ipput
     for i in range(len(m)):
