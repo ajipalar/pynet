@@ -9,5 +9,6 @@
 "41586_2021_3493_MOESM7_ESM.xlsx" : "Supplementary Table 3 Total proteome of A549 cells expressing individual corona virus proteins, \"effectome\"",
 "41586_2021_3493_MOESM8_ESM.xlsx" : "Supplementary Table 4 Transcriptome of A549-ACE2 cells infected with SARS-CoV-2 and SARS-CoV",
 "41586_2021_3493_MOESM9_ESM.xlsx" : "Supplementary Table 5 Total proteome of A549-ACE2 cells infected with SARS-CoV-2 and SARS-CoV", 
+"41586_2021_3493_MOESM5_ESM.xlsx" : "Sequences of coronavirus proteins used as baits in AP-MS experiments",
 "checksums.txt"  :  "shasum -a 256 protection against data corruption"
 }
