@@ -1,3 +1,5 @@
+from pathlib import Path
+
 def modparse(local_dict):
     modname = local_dict['__name__']
     if "." in modname:
@@ -14,6 +16,9 @@ def doc(x):
     """
     print(x.__doc__)
 
+def ls(p:Path):
+    for f in p.iterdir():
+        print(str(f))
 import config
 if config.PRINT_MODULE_INFO:
     moduleinfo(locals())
