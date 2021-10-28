@@ -3,6 +3,13 @@ import json
 from pathlib import Path
 import pandas as pd
 import sys
+import typing as t
+from typing import Iterable, Iterator
+
+#Custom modules
+import tools.predicates as pred
+from net.typedefs import AnyPath, FilePath, DirPath
+
 
 """
 Reading and parsing excel files
@@ -15,25 +22,13 @@ parser.add_argument("-d", help="Read all excel files in the directory")
 args = parser.parse_args()
 
 
+def fpaths(paths: Iterator[AnyPath]) -> Iterator[FilePath]:
+    return filter(pred.isfile, paths)
 
-def colnames(p):
-    return pd.read_excel(p).columns
+def xlsxpaths(paths: Iterator[FilePath]) -> Iterator[FilePath]:
+    return filter(pred.isxlsx, paths)
 
-def gen_xlsx_fpaths(p):
-    """
-    :param p pathlib path
-    returns a generator
-    """
-    for f in p.iterdir():
-        if f.suffix == '.xlsx':
-            yield f
-
-
-def gen_sheets(fpath):
-    """
-    :param fpath file path
-    returns a generator of sheetnames
-    """
+def gen_sheets(xlsxpath: Iterator[FilePath]) -> Iterator[str]:
     ef = pd.ExcelFile(fpath)
     for sheet in ef.sheet_names:
         yield sheet
