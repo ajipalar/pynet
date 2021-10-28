@@ -21,6 +21,13 @@ parser.add_argument("-d", help="Read all excel files in the directory")
 
 args = parser.parse_args()
 
+### Filters paths using predicates ###
+def pathsT(paths: Iterator[FilePath], T: str) -> Iterator[FilePath]:
+    """Generic for filtering paths functions
+    T: file, xlsx, excel, json, txt
+    """
+    predf = eval(f'pred.is{T}') 
+    return filter(predf, paths)
 
 def fpaths(paths: Iterator[AnyPath]) -> Iterator[FilePath]:
     return filter(pred.isfile, paths)
@@ -28,24 +35,48 @@ def fpaths(paths: Iterator[AnyPath]) -> Iterator[FilePath]:
 def xlsxpaths(paths: Iterator[FilePath]) -> Iterator[FilePath]:
     return filter(pred.isxlsx, paths)
 
+def excelpaths(paths: Iterator[FilePath]) -> Iterator[FilePath]:
+    return filter(pred.isexcel, paths)
+
 def jsonpaths(paths: Iterator[FilePath]) -> Iterator[FilePath]:
     return filter(pred.isjson, paths)
+
+### Generates path iterators from a directory ###
+def gen_pathsT_from_dir(dirpath: DirPath, T: str) -> Iterator[FilePath]:
+    """Generic for path generator from directory 
+    T: xlsx, excel, xls
+    """
+    return pathsT(fpaths(dirpath.iterdir()), T)
 
 def gen_xlsxpaths_from_dir(dirpath: DirPath) -> Iterator[FilePath]:
     return xlsxpaths(fpaths(dirpath.iterdir()))
 
-def gen_sheets_from_fpath(xlsxpath: FilePath) -> Iterator[str]:
+def gen_excelpaths_from_dir(dirpath: DirPath) -> Iterator[FilePath]:
+    return excelpaths(fpaths(dirpath.iterdir()))
+
+
+### sheet generator ###
+
+def gen_sheets_from_pathsT(pathT: FilePath, T: str) -> Iterator[str]:
+    """
+    T: xlsx, excel, xls
+    """
+    ef = pd.ExcelFile(xlsxpath)
+    for sheet in ef.sheet_names:
+        yield sheet
+
+def gen_sheets_from_xlsxpath(xlsxpath: FilePath) -> Iterator[str]:
     ef = pd.ExcelFile(xlsxpath)
     for sheet in ef.sheet_names:
         yield sheet
 
 def gen_xlsx_sheet_pair(xlsxpath: FilePath) -> Tuple[FilePath, Iterator[str]]:
-    return (xlsxpath, gen_sheets_from_fpath(xlsxpath))
+    return (xlsxpath, gen_sheets_from_xlsxpath(xlsxpath))
 
-def gen_xlsx_sheet_pairs(dirpath: DirPath) -> Iterator[Tuple[FilePath, Iterator[str]]]:
+def gen_T_sheet_pairs(dirpath: DirPath, T: str) -> Iterator[Tuple[FilePath, Iterator[str]]]:
     """Returns an iterator of (FilePath, sheet name) pairs"""
     for i in gen_xlsxpaths_from_dir(dirpath):
-        yield (i, gen_sheets_from_fpath(i))
+        yield (i, gen_sheets_from_xlsxpath(i))
 
 def dict_of_file_sheetname(dirpath: DirPath) -> Dict:
     """Returns {FilePath : [sheet_name1, sheet_name2, ...]}""" 
@@ -68,8 +99,17 @@ def drop_non_xlsx_keys(jd: Dict) -> Dict:
             newd[key] = jd[key]
     return newd
 
-def list_description_col_pairs() -> List:
-    pass
+def gen_summarize_excel_contents(dirpath: DirPath) -> Iterator:
+    xlsx_sheet_pairs = gen_xlsx_sheet_pairs(dirpath)
+    jd = dict_from_summary_json(dirpath)
+    for pair in xlsx_sheet_pairs:
+        fname = pair[0]
+        col_list = list(pair[1])
+        description = ''
+        name = str(fname.name)
+        if name in jd:
+            description = jd[name]           
+        yield (fname, description, col_list)
     
 
 def gen_colnames_from_sheet(xlsxpath: FilePath, sheet: str) -> Iterator[str]:
