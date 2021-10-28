@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 import pandas as pd
 import sys
@@ -27,6 +28,7 @@ def gen_xlsx_fpaths(p):
         if f.suffix == '.xlsx':
             yield f
 
+
 def gen_sheets(fpath):
     """
     :param fpath file path
@@ -35,6 +37,20 @@ def gen_sheets(fpath):
     ef = pd.ExcelFile(fpath)
     for sheet in ef.sheet_names:
         yield sheet
+
+def gen_colnames(fpath, sheet_name):
+    for column in pd.read_excel(fpath, sheet_name=sheet_name).columns:
+        yield column
+
+def gen_all_colnames(dirpath):
+    xlsx_fpaths = gen_xlsx_fpaths(dirpath)
+    for fpath in xlsx_fpaths:
+        io = pd.ExcelFile(fpath)
+        for sheet in io.sheet_names:
+            yield (sheet, list(io.parse(sheet_name=sheet).columns))
+    
+
+
 
 def tree_excel(p):
     for xlsx in get_xlsx_file_paths(p):
