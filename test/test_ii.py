@@ -1,5 +1,5 @@
 import config
-import utilities.utils as utils
+import tools.utils as utils
 from .testoptions import decorate_print_test_results
 
 if config.PRINT_MODULE_INFO:

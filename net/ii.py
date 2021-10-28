@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import f_oneway
 from statsmodels.stats.multitest import fdrcorrection
-import utilities.utils as utils
+import tools.utils as utils
 import config
 import pathlib
 
@@ -35,6 +35,11 @@ def summarize_lip_data():
 
 def summarize_gordon_data():
     return nproteins
+
+def read_stuk_apms_data():
+    dpath_stuk = pathlib.Path("")
+
+def read_gordon_data():
 
 def summarize_stuk_data():
     return nAPMSproteins, nRNAgenes, nUbiquit, nPhos
