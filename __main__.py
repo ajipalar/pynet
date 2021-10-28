@@ -12,7 +12,7 @@ print(args)
 if __name__ == "__main__":
     if args.m:
        config.PRINT_MODULE_INFO = True
-       import utilities.utils as utils
+       import tools.utils as utils
        utils.moduleinfo(locals())
     if args.ptr:
         #Update global printing variable
