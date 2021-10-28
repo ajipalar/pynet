@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import sys
 import typing as t
-from typing import Iterable, Iterator
+from typing import Dict, Iterable, Iterator, List, Tuple
 
 #Custom modules
 import tools.predicates as pred
@@ -28,13 +28,52 @@ def fpaths(paths: Iterator[AnyPath]) -> Iterator[FilePath]:
 def xlsxpaths(paths: Iterator[FilePath]) -> Iterator[FilePath]:
     return filter(pred.isxlsx, paths)
 
-def gen_sheets(xlsxpath: Iterator[FilePath]) -> Iterator[str]:
-    ef = pd.ExcelFile(fpath)
+def jsonpaths(paths: Iterator[FilePath]) -> Iterator[FilePath]:
+    return filter(pred.isjson, paths)
+
+def gen_xlsxpaths_from_dir(dirpath: DirPath) -> Iterator[FilePath]:
+    return xlsxpaths(fpaths(dirpath.iterdir()))
+
+def gen_sheets_from_fpath(xlsxpath: FilePath) -> Iterator[str]:
+    ef = pd.ExcelFile(xlsxpath)
     for sheet in ef.sheet_names:
         yield sheet
 
-def gen_colnames(fpath, sheet_name):
-    for column in pd.read_excel(fpath, sheet_name=sheet_name).columns:
+def gen_xlsx_sheet_pair(xlsxpath: FilePath) -> Tuple[FilePath, Iterator[str]]:
+    return (xlsxpath, gen_sheets_from_fpath(xlsxpath))
+
+def gen_xlsx_sheet_pairs(dirpath: DirPath) -> Iterator[Tuple[FilePath, Iterator[str]]]:
+    """Returns an iterator of (FilePath, sheet name) pairs"""
+    for i in gen_xlsxpaths_from_dir(dirpath):
+        yield (i, gen_sheets_from_fpath(i))
+
+def dict_of_file_sheetname(dirpath: DirPath) -> Dict:
+    """Returns {FilePath : [sheet_name1, sheet_name2, ...]}""" 
+    sheet_pairs = gen_xlsx_sheet_pairs(dirpath)
+    xlsx_dict = {}
+    for pair in sheet_pairs:
+        key = pair[0]
+        val = list(pair[1])
+        xlsx_dict[key] = val
+    return xlsx_dict
+
+def dict_from_summary_json(dirpath: DirPath) -> Dict:
+    """Returns a py dict of directory contents from summary.json"""
+    return json.load(open(dirpath / 'summary.json'))
+
+def drop_non_xlsx_keys(jd: Dict) -> Dict:
+    newd = {}
+    for key in jd:
+        if Path(key).suffix == '.xlsx':
+            newd[key] = jd[key]
+    return newd
+
+def list_description_col_pairs() -> List:
+    pass
+    
+
+def gen_colnames_from_sheet(xlsxpath: FilePath, sheet: str) -> Iterator[str]:
+    for column in pd.read_excel(xlsxpath, sheet_name=sheet).columns:
         yield column
 
 def gen_all_colnames(dirpath):
