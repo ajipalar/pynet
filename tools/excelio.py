@@ -57,30 +57,22 @@ def gen_excelpaths_from_dir(dirpath: DirPath) -> Iterator[FilePath]:
 
 ### sheet generator ###
 
-def gen_sheets_from_pathsT(pathT: FilePath, T: str) -> Iterator[str]:
-    """
-    T: xlsx, excel, xls
-    """
-    ef = pd.ExcelFile(xlsxpath)
+def gen_sheets_from_excelpath(excelpath: FilePath) -> Iterator[str]:
+    ef = pd.ExcelFile(excelpath)
     for sheet in ef.sheet_names:
         yield sheet
 
-def gen_sheets_from_xlsxpath(xlsxpath: FilePath) -> Iterator[str]:
-    ef = pd.ExcelFile(xlsxpath)
-    for sheet in ef.sheet_names:
-        yield sheet
-
-def gen_xlsx_sheet_pair(xlsxpath: FilePath) -> Tuple[FilePath, Iterator[str]]:
-    return (xlsxpath, gen_sheets_from_xlsxpath(xlsxpath))
+def gen_excelpath_sheetname_pair(excelpath: FilePath) -> Tuple[FilePath, Iterator[str]]:
+    return (xlsxpath, gen_sheets_from_excelpath(excelpath))
 
 def gen_T_sheet_pairs(dirpath: DirPath, T: str) -> Iterator[Tuple[FilePath, Iterator[str]]]:
     """Returns an iterator of (FilePath, sheet name) pairs"""
     for i in gen_xlsxpaths_from_dir(dirpath):
-        yield (i, gen_sheets_from_xlsxpath(i))
+        yield (i, gen_sheets_from_excelpath(i))
 
 def dict_of_file_sheetname(dirpath: DirPath) -> Dict:
     """Returns {FilePath : [sheet_name1, sheet_name2, ...]}""" 
-    sheet_pairs = gen_xlsx_sheet_pairs(dirpath)
+    sheet_pairs = gen_excelpath_sheetname_pairs(dirpath)
     xlsx_dict = {}
     for pair in sheet_pairs:
         key = pair[0]
@@ -100,7 +92,7 @@ def drop_non_xlsx_keys(jd: Dict) -> Dict:
     return newd
 
 def gen_summarize_excel_contents(dirpath: DirPath) -> Iterator:
-    xlsx_sheet_pairs = gen_xlsx_sheet_pairs(dirpath)
+    xlsx_sheet_pairs = gen_excelpath_sheetname_pairs(dirpath)
     jd = dict_from_summary_json(dirpath)
     for pair in xlsx_sheet_pairs:
         fname = pair[0]
