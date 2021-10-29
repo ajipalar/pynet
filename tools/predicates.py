@@ -22,7 +22,7 @@ def isxlsx(p: FilePath) -> bool:
     return p.suffix == '.xlsx'
 
 def isexcel(p: FilePath) -> bool:
-    return (p.suffix == '.xlsx') or ('.xls')
+    return ((p.suffix == '.xlsx') or (p.suffix == '.xls'))
 
 def isjson(p: FilePath) -> bool:
     return p.suffix == '.json'
