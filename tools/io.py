@@ -161,13 +161,13 @@ def print_all_colnames(path):
 def gen_xls(xlsfile: FilePath) -> Iterator[str]:
     with open(xlsfile, 'r') as f:
         for line in f:
-            yield f.readline()
+            yield line
 
-def parse_lip_line(line: str) List[str]:
+def parse_lip_line(line: str) -> List[str]:
     return list(i.strip() for i in line.split('\t'))
 
-def gen_parsed_lip_xls(xlsfile: FilePath) -> Iterator[List[str]]:
-    lip_gen = gen_xls(xlsfile)
+def gen_parsed_lip_xls(xls: FilePath) -> Iterator[List[str]]:
+    lip_gen = gen_xls(xls)
     return (parse_lip_line(i) for i in lip_gen)
 
 def filter_lines(line_list: List[str], column_positions: List[int]) -> List[str]:
@@ -196,12 +196,44 @@ def build_position_dict(l: List[str]) -> Dict:
 
 def check_desired_columns_in_header(header_cols: List[str], desired_cols: List[str]):
     for col in desired_cols:
-        assert col in header_cols 
+        try:
+            assert col in header_cols 
+        except AssertionError:
+            raise AssertionError(f'{col} not in header:\n\n{header_cols}')
 
 def desired_positions(input_header_list: List[str], columns: List[str]) -> List[int]:
+    pos_dict = build_position_dict(input_header_list)
+    pos_list = []
+    for i in columns:
+        pos_list.append(pos_dict[i])
+    return pos_list    
+
+def parse_lip_xsl_file(xlspath: FilePath, cols: List[str]=desired_columns()) -> Iterator[List[str]]:
+    #Get the desired columns
+
+    #Create a file Iterator[List[str]] where the str are whitespace stripped
+    xls_it = gen_parsed_lip_xls(xlspath)
+    header_list = next(xls_it)
+    #Make sure the desired columns are in the header_list
+    check_desired_columns_in_header(header_list, cols)
+    #Get the column positions
+    pos_list = desired_positions(header_list, cols) 
+    filtered_header = filter_lines(header_list, pos_list)
+    #generate the filtered file
+    yield filtered_header
+    for line in xls_it:
+        yield filter_lines(line, pos_list)
+
+def df_from_it(xls_it: Iterator[List[str]]):
+    columns = next(xls_it)
+    d = pd.DataFrame(columns=columns)
+['R.Condition', 'R.FileName', 'R.Label', 'R.Replicate', 'PG.ProteinAccessions', 'PG.ProteinGroups', 'PG.Qvalue', 'PG.Quantity', 'PEP.IsProteinGroupSpecific', 'PEP.IsProteotypic', 'PEP.NrOfMissedCleavages', 'PEP.PeptidePosition', 'PEP.StrippedSequence', 'PEP.DigestType - [Trypsin/P]', 'EG.iRTPredicted', 'EG.ModifiedPeptide', 'EG.ModifiedSequence', 'EG.Qvalue', 'FG.Charge', 'FG.LabeledSequence', 'FG.PrecMz', 'FG.MS2RawQuantity'   ]
+
+    dtypes = {'R.Condition': "category", 'R.Replicate': 'category', 'PEP.DigestType - [Trypsin/P]': "category", }
+    for i, lst in enumerate(xls_it):
+        d.loc[len(d.index)] = lst
+    return d
     
-
-
 
 def get_header(xlsfile: FilePath) -> List[str]:
     with open(xlsfile, 'r') as f:
