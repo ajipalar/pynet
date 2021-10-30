@@ -1,4 +1,6 @@
+import inspect
 from pathlib import Path
+
 
 def modparse(local_dict):
     modname = local_dict['__name__']
@@ -15,6 +17,9 @@ def doc(x):
     Print the docstring
     """
     print(x.__doc__)
+
+def psrc(x):
+    print(inspect.getsource(x))
 
 def ls(p:Path):
     for f in p.iterdir():

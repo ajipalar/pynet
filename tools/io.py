@@ -4,11 +4,11 @@ from pathlib import Path
 import pandas as pd
 import sys
 import typing as t
-from typing import Dict, Iterable, Iterator, List, Tuple
+from typing import Dict, Iterable, Iterator, List, Set, Tuple
 
 #Custom modules
 import tools.predicates as pred
-from net.typedefs import AnyPath, FilePath, DataFrame, DirPath
+from net.typedefs import AnyPath, AnyCol, DataFrame, DirPath, FilePath, PGGroupCol
 
 
 """
@@ -208,7 +208,7 @@ def desired_positions(input_header_list: List[str], columns: List[str]) -> List[
         pos_list.append(pos_dict[i])
     return pos_list    
 
-def parse_lip_xsl_file(xlspath: FilePath, cols: List[str]=desired_columns()) -> Iterator[List[str]]:
+def parse_lip_xls_file(xlspath: FilePath, cols: List[AnyCol]=desired_columns()) -> Iterator[List[AnyCol]]:
     #Get the desired columns
 
     #Create a file Iterator[List[str]] where the str are whitespace stripped
@@ -224,15 +224,44 @@ def parse_lip_xsl_file(xlspath: FilePath, cols: List[str]=desired_columns()) -> 
     for line in xls_it:
         yield filter_lines(line, pos_list)
 
+def gen_helper_protein_name_columns(xlspath: FilePath, cols=['PG.ProteinGroups']) -> Iterator[List[PGGroupCol]]:
+    return parse_lip_xls_file(xlspath, cols=cols)
+
+def gen_parse_protein_names_from_it(col_it: Iterator[List[PGGroupCol]]) -> Iterator[List[str]]:
+    #Yeild the header
+    yield next(col_it)
+    for name_list in col_it:
+        semicolon_str = name_list[0]
+        protein_id_list = semicolon_str.split(";")
+        yield protein_id_list
+
+def unique_protein_names(protein_name_it: Iterator[List[str]]) -> Tuple[PGGroupCol, Set[str]]:
+    header_str = next(protein_name_it)[0]
+    s = set()
+    for i, protein_id_list in enumerate(protein_name_it):
+        for protein_name in protein_id_list:
+            s.add(protein_name)
+    return header_str, s
+        
+
 def df_from_it(xls_it: Iterator[List[str]]):
     columns = next(xls_it)
     d = pd.DataFrame(columns=columns)
-['R.Condition', 'R.FileName', 'R.Label', 'R.Replicate', 'PG.ProteinAccessions', 'PG.ProteinGroups', 'PG.Qvalue', 'PG.Quantity', 'PEP.IsProteinGroupSpecific', 'PEP.IsProteotypic', 'PEP.NrOfMissedCleavages', 'PEP.PeptidePosition', 'PEP.StrippedSequence', 'PEP.DigestType - [Trypsin/P]', 'EG.iRTPredicted', 'EG.ModifiedPeptide', 'EG.ModifiedSequence', 'EG.Qvalue', 'FG.Charge', 'FG.LabeledSequence', 'FG.PrecMz', 'FG.MS2RawQuantity'   ]
+
+    in_development_col_list = ['R.Condition', 'R.FileName', 'R.Label', 'R.Replicate', 'PG.ProteinAccessions', 'PG.ProteinGroups', 'PG.Qvalue', 'PG.Quantity', 
+     'PEP.IsProteinGroupSpecific', 'PEP.IsProteotypic', 'PEP.NrOfMissedCleavages', 'PEP.PeptidePosition', 'PEP.StrippedSequence', 'PEP.DigestType - [Trypsin/P]', 
+     'EG.iRTPredicted', 'EG.ModifiedPeptide', 'EG.ModifiedSequence', 'EG.Qvalue', 
+     'FG.Charge', 'FG.LabeledSequence', 'FG.PrecMz', 'FG.MS2RawQuantity']
 
     dtypes = {'R.Condition': "category", 'R.Replicate': 'category', 'PEP.DigestType - [Trypsin/P]': "category", }
     for i, lst in enumerate(xls_it):
         d.loc[len(d.index)] = lst
     return d
+
+def gen_xls_column_stream(f: FilePath, col: str) -> Iterator[str]:
+    #Unparsed lip file iterator
+    xls_it = gen_parsed_lip_xls(xls)
+    header_list = next(xls_it)
     
 
 def get_header(xlsfile: FilePath) -> List[str]:
