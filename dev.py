@@ -19,6 +19,7 @@ src = home / 'Projects/pynet'
 data = src / 'data'
 lip = data / 'sars-cov-2-LiP'
 multi = data / 'multi-proteomics'
+apms_gordon = data / 'sars-cov-2-ppi/41586_2020_2286_MOESM5_ESM.xlsx'
 
 #Variables for testing lip funcitons
 

@@ -8,5 +8,10 @@ DirPath = NewType('DirPath', Path)
 FilePath = NewType('FilePath', Path)
 AnyPath = NewType('AnyPath', Path)
 
+#Column label types
 AnyCol = NewType('AnyCol', str)
-PGGroupCol = NewType('PGGroupCol', str)
+PGGroupCol = NewType('PGGroupCol', AnyCol)
+
+#Data Types (entries in the excel sheets)
+UID = NewType('UID', str) #UniProtID
+

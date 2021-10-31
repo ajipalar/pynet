@@ -8,7 +8,7 @@ from typing import Dict, Iterable, Iterator, List, Set, Tuple
 
 #Custom modules
 import tools.predicates as pred
-from net.typedefs import AnyPath, AnyCol, DataFrame, DirPath, FilePath, PGGroupCol
+from net.typedefs import AnyPath, AnyCol, DataFrame, DirPath, FilePath, PGGroupCol, UID
 
 
 """
@@ -249,6 +249,15 @@ def wrapper_pname_set(x: FilePath) -> Tuple[PGGroupCol, Set[str]]:
     h =  unique_protein_names
     return h(g(f(x))) 
 
+"""
+def get_intersections(dirpath: DirPath):
+    excel_paths = excelpaths(dirpath)
+    n = len(excel_paths)
+    intersecrtion_matrix = np.ndarray((n, n), dtype=int)
+    columns = []
+    for fpath in  excel_paths:
+"""    
+
 def df_from_it(xls_it: Iterator[List[str]]):
     columns = next(xls_it)
     d = pd.DataFrame(columns=columns)
@@ -302,7 +311,33 @@ def xls_shape(xlsfile: FilePath) -> Tuple[int, int]:
             r+=1
     return (r, c)
         
+def data_protein_overlap_matrix():
+    pass 
+
+#Load in the lip Datasets
+def load_lip_datasets() -> Iterator[Tuple[FilePath, Set[UID]]]:
+    pass
+
+#Load in the Gordon APMS Dataset
+def load_gordon_dataset(apmsxlsx: FilePath) -> Dict[str, List[UID]]:
+    d = pd.read_excel(apmsxlsx)
+    unique_baits = set(d['Bait'])
+    bait_preys_dict= {key: set() for key in unique_baits}
+    for i, row in d.iterrows():
+        key: str = row['Bait']
+        val: UID = row['Preys']
+        bait_preys_dict[key].add(val) 
+    return bait_preys_dict
+        
     
+#Load in the Stuk dataset
+def load_stuk_dataset(stukpath: FilePath):
+    stuk_significant_apms = pd.read_excel(stukpath, usecols=[])
+       
+#Load in the BioID dataset    
+
+#Load in the genetic screen
+
 
 
 
