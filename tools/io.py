@@ -7,8 +7,11 @@ import typing as t
 from typing import Dict, Iterable, Iterator, List, Set, Tuple
 
 #Custom modules
+###############################################################################
 import tools.predicates as pred
-from net.typedefs import AnyPath, AnyCol, DataFrame, DirPath, FilePath, PGGroupCol, UID
+from net.typedefs import (AnyPath, AnyCol, Bait, DataFrame, DirPath, FilePath, 
+                          Organism, PGGroupCol, PreyUID, UID
+)
 
 
 """
@@ -287,6 +290,7 @@ def get_header(xlsfile: FilePath) -> List[str]:
 
 
 def remove_irrelevant_columns(it: Iterator[str]) -> Iterator[str]:
+
     headers = ['R.Condition', 'R.FileName', 'R.Fraction', 'R.Label', 'R.Replicate', 
                'PG.ProteinAccessions', 'PG.ProteinGroups', 'PG.Cscore', 'PG.Pvalue', 'PG.Qvalue', 'PG.RunEvidenceCount', 'PG.Quantity', 
                'PEP.AllOccurringProteinAccessions', 'PEP.GroupingKey', 'PEP.GroupingKeyType', 'PEP.IsProteinGroupSpecific', 
@@ -331,12 +335,49 @@ def load_gordon_dataset(apmsxlsx: FilePath) -> Dict[str, List[UID]]:
         
     
 #Load in the Stuk dataset
-def load_stuk_dataset(stukpath: FilePath):
-    stuk_significant_apms = pd.read_excel(stukpath, usecols=[])
-       
-#Load in the BioID dataset    
+def load_stuk_dataset(stukpath: FilePath
+                      ) -> Dict[Organism, Dict[Bait, List[PreyUID]]]:
+    stuk_significant_apms = pd.read_excel(stukpath, 
+                                          usecols=['bait_organism',
+                                                   'bait_name', 
+                                                   'majority_protein_acs'],
+                                          sheet_name='A - Significant interactions')
 
-#Load in the genetic screen
+    unique_organisms = set(stuk_significant_apms.iloc[:, 0])
+    unique_baits = set(stuk_significant_apms.iloc[:, 1])
+    bait_dict = {bait: list() for bait in unique_baits}
+    #Dict[org, Dict[bait, preys]
+    
+    stuk_preys_dict = {org: {bait: set() for bait in unique_baits} for org in unique_organisms}
+    #populate the dictionary with unique preys
+    for i, row in stuk_significant_apms.iterrows():
+        org = row['bait_organism']
+        bait = row['bait_name']
+        uid_list = row['majority_protein_acs'].split(';')
+        #Remove isoforms
+        uid_list = list(i.split('-')[0] for i in uid_list)
+        uid_list = list(i.split('#')[0] for i in uid_list)
+        
+        for uid in uid_list:
+            stuk_preys_dict[org][bait].add(uid)
+
+    #Remove empty sets from the dictionary
+    to_remove = []
+    for org in stuk_preys_dict:
+        for bait in stuk_preys_dict[org]:
+            if len(stuk_preys_dict[org][bait]) == 0:
+                to_remove.append((org, bait))
+    
+    for org, bait in to_remove:
+        stuk_preys_dict[org].pop(bait)
+
+    return stuk_preys_dict
+       
+        
+    
+    #Load in the BioID dataset    
+
+    #Load in the genetic screen
 
 
 

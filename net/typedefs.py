@@ -13,5 +13,9 @@ AnyCol = NewType('AnyCol', str)
 PGGroupCol = NewType('PGGroupCol', AnyCol)
 
 #Data Types (entries in the excel sheets)
+ExcelEntry = NewType('ExcelEntry', str)
 UID = NewType('UID', str) #UniProtID
+PreyUID = NewType('PreyUID', UID)
+Bait = NewType('Bait', str)
+Organism = NewType('Organism', str)
 
