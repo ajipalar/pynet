@@ -242,7 +242,12 @@ def unique_protein_names(protein_name_it: Iterator[List[str]]) -> Tuple[PGGroupC
         for protein_name in protein_id_list:
             s.add(protein_name)
     return header_str, s
-        
+
+def wrapper_pname_set(x: FilePath) -> Tuple[PGGroupCol, Set[str]]:
+    f = gen_helper_protein_name_columns 
+    g = gen_parse_protein_names_from_it
+    h =  unique_protein_names
+    return h(g(f(x))) 
 
 def df_from_it(xls_it: Iterator[List[str]]):
     columns = next(xls_it)

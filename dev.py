@@ -8,7 +8,7 @@ import pandas as pd
 
 
 #User
-import tools.io as myio
+import tools.io as mio
 from tools.myitertools import exhaust, forp
 import tools.predicates as pred
 from tools.utils import doc, ls, psrc
@@ -22,8 +22,8 @@ multi = data / 'multi-proteomics'
 
 #Variables for testing lip funcitons
 
-xls_paths = list(myio.gen_excelpaths_from_dir(lip))
+xls_paths = list(mio.gen_excelpaths_from_dir(lip))
 lip1 = xls_paths[1]
 
-lipgen = myio.parse_lip_xsl_file(lip1)
+lipgen = mio.parse_lip_xls_file(lip1)
 

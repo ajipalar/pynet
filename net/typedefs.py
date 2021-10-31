@@ -7,3 +7,6 @@ DataFrame = NewType('DataFrame', pd.DataFrame)
 DirPath = NewType('DirPath', Path)
 FilePath = NewType('FilePath', Path)
 AnyPath = NewType('AnyPath', Path)
+
+AnyCol = NewType('AnyCol', str)
+PGGroupCol = NewType('PGGroupCol', str)
