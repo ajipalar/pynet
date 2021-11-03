@@ -17,3 +17,17 @@ examples/CMakeLists.txt
 pyext/CMakeLists.txt
 utility/CMakeLists.txt
 */Files.cmake
+cmake-build-debug
+.idea
+*.xlsx
+*.xls
+*.csv
+*.ipynb_checkpoints
+*.swp
+*.swo
+**/__pycache__
+data/sars-cov-2-LiP/*.xls
+data/sars-cov-2-ppi
+data/genetic-screen
+*.png
+*.zip

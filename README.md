@@ -4,11 +4,11 @@ Fill in this file with a description of your module.
 
 # Info
 
-_Author(s)_: (full names of author(s))
+_Author(s)_: (Ajikarunia Palar)
 
-_Maintainer_: (GitHub name of active maintainer)
+_Maintainer_: (Ben Webb)
 
-_License_: None
+_License_: LGPL 2.1
 
 _Publications_:
 - None
