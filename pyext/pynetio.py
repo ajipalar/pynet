@@ -9,8 +9,8 @@ from typing import Dict, Iterable, Iterator, List, Set, Tuple
 
 #Custom modules
 ###############################################################################
-import tools.predicates as pred
-from net.typedefs import (AnyPath, AnyCol, Bait, DataFrame, DirPath, FilePath, 
+import predicates as pred
+from typedefs import (AnyPath, AnyCol, Bait, DataFrame, DirPath, FilePath, 
                           Organism, PGGroupCol, PreyUID, UID
 )
 

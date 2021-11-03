@@ -6,7 +6,7 @@ e.g., filter(predicate, iterator)
 """
 
 from pathlib import Path
-from net.typedefs import AnyPath, FilePath, DirPath
+from typedefs import AnyPath, FilePath, DirPath
 
 
 def isfile(p: AnyPath) -> bool:
