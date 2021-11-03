@@ -1,0 +1,16 @@
+It would be good to consider Jit compilers for speed during design
+** JAX
+   - Auto diff native python and NumPy functions
+   - Diff through loops, branches, recursions, and closures
+   - reverse-mode differentiation, backprop via grad
+   - uses the XLA compiler (Accelerated Linear Algebra)
+*** Functions
+**** grad
+**** jit
+**** vmap
+**** pmap
+
+** Numba
+   - Uses the LLVM compiler
+   - Open source from Anaconda
+
