@@ -1,3 +1,5 @@
+import graph_tool as gt
+from graph_tool.all import graph_draw
 import inspect
 import json
 import matplotlib.pyplot as plt
@@ -8,10 +10,10 @@ import pandas as pd
 
 
 #User
-import tools.io as mio
-from tools.myitertools import exhaust, forp
-import tools.predicates as pred
-from tools.utils import doc, ls, psrc
+import io as mio
+from myitertools import exhaust, forp
+import predicates as pred
+from utils import doc, ls, psrc
 
 
 home = Path.home()
