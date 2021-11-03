@@ -13,7 +13,7 @@ import pandas as pd
 import io as mio
 from myitertools import exhaust, forp
 import predicates as pred
-from utils import doc, ls, psrc
+from .utils import doc, ls, psrc
 
 
 home = Path.home()
