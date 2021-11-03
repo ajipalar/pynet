@@ -1,0 +1,10 @@
+{
+  "query": {
+    "type": "terminal",
+    "service": "text"
+  },
+  "request_options": {
+    "return_counts": true
+  },
+  "return_type": "entry"
+}

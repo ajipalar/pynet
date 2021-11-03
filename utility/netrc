@@ -1,0 +1,3 @@
+#!/bin/zsh
+
+alias t="py ~/Projects/pynet/__main__.py -t -m -ptr"
