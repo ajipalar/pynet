@@ -1,5 +1,10 @@
 """
-
+->   Define a graph prior
+->   Define a graph likelihood
+->   Define a forward model
+->   Define an uncertainty model
+->   Define the inverse likelihood function
+->   
 
 """
 import graph_tool as gt
@@ -15,8 +20,18 @@ apms = pd.read_excel(apms_gordon)
 
 
 #Define the likelihood
-#L(G, 
-def apms_like
+def l_spec_counts_apms_forward_model(g:G, theta) -> d_i: 
+    """
+    Likelihood for triplets
+    g: a triplet X, Y, Z
+    """
+
+
+
+
+
+    
+
 
 #Define the scoring function
 

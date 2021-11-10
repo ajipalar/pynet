@@ -2,6 +2,7 @@ import typing as t
 from typing import NewType
 import pandas as pd
 from pathlib import Path
+import graph_tool as gt
 
 DataFrame = NewType('DataFrame', pd.DataFrame)
 DirPath = NewType('DirPath', Path)
@@ -19,3 +20,5 @@ PreyUID = NewType('PreyUID', UID)
 Bait = NewType('Bait', str)
 Organism = NewType('Organism', str)
 
+#Graph types
+G = NewType('G', gt.Graph)
