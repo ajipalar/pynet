@@ -20,10 +20,10 @@ Reading and parsing excel files
 pf pure function. Function has no side effects
 """
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-d", help="Read all excel files in the directory") 
+#parser = argparse.ArgumentParser()
+#parser.add_argument("-d", help="Read all excel files in the directory") 
 
-args = parser.parse_args()
+#args = parser.parse_args()
 
 ### Filters paths using predicates ###
 def pathsT(paths: Iterator[FilePath], T: str) -> Iterator[FilePath]:
@@ -505,7 +505,7 @@ def do_comparison(stukpath: FilePath,
 
 
 
-if args.d:
-   print_all_colnames(args.d)
+#if args.d:
+#   print_all_colnames(args.d)
    
     
