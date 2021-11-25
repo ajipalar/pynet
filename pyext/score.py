@@ -4,7 +4,27 @@
 #An Abstract interface for molecular networks
 
 from abc import ABC, abstractmethod
+import graph_tool as gt
+
+from graph_tool.all import graph_draw
 import math
+import numpy
+import scipy
+import inspect
+from itertools import combinations
+import json
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path, PosixPath
+
+import pandas as pd
+import scipy
+#User
+import pynetio as mio
+from myitertools import exhaust, forp
+import predicates as pred
+from utils import doc, ls, psrc
 
 class Network(ABC):
     
@@ -124,3 +144,138 @@ def get_graph_from_order(m, n):
        return the graph g_m
     """
 
+    
+"""
+gid indexes into the sequence of ordered undirected graphs
+mantissa indexes into the sequence of ordered subgraphs
+with ne edges
+"""
+
+def femax(vmax):
+    """
+    Returns the maximum number of edges in the undirected graph
+    """
+    return vmax*(vmax - 1) // 2
+def edge_combs(emax):
+    """
+    Returns an edge combination generator
+    The value is the number of combinations
+    The index is the number of edges
+    
+    e.g., index 0 1 2 3
+          value 1 3 3 1
+    """
+    return (int(scipy.special.comb(emax, i)) for i in range(emax+1))
+            
+def ne(gid, vmax):
+    """
+    Returns the number of edges for a given gid & vmax
+    """
+    emax = femax(vmax)
+    
+    #The index of combs is the edge number
+    combs = list(edge_combs(emax))
+    assert sum(combs) == 2**emax
+    
+    solutions = 0
+    edges = 0
+    while gid >= solutions:
+        solutions += combs[edges]
+        edges +=1
+    return edges - 1
+
+def base(nedges, vmax):
+    """
+    returns the base for nedges and vmax
+    The graph id (gid) = base + mantissa
+    """
+    emax = femax(vmax)
+    combs = list(edge_combs(emax))
+    return sum(combs[0:nedges])
+
+def mantissa(gid, vmax):
+    """
+    returns the mantissa for gid, vmax
+    gid = base + mantissa
+    """
+    b = base(ne(gid, vmax), vmax)
+    return gid - b
+
+def next_vertex(i):
+    """
+    Count the next vertex, undefined over vmax
+    """
+    return i + 1
+
+def prev_vertex(i):
+    """
+    Count the previous vertex, undefined for i < 1
+    """
+    return i - 1
+
+def next_edge(e, vertex_n_max):
+    """
+    Return the next edge in the sequence
+    """
+    if e[1] < vertex_n_max - 1: return (e[0], e[1]+1)
+    else: return (e[0] + 1, e[0] + 2)
+    
+def prev_edge(e, vmax):
+    """
+    Count the previous edge in the sequence
+    """
+    #if e > first_e:
+    # (0, 2) -> (0, 1)
+    if e[1] > e[0] + 1: return (e[0], e[1] - 1)
+    # (1, 2) -> (0, 3)
+    else: return (e[0] - 1, vmax - 1)
+
+def generate_eseq(estart, vertex_n_max):
+    yield estart
+    while estart != (vertex_n_max - 2, vertex_n_max - 1):
+        next_e = next_edge(estart, vertex_n_max)
+        estart = next_e
+        yield estart   
+
+def permutations(nitems):
+    perms = []
+    for i in range(nitems):
+        for j in range(i+1, nitems):
+            perms.append((i, j))
+    return perms
+
+
+def generate_graph(gid, vmax):
+    """
+    Return an ordered elist from a graph id and n vertices
+    """
+    nedges = ne(gid, vmax)
+    b = base(nedges, vmax)
+    m = mantissa(gid, vmax)
+    
+    if gid == 0:
+        return []
+    else:
+        all_edges = list(generate_eseq((0, 1), vmax))
+        combinations_iter = combinations(range(len(all_edges)), nedges)
+        
+        for i, combo in enumerate(combinations_iter):
+            #print(i, combo)
+            if i == m:
+                eseq = []
+                #print(combo)
+                for idx in combo:
+                    eseq.append(all_edges[idx])
+                return eseq
+            
+def test_next_prev(vmax):
+    print("fEdges for vmax = {vmax}")
+    print(' e      next   prev   pne    npe   b')
+    for e in generate_eseq((0, 1), vmax):
+        ne = next_edge(e, vmax)
+        pe = prev_edge(e, vmax)
+        pne = prev_edge(ne, vmax)
+        npe = next_edge(pe, vmax)
+        b = e == npe
+        
+        print(e, ne, pe, pne, npe, b)
