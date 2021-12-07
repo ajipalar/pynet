@@ -12,6 +12,8 @@ import numpy
 import scipy
 import inspect
 from itertools import combinations
+import jax
+import jax.numpy as jnp
 import json
 import matplotlib
 import matplotlib.pyplot as plt
@@ -24,6 +26,7 @@ import scipy
 import pynetio as mio
 from myitertools import exhaust, forp
 import predicates as pred
+from typing import List, Tuple
 from utils import doc, ls, psrc
 
 class Network(ABC):
@@ -267,7 +270,18 @@ def generate_graph(gid, vmax):
                 for idx in combo:
                     eseq.append(all_edges[idx])
                 return eseq
-            
+
+def ugraph_from_elist(elist: List[Tuple[int]]):
+    """
+    elist: 
+    """
+    g = gt.Graph(directed=False)
+    for edge in elist:
+        s=edge[0]
+        t=edge[1]
+        g.add_edge(s, t)
+    return g
+
 def test_next_prev(vmax):
     print("fEdges for vmax = {vmax}")
     print(' e      next   prev   pne    npe   b')
@@ -279,3 +293,36 @@ def test_next_prev(vmax):
         b = e == npe
         
         print(e, ne, pe, pne, npe, b)
+
+
+class PoissonSQRGM:
+    theta = 0
+    phi = 0
+    d = None
+    def __init__(self, 
+                 theta,
+                 phi,
+                 d):
+        self.theta = theta
+        self.phi = phi
+        self.d = d
+    
+    def rPhi(d, key):
+        """
+        Generate a random R^(d x d) where 
+        the values are between -2, 2
+        """
+        a = jnp.random.uniform(key, shape=(d, d), minval=-2, maxval=2)
+        a = (a + a.T)/2
+        return a
+    
+    
+    
+        
+        
+        
+        
+        
+        
+        
+        
