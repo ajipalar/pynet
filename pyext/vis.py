@@ -1,8 +1,12 @@
+from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
-def plot_density():
+#Import my modules
+
+from score import mode, normal_pdf, parabola, ull_normal
+def plot_density(length, mu, sig):
 
     xnorm = np.arange(-length, length)
     ynorm = normal_pdf(xnorm, mu, sig)
@@ -20,10 +24,9 @@ def plot_density():
     plt.tight_layout()
     plt.show()
 
-    print(mode(xnorm, ynorm))
-    print(mode(xnorm, np.log(ynorm)))
 
 def MCMC_chain_plot(chain, y):
+    steps = len(chain)
     fig, (a1, a2) = plt.subplots(nrows=1, ncols=2)
     plt.suptitle('MCMC-MH Sampling a Guassian')
     a1.plot(chain)
@@ -38,14 +41,14 @@ def MCMC_chain_plot(chain, y):
             transform=a2.transAxes)
     plt.show()
 
-    def chain_summary(ax, title, chain, tx, ty):
-        ax.hist(chain)
-        ax.set_title(title)
-        med = np.round(np.median(chain))
-        std = np.round(np.std(chain))
-        ax.text(tx, ty, f'med:{med}\nstd{std}', transform=ax.transAxes)
+def chain_summary(ax, title, chain, tx, ty):
+    ax.hist(chain)
+    ax.set_title(title)
+    med = np.round(np.median(chain))
+    std = np.round(np.std(chain))
+    ax.text(tx, ty, f'med:{med}\nstd{std}', transform=ax.transAxes)
 
-def summary_wrapper(chain):
+def summary_wrapper(chain, mu, sig):
     fig, (a1, a2) = plt.subplots(nrows=1, ncols=2)
     plt.suptitle(f'mu={mu}, sigma={sig}')
     chain_summary(a1, 'Estimate of mu', chain[:, 0], 0.7, 0.85)
@@ -58,13 +61,13 @@ def plot_parabola():
     for i in x:
         y.append(np.sum(parabola(i, mu)))
     plt.plot(x, y)
-plot_parabola()
 
-def plot_likelihood_func(mu, sig):
+
+def plot_likelihood_func(mu, sig, length, width=0.5):
     pretty_sigma = np.round(sig, decimals=1)
     pretty_mu = np.round(mu, decimals=1)
     y = mu + np.random.randn(length) * sig
-    width = 0.5
+
     #plt.style.use('ggplot')
     mu_guess = np.arange(mu - width * mu, mu +  width *mu, width * mu / 128)
     sig_guess = np.arange(sig - width * sig, sig +  width *sig, width * sig / 128)
