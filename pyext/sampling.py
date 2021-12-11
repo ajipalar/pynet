@@ -195,10 +195,34 @@ def edge_from_eid(eid, v):
     eid = eid - area + s + 1
     return s, eid
 
-def MH_MCMC(A, steps=10000, score_f=None, SA=1, Q=None):
-    #The target distribtuion
-    target = score_f**SA
-    #The transition kernel
-    Q = Q
-
-    pass
+def MH_MCMC(steps, target, seed, y, mustart, sigstart,
+            mu_step_size = 1,
+            sigma_step_size = 1):
+    np.random.seed(seed)
+    chain = np.zeros((steps, 3))
+    
+    mu = mustart
+    sigma = sigstart
+    chain[0] = mu, sigma, np.sum(target(y, mu, sigma))
+    av = np.mean(y)
+    avstd = np.std(y)
+    for i in range(1, steps):
+        mu = chain[i-1][0]
+        sigma = chain[i-1][1]
+        mu1 = mu + np.random.uniform(-mu_step_size, mu_step_size) 
+        sigma1 = sigma + np.random.uniform(-sigma_step_size, sigma_step_size) 
+        
+        score1 = np.sum(target(y, mu1, sigma1)) 
+        score2 = np.sum(target(y, mu, sigma)) 
+        a = min(1, score1 / score2)
+        u = np.random.uniform(low=0, high=1)
+        if u <= a:
+            #Accept the move
+            chain[i] = mu1, sigma1, score1
+        else:
+            #Reject the move
+            chain[i] = mu, sigma, score2
+        
+    return chain
+            
+        
