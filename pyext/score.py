@@ -296,16 +296,33 @@ def test_next_prev(vmax):
 
 
 class PoissonSQRGM:
-    theta = 0
-    phi = 0
-    d = None
+    """ An implementation of the Poisson Square root graphical model from David Inoyue """
     def __init__(self, 
-                 theta,
-                 phi,
-                 d):
-        self.theta = theta
-        self.phi = phi
-        self.d = d
+                 x,
+                 theta=None,
+                 phi=None,
+                 ):
+        self.x = x
+        self.sqrx = np.sqr(x)
+        self.d = self.sqrx.shape[0]
+        self.theta = theta if theta else np.zeros(self.d)
+        self.phi = phi if phi else np.zeros((self.d, self.d))
+    
+    def A(self):
+        """The log partition function"""
+        pass
+    def B(self):
+        """The log base measure"""
+        pass
+    def node_term(self):
+        return self.sqrx @ 
+
+    def log_likelihood(self):
+        return B() + A() + 
+
+
+
+
     
     def rPhi(d, key):
         """
