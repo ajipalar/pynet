@@ -333,9 +333,28 @@ class PoissonSQRGM:
         a = (a + a.T)/2
         return a
     
+def stable_div(a, b):
+    return np.exp(np.log(a) - np.log(b))
+
+def normal_pdf(y, mu, sigma):
+    base = np.sqrt(2* np.pi)*sigma
+    base = stable_div(1, base)
+    num = -(y - mu)** 2
+    den = 2 * sigma**2
+    exp = stable_div(num, den)
+    return base * np.exp(exp)
+
+
+def parabola(x, mu, sigma):
+    return -(x-mu)**2 - 10    
     
+def ull_normal(y, mu, sigma):
+    n = len(y)
+    tau =  1 / sigma**2
+    return  n / 2 * np.log(tau) - tau * (1 / 2) * np.sum((y - mu)**2)
     
-        
+def mode(x, y):
+    return x[np.where(y == max(y))[0][0]]
         
         
         
