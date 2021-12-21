@@ -1,19 +1,22 @@
+from __future__ import print_function
+from pathlib import Path
 import unittest
 import sys
-sys.path.append("..")
+from pynet_test_config import impure_pynet_testing_path_setup
 
-from net.graph import Node
+impure_pynet_testing_path_setup()
+
+from pyext.graph import Node
 
 class TestGraph(unittest.TestCase):
     def test_print(self):
-        print("Unit tests running")
+        pass
     def test_nnodes(self):
-        print("testing nnodes")
-        assert Node.nnodes == 0
+        self.assertEqual(Node.nnodes , 0)
         x = Node()
-        assert Node.nnodes == 1
+        self.assertEqual(Node.nnodes , 1)
         y = Node(structure=0)
-        assert Node.nnodes == 2
+        self.assertEqual(Node.nnodes , 2)
 
 if __name__ == "__main__":
     unittest.main()

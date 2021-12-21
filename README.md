@@ -4,6 +4,8 @@ Fill in this file with a description of your module.
 
 # Info
 
+Pynet is a library for integrative modeling of molecular networks.
+
 _Author(s)_: (Ajikarunia Palar)
 
 _Maintainer_: (Ben Webb)
