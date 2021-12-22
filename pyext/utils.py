@@ -1,6 +1,10 @@
 import inspect
 from pathlib import Path
 
+pynet_home = Path('.').absolute().parent
+sys.path.append(str(pynet_home))
+
+import config
 
 def modparse(local_dict):
     modname = local_dict['__name__']
@@ -24,6 +28,6 @@ def psrc(x):
 def ls(p:Path):
     for f in p.iterdir():
         print(str(f))
-import config
+
 if config.PRINT_MODULE_INFO:
     moduleinfo(locals())

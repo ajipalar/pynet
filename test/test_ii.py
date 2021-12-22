@@ -1,6 +1,11 @@
-import config
-import tools.utils as utils
-from .testoptions import decorate_print_test_results
+from pynet_test_config import impure_pynet_testing_path_setup
+
+impure_pynet_testing_path_setup()
+
+#Module specific imports
+import pyext.config
+import pyext.utils as utils
+from testoptions import decorate_print_test_results
 
 if config.PRINT_MODULE_INFO:
     utils.moduleinfo(locals())
