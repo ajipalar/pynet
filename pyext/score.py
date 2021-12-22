@@ -6,28 +6,27 @@
 from abc import ABC, abstractmethod
 import graph_tool as gt
 
-from graph_tool.all import graph_draw
+#from graph_tool.all import graph_draw
 import math
-import numpy
 import scipy
-import inspect
+#import inspect
 from itertools import combinations
-import jax
+#import jax
 import jax.numpy as jnp
-import json
-import matplotlib
-import matplotlib.pyplot as plt
+#import json
+#import matplotlib
+#import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path, PosixPath
+#from pathlib import Path, PosixPath
 
-import pandas as pd
+#import pandas as pd
 import scipy
 #User
-import pynetio as mio
-from myitertools import exhaust, forp
-import predicates as pred
-from typing import List, Tuple
-from utils import doc, ls, psrc
+#import pynetio as mio
+#from myitertools import exhaust, forp
+#import predicates as pred
+from typing import List, Tuple 
+#from utils import doc, ls, psrc
 
 class Network(ABC):
     
@@ -315,10 +314,11 @@ class PoissonSQRGM:
         """The log base measure"""
         pass
     def node_term(self):
-        return self.sqrx @ 
+        pass
+        #return self.sqrx @ 
 
     def log_likelihood(self):
-        return B() + A() + 
+        pass
 
 
 
