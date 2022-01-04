@@ -75,11 +75,3 @@ fi
 echo "Error: never exited after if statements"
 exit 1
 
-#asserts on
-sed '/assert / s/^#\([^#]\)\(.*\)/\1\2/' <$1 >$1.mytmp
-cat $1.mytmp > $1
-rm $1.mytmp
-
-#asserts off
-
-
