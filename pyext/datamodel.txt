@@ -1,0 +1,3 @@
+Data is backed up on piano and is periodically backed up by the lab on tape
+Data is not version controlled
+Data are checksummed and the checksums are version controlled
