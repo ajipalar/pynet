@@ -1,3 +1,9 @@
+import sys
+
+pyversion = sys.version
+assert pyversion[0:5] == '3.9.7'
+
+
 from pathlib import Path
 from utility import data_setup as ds
 from utility.data_setup import ls
