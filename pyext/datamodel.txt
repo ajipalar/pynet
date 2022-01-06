@@ -1,3 +1,6 @@
 Data is backed up on piano and is periodically backed up by the lab on tape
 Data is not version controlled
 Data are checksummed and the checksums are version controlled
+Data should be plain text readable
+Archived data may be binary if storage is an issue
+Data is read only
