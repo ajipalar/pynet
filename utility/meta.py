@@ -14,11 +14,17 @@ def pipe_parse(s: str)-> str:
         output = f'({arg}{output})'
     return output[1:-1]
 
-def pipe(*args):
-    for i in args:
-        print(i)
+def pipe(fluid, *segments):
+    """
+    The parameters flow through the pipe from input to output
+    Only use pure segments, don't use impure dirty piping
+    Those lead to oil spills
+    """
+    for segment in segments:
+        fluid = segment(fluid) 
+    return fluid
 
-def pipe(s: str):
+def pipe_depracated(s: str):
     """Evaluates the pipe s and returns the value"""
     pipes = pipe_parse(s)
     return eval(pipes)
