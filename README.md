@@ -14,3 +14,19 @@ _License_: LGPL 2.1
 
 _Publications_:
 - None
+
+# Contents
+
+## .checksum
+
+################################################################################
+This is for data and other files not put under
+git version control.
+
+The checksum files are placed under VC instead
+
+File validation is performed 
+
+The names of the checksum files are PATH-TO-CHECKSUMFILE
+Following the path leads to a copy of the checksum file in the corresponding
+directory named checksum
