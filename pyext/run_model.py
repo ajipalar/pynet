@@ -4,10 +4,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-
 #Load synthetic datasynthetic data
 synthetic_spec_counts_data = np.random.randint(0, 200, (300, 3))
-
 
 print(synthetic_spec_counts_data)
 #Set up model
@@ -55,5 +53,10 @@ def plot_sample_edge_mean(samples):
 
 def plot_sample_edge_variance(samples):
     return None
+
+def cluster_models(samples):
+    return clustered_samples
+
+
 
 

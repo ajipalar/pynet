@@ -42,7 +42,6 @@ class AdjNetwork(Network):
       def __init__(n):
           self.n = n
           self.M = np.ndarray((n,n), dtype=int)
-    
 
 def get_graph_ordering(g) -> int:
     """For an unweighted undirected graph g
@@ -158,6 +157,7 @@ def femax(vmax):
     Returns the maximum number of edges in the undirected graph
     """
     return vmax*(vmax - 1) // 2
+
 def edge_combs(emax):
     """
     Returns an edge combination generator
@@ -246,7 +246,6 @@ def permutations(nitems):
             perms.append((i, j))
     return perms
 
-
 def generate_graph(gid, vmax):
     """
     Return an ordered elist from a graph id and n vertices
@@ -292,7 +291,6 @@ def test_next_prev(vmax):
         b = e == npe
         
         print(e, ne, pe, pne, npe, b)
-
 
 class PoissonSQRGM:
     """ An implementation of the Poisson Square root graphical model from David Inoyue """
@@ -344,7 +342,6 @@ def normal_pdf(y, mu, sigma):
     exp = stable_div(num, den)
     return base * np.exp(exp)
 
-
 def parabola(x, mu, sigma):
     return -(x-mu)**2 - 10    
     
@@ -355,10 +352,4 @@ def ull_normal(y, mu, sigma):
     
 def mode(x, y):
     return x[np.where(y == max(y))[0][0]]
-        
-        
-        
-        
-        
-        
         
