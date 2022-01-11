@@ -1,9 +1,9 @@
-PRINT_ON = True
+PRINT_ON = False
 printf = lambda s: print(s) if PRINT_ON else None
 printf("Importing modules...")
 import sys
 sys.path.append("../examples")
-import sampling as s
+import IMP.pynet.sampling as s
 import numpy as np
 printf("Done")
 
@@ -60,10 +60,6 @@ def test_plot_dataset_overlap():
     g = {'A', 'B', 'C'}
     h = {}
 
-         
-          
-                
-                
 def run_tests():
     """
     Running tests

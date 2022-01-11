@@ -3,8 +3,8 @@ from pynet_test_config import impure_pynet_testing_path_setup
 impure_pynet_testing_path_setup()
 
 #Module specific imports
-import pyext.config
-import pyext.utils as utils
+import IMP.pynet.config
+import IMP.pynet.utils as utils
 from testoptions import decorate_print_test_results
 
 if config.PRINT_MODULE_INFO:
@@ -14,6 +14,7 @@ if config.PRINT_MODULE_INFO:
 if __name__ != "__main__":
     assert config.RUN_ALL_NET_TESTS == True
     from net.ii import get_dataset_overlap
+
 import sys
 import numpy as np
 

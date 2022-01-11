@@ -6,7 +6,7 @@ from pynet_test_config import impure_pynet_testing_path_setup
 
 impure_pynet_testing_path_setup()
 
-from pyext.graph import Node
+from IMP.pynet.graph import Node
 
 class TestGraph(unittest.TestCase):
     def test_print(self):
