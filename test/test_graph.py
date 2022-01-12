@@ -41,7 +41,6 @@ class TestEID(IMP.test.TestCase):
 #These variables are provided for interactive testing w/ the python interpreter
 #Use test_graph.run_tests(test_list)
 
-
         self.assertEqual(0, 1)
 
     @unittest.expectedFailure
