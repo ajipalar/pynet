@@ -1,35 +1,35 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import numpyro
 import jax
-import pytorch
+import torch
 import torchvision
-from numpyro import jit, grad
+from jax import jit, grad
 
 from scipy.stats import f_oneway
 from statsmodels.stats.multitest import fdrcorrection
 from typing import List
-dpath_lip = "../data/sars-cov-2-LiP/20210430_084806_lgillet_SARS2_NSP9_LiP_SpecLib_Report.xls"
-dpath_TC = "../data/sars-cov-2-LiP/20210430_084629_lgillet_SARS2_NSP9_TC_SpecLib_Report.xls"
+
+#Set up the data paths
+dpath_lip = "pyext/data/sars-cov-2-LiP/20210430_084806_lgillet_SARS2_NSP9_LiP_SpecLib_Report.xls"
+dpath_TC = "pyext/data/sars-cov-2-LiP/20210430_084629_lgillet_SARS2_NSP9_TC_SpecLib_Report.xls"
 
 df_lip = pd.read_csv(dpath_lip, delimiter="\t")
 
 #Read In Data, Transform it, Train, test, holdout
 def import_all_data():
+    """Read in the LiP data"""
     dflip = import_lip_data()
     dfbioid = import_bioid_data()
     dfapms_gordon = import_apms_gordon()
     dfapms_stukalov = import_apms_stukalov()
     return dflip, dfbioid, dfapms_gordon, dfapms_stukalov
 
-def transform_data(x:List)-> y:List:
+def transform_data(x: List)-> List:
     y = []
     for df in x:
         y.append(transform_data(df))
@@ -42,9 +42,7 @@ def transform_data(x):
     return t_x
 
 def t_lip(x):
-    """
-    Transform Lip Data
-    """
+    """ Transform Lip Data """
     pass
 
 
@@ -61,14 +59,11 @@ def t_apms_g(x):
     pass
 
 def t_apms_s(x):
-    """
-    Transform APMS Data
-    """
+    """Transform APMS Data."""
     pass
 
 def impute_missing_values_LiP():
     pass 
-
 
 #Representation
 
@@ -82,7 +77,7 @@ def likelihood(D, M):
     pass
 
 def score(D, M):
-    return -np.log10(likelihood(D, M) + -np.log10(prior(M)
+    return -np.log10(likelihood(D, M) + -np.log10(prior(M)))
 
 def scoreSA(score, beta=1):
     return score**beta
@@ -94,6 +89,7 @@ def MHSA(M, S, D):
     sM = score(M)
      
     return post
+
 def kernal_mh_simple():
     pass
 
@@ -101,8 +97,6 @@ def kernal_mh_simple():
 
 def get_degree_dist():
     pass
-
-def get_
 
 #Generate Synthetic Benchmarks
 def generate_synthetic_benchmarks():
@@ -143,15 +137,8 @@ def edge_precision(M, T):
 #anova(aov(pep_imputed_intensity))
 
 
-# In[3]:
-
-
 plt.hist(np.log2(df_lip['FG.MS2RawQuantity']), bins=50)
 plt.show()
-
-
-# In[198]:
-
 
 len(df_lip)
 
@@ -241,7 +228,7 @@ conformotypic = np.logical_and(np.abs(log2_fc_synth) >=2, -np.log10(fdr_adj_pval
 
 
 import matplotlib
-get_ipython().run_line_magic('matplotlib', 'inline')
+#get_ipython().run_line_magic('matplotlib', 'inline')
 
 def plot_figure(x, y):
     # Font
@@ -336,28 +323,7 @@ def stochastic_model(log2_I_wt, log2_I_treat, prior_mu, prior_sigma, n_generated
 mu = np.mean(2**wt, axis=1)
 sigma = np.std(2**wt, axis=1)
 stochastic_model(wt, treatment, mu, sigma )
-
-
-# In[356]:
-
-
-
-
-
-# In[324]:
-
-
 np.concatenate((wt, wt), axis=1)
-
-
-# In[327]:
-
-
-
-
-
-# In[165]:
-
 
 def fdr(parray, test=False):
     # Get positions of all entries
@@ -383,23 +349,19 @@ def fdr(parray, test=False):
         old_pos=position_dict[old_val]
         empty[old_pos] = input_array[i]
     return empty
+
 x = np.random.randn(1000,)
 x2 = fdr(x, test=True)
+
 assert (x==x2).sum() == len(x)
 del x
 del x2
+
 aov_adjusted_p_val = fdr(aov_p_val)
-
-
-# In[154]:
-
 
 x = aov_p_val.copy()
 x.sort()
 plt.scatter(np.log(x), np.log(aov_adjusted_p_val))
-
-
-# In[170]:
 
 
 plt.scatter(log2_fc, -np.log10(adjusted_p_val[1]))
@@ -407,9 +369,5 @@ plt.title("Synthetic Peptide Data")
 plt.xlabel("Log2 Fold Change Treatment vs Untreated")
 plt.ylabel("-log10(FDR adjusted p value)")
 
-
-# In[65]:
-
-
-get_ipython().run_line_magic('pinfo', 'np.random.randn')
+#get_ipython().run_line_magic('pinfo', 'np.random.randn')
 
