@@ -6,7 +6,6 @@ import io
 import os
 import math
 
-
 class Tests(IMP.test.TestCase):
 
     def test_magnitude(self):

@@ -1,20 +1,13 @@
-#from pynet_test_config import impure_pynet_testing_path_setup
-
-#impure_pynet_testing_path_setup()
 import sys
 import numpy as np
 
 #Module specific imports
+import IMP.test
+import IMP.algebra
 import IMP.pynet.config
 import IMP.pynet.utils as utils
 from IMP.pynet.ii import get_dataset_overlap
-#from testoptions import decorate_print_test_results
-
-#if config.PRINT_MODULE_INFO:
-#    utils.moduleinfo(locals())
-   
-
-
+import unittest
 
 class TestII(IMP.test.TestCase):
 
@@ -48,8 +41,17 @@ class TestII(IMP.test.TestCase):
             self.assertEqual(m[i, 0], a_inter[i])
             self.assertEqual(m[0, i], a_inter[i])
     
+    @unittest.expectFailure
     def test_fail(self):
         self.assertEqual(False, True)
+
+    @expectFailure
+    def test_fail2(self):
+        self.assertEqual(False, True)
+
+    def test_fail3(self):
+        self.assertEqual(False, True)
+
     def test_pass(self):
         self.assertEqual(True, True)
 
@@ -61,6 +63,6 @@ class TestII(IMP.test.TestCase):
             test()
 
 if __name__ == "main":
-    unittest.main()
+    IMP.test.main()
 
 

@@ -1,21 +1,12 @@
 from __future__ import print_function
-import argparse
-from pathlib import Path
+import IMP.test
+import IMP.algebra
 import unittest
 import sys
 
 from IMP.pynet.graph import Node 
 
-#impure_pynet_testing_path_setup()
-
-#Testing setup
-"""
-parser = argparse.ArgumentParser(description='Local testing toggle.')
-parser.add_argument('-local-test', '--local_test') 
-args = parser.parse_args()
-"""
-
-class TestGraph(unittest.TestCase):
+class TestGraph(IMP.test.TestCase):
     def test_print(self):
         pass
     def test_nnodes(self):
@@ -25,8 +16,28 @@ class TestGraph(unittest.TestCase):
         y = Node(structure=0)
         self.assertEqual(Node.nnodes , 2)
 
-class TestEID(unittest.TestCase):
-    pass
+    @expectedFailure
+    def test_fail(self):
+        self.assertEqual(0, 1)
+
+    @unittest.expectedFailure
+    def test_fail2(self):
+        self.assertEqual(0, 1)
+
+    def test_fail3(self):
+        self.assertEqual(0, 1)
+
+class TestEID(IMP.test.TestCase):
+    @expectedFailure
+    def test_fail(self):
+        self.assertEqual(0, 1)
+
+    @unittest.expectedFailure
+    def test_fail2(self):
+        self.assertEqual(0, 1)
+
+    def test_fail3(self):
+        self.assertEqual(0, 1)
 
 if __name__ == "__main__":
-    unittest.main()
+    IMP.test.main()
