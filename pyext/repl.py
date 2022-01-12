@@ -1,9 +1,15 @@
 import os
 
-class cl(object):
+class CL(object):
     """An alias for clear in python"""
     def __repr__(self):
-        exec('os.system("clear")')
+        os.system("clear")
         return ""
 
-cl = cl()
+class PWD(object):
+    """An alias for pwd in python."""
+    def __repr__(self):
+        return os.getcwd()
+
+cl = CL()
+pwd = PWD()
