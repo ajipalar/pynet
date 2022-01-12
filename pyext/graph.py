@@ -1,6 +1,5 @@
-"""
-Welcome to the graph
-"""
+"""Welcome to the graph"""
+import IMP
 
 class Node():
     # Belonging to all nodes / node class
@@ -33,3 +32,11 @@ class Information():
     """
 def compute_score(m: Model, d: Data) -> float:
     pass
+
+def add_nodes(model, n):
+    """Add n nodes to an empty imp model"""
+    for i in range(0, n):
+        model.add_particle(i)
+    return model
+
+
