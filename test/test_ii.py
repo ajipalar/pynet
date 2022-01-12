@@ -1,13 +1,20 @@
 import sys
 import numpy as np
+import IMP
+import unittest
 
 #Module specific imports
-import IMP.test
-import IMP.algebra
-import IMP.pynet.config
-import IMP.pynet.utils as utils
-from IMP.pynet.ii import get_dataset_overlap
-import unittest
+if __name__ == "__main__":
+    import IMP.test
+    import IMP.algebra
+    import IMP.pynet.config
+    import IMP.pynet.utils as utils
+    from IMP.pynet.ii import get_dataset_overlap
+else:
+    import pyext.src.config
+    import pyext.src.utils as utils
+    from pyext.src.ii import get_dataset_overlap
+
 
 class TestII(IMP.test.TestCase):
 

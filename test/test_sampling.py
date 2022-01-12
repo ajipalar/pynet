@@ -1,11 +1,14 @@
-#PRINT_ON = False
+PRINT_ON = False
 printf = lambda s: print(s) if PRINT_ON else None
 printf("Importing modules...")
 import sys
 #sys.path.append("../examples")
-import IMP.pynet.sampling as s
 import numpy as np
 #printf("Done")
+if __name__ == "__main__":
+    import IMP.pynet.sampling as samp
+else:
+    import pyext.src.sampling as samp
 
 class TestSampling(IMP.test.TestCase):
 
@@ -13,17 +16,17 @@ class TestSampling(IMP.test.TestCase):
         """ Testing degree prior. """
         a = np.arange(10)
         b = np.arange(10)
-        self.assertEqual(s.degree_prior(a, b), 0)
-        self.assertEqual(s.degree_prior(a, b, s=10), 0)
-        self.assertEqual(s.degree_prior(a, b, s=-1), 0)
-        self.assertEqual(s.degree_prior(a, b, s=-1), 0)
-        self.assertEqual(s.degree_prior(a, b, s=-1), 0)
-        self.assertEqual(s.degree_prior(a, b, s=-1), 0)
+        self.assertEqual(samp.degree_prior(a, b), 0)
+        self.assertEqual(samp.degree_prior(a, b, s=10), 0)
+        self.assertEqual(samp.degree_prior(a, b, s=-1), 0)
+        self.assertEqual(samp.degree_prior(a, b, s=-1), 0)
+        self.assertEqual(samp.degree_prior(a, b, s=-1), 0)
+        self.assertEqual(samp.degree_prior(a, b, s=-1), 0)
         b = b + 1
 
-        self.assertEqual(s.degree_prior(a, b), 10)
-        self.assertEqual(s.degree_prior(a, b, s=0.5), 40)
-        self.assertEqual(s.degree_prior(a, b, s=100), ((1 / 100)**2)*10)
+        self.assertEqual(samp.degree_prior(a, b), 10)
+        self.assertEqual(samp.degree_prior(a, b, s=0.5), 40)
+        self.assertEqual(samp.degree_prior(a, b, s=100), ((1 / 100)**2)*10)
 
         print("Passed")
     
@@ -32,7 +35,7 @@ class TestSampling(IMP.test.TestCase):
         for v in range(2, 13):
             for i in range(v):
                 if i < v-1:
-                    self.assertEqual(s.e_base(i, v), True)
+                    self.assertEqual(samp.e_base(i, v), True)
     
     def test_edge_id(self):
         """edge_id should return the unique edge identifier"""
@@ -46,10 +49,10 @@ class TestSampling(IMP.test.TestCase):
                 entered_outer_loop = True
                 for j in range(i+1, v):
                     entered_inner_loop = True
-                    eid = s.get_immutable_edge_id(i, j, v)
+                    eid = samp.get_immutable_edge_id(i, j, v)
                     if v==2:
                         printf(f"{i, j, eid}") 
-                    s2, t2 = s.edge_from_eid(eid, v)
+                    s2, t2 = samp.edge_from_eid(eid, v)
 
                     self.assertLessEqual(0, i)
                     self.assertEqual(i, s2)

@@ -6,7 +6,7 @@ import unittest
 import sys
 
 if __name__ == "__main__":
-    import IMP.pyent.graph as graph
+    import IMP.pynet.graph as graph
     from IMP.pynet.graph import Node 
 
 else:
