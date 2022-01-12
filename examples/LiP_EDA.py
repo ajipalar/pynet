@@ -266,7 +266,8 @@ plt.errorbar(log2_fc_synth, log2_fc_synth, **error_d )
 
 # In[358]:
 
-
+npep=None
+ngen=None
 def reshape(x, npep=npep, ngen=ngen):
     return np.repeat(x, ngen).reshape(npep, ngen)
 
