@@ -1,6 +1,7 @@
 from __future__ import print_function
 import IMP.test
 import IMP.algebra
+import IMP.pynet
 import io
 import os
 import math

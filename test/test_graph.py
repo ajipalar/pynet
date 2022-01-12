@@ -1,12 +1,19 @@
 from __future__ import print_function
+import argparse
 from pathlib import Path
 import unittest
 import sys
-from pynet_test_config import impure_pynet_testing_path_setup
-
-impure_pynet_testing_path_setup()
 
 from IMP.pynet.graph import Node 
+
+#impure_pynet_testing_path_setup()
+
+#Testing setup
+"""
+parser = argparse.ArgumentParser(description='Local testing toggle.')
+parser.add_argument('-local-test', '--local_test') 
+args = parser.parse_args()
+"""
 
 class TestGraph(unittest.TestCase):
     def test_print(self):
