@@ -10,6 +10,7 @@ synthetic_spec_counts_data = np.random.randint(0, 200, (300, 3))
 print(synthetic_spec_counts_data)
 #Set up model
 def represent_network(n):
+    """represent a network of n nodes."""
     return network
 
 """
