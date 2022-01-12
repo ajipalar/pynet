@@ -45,21 +45,25 @@ def summarize_stuk_data():
     return nAPMSproteins, nRNAgenes, nUbiquit, nPhos
 
 def overlap(a, b):
-    """
-    Returns the magnitude of the intersection between two sets
-    """
+    """Returns the magnitude of the intersection between two sets."""
     return len(a.intersection(b))
+
 def get_dataset_overlap(dataset_dict, dataset_names=None):
-    """
-    :param dataset_dict: datasets in set format
-    :return:
-    """
+    """For n datasets in param: dataset_dict, returns a
+       symmetric intersection matrix where the values of the
+       matrix are the pairwise intersection between two datasets
+       in the dataset_dict.
+
+       returns an intersection_matrix: np.ndarray(dtype=np.uint)"""
+
     if not dataset_names:
         dataset_names = ['LiP', 'APMS_Gordon', 'APMS_Stuk', 'Total_Stuk',
                          'mRNA_Stuk', 'Phos_Stuk', 'Ubiq_Stuk']
     ndatasets = len(dataset_names)
-    overlap_matrix = np.ndarray((ndatasets, ndatasets), dtype=np.uint)
+    intersection_matrix = np.ndarray((ndatasets, ndatasets), dtype=np.uint)
     for i, key in enumerate(dataset_names):
         for j, key2 in enumerate(dataset_names):
-            overlap_matrix[i, j] = overlap(dataset_dict[key], dataset_dict[key2])
-    return overlap_matrix
+            intersection_matrix[i, j] = overlap(dataset_dict[key], dataset_dict[key2])
+    return intersection_matrix
+
+
