@@ -1,8 +1,13 @@
-import typing as t
-from typing import NewType
+import graph_tool as gt
 import pandas as pd
 from pathlib import Path
-import graph_tool as gt
+from typing import Any, Callable, NewType, ParamSpec, TypeVar
+import typing
+import inspect
+import types
+
+T = TypeVar('T')
+P = ParamSpec('P')
 
 DataFrame = NewType('DataFrame', pd.DataFrame)
 DirPath = NewType('DirPath', Path)
@@ -22,3 +27,11 @@ Organism = NewType('Organism', str)
 
 #Graph types
 G = NewType('G', gt.Graph)
+
+#Functions
+Function = NewType('Function', Callable[[T], P])
+
+PureFunction = NewType('PureFunction', Function)
+Parameters = NewType('Parameters', 
+             dict[str, inspect.Parameter])
+
