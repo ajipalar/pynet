@@ -4,16 +4,6 @@ from pathlib import Path
 from utility.meta import pipe
 
 
-def ls(dirpath):
-    """
-    Imitates the ls command
-    """
-    
-    dir_contents = list(dirpath.iterdir())
-    dir_contents.sort()
-    
-    for path in dir_contents: print(path)
-
 def sars_cov_2_ppi_to_plain_text():
     dpath = pipe("./pyext/data/sars-cov-2-ppi", Path)
     jpath = dpath / "summary.json"
