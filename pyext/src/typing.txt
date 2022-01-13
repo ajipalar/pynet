@@ -1,0 +1,14 @@
+"""
+Why typing in the pynet project?
+1. Static nominal typing will reduce runtime bugs
+2. Function composition - with static typing I can determine the set of functions
+   g that are composable with f such that h = f compose g = f(g(x))
+
+   I expect this to help program flexibility
+   
+"""
+
+x = {}
+y: float = 3.5
+reveal_type(y)
+
