@@ -4,7 +4,7 @@
 #An Abstract interface for molecular networks
 
 from abc import ABC, abstractmethod
-import graph_tool as gt
+#import graph_tool as gt #graph tool not supported in 3.10.1 env
 
 #from graph_tool.all import graph_draw
 import math
