@@ -1,8 +1,11 @@
 from inspect import signature
 from typing import Any, Callable 
-from typedefs import Function, Parameters
-
 import typing
+
+try:
+    from IMP.pynet.typdefs import Function, Parameters
+except:
+    from typedefs import Function, Parameters
 
 def parameters(f: Function):
     return signature(f).parameters

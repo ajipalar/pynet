@@ -3,9 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
-#Import my modules
+#pynet modules
 
-from score import mode, normal_pdf, parabola, ull_normal
+try:
+    from IMP.pynet.score import mode, normal_pdf, parabola, ull_normal
+except:
+    from pyext.src.score import mode, normal_pdf, parabola, ull_normal
+
 def plot_density(length, mu, sig):
 
     xnorm = np.arange(-length, length)

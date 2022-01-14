@@ -4,15 +4,24 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 import sys
-import typing as t
+import typing
 from typing import Dict, Iterable, Iterator, List, Set, Tuple
 
 #Custom modules
 ###############################################################################
-import predicates as pred
-from typedefs import (AnyPath, AnyCol, Bait, DataFrame, DirPath, FilePath, 
-                          Organism, PGGroupCol, PreyUID, UID
-)
+try:
+    import IMP.pynet.predicates as pred
+    from IMP.pynet.typedefs import (AnyPath, AnyCol, 
+            Bait, DataFrame, 
+            DirPath, FilePath, 
+            Organism, PGGroupCol, PreyUID, UID )
+
+except:
+    import pyext.src.predicates as pred
+    from pyext.src.typedefs import (AnyPath, AnyCol, 
+            Bait, DataFrame, 
+            DirPath, FilePath, 
+            Organism, PGGroupCol, PreyUID, UID )
 
 
 """

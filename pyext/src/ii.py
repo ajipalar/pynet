@@ -4,14 +4,21 @@ Input Information
 Module for handling data I/O and preprocessing
 """
 
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import f_oneway
-from statsmodels.stats.multitest import fdrcorrection
-import tools.utils as utils
-import config
+import numpy as np
+import pandas as pd
 import pathlib
+from scipy.stats import f_oneway
+import sys
+#from statsmodels.stats.multitest import fdrcorrection
+
+#Local imports
+try:
+    import IMP.pynet.config
+    import IMP.pynet.utils as utils
+except:
+    import pyext.src.config as config
+    import pyext.src.utils as utils
 
 src = pathlib.Path("~/Projects/pynet")
 
