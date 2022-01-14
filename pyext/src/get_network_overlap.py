@@ -11,7 +11,10 @@ from pathlib import Path
 import json
 
 #Read in Stukalov data
-data_p = Path("../data")
+#Paths are relative to the pynet home directory
+#pynethome/pyext/src/*.py
+
+data_p = Path("pyext/data")
 multi_omnics_p = data_p / "multi-proteomics"
 summary_json_p = multi_omnics_p / "summary.json"
 apms_interactions = multi_omnics_p / '41586_2021_3493_MOESM6_ESM.xlsx'
