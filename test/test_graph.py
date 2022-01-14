@@ -10,8 +10,8 @@ if __name__ == "__main__":
     from IMP.pynet.graph import Node 
 
 else:
-    import pyext.graph as graph
-    from pyext.graph import Node
+    import pyext.src.graph as graph
+    from pyext.src.graph import Node
 
 class TestGraph(IMP.test.TestCase):
     def test_print(self):
