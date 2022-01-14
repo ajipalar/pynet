@@ -40,6 +40,7 @@ def read_stuk_apms_data():
     dpath_stuk = pathlib.Path("")
 
 def read_gordon_data():
+    pass
 
 def summarize_stuk_data():
     return nAPMSproteins, nRNAgenes, nUbiquit, nPhos
