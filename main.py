@@ -29,7 +29,7 @@ import pyext.src.vis as vis
 
 import test.test_graph
 
-from pyext.src.myitertools import forp, exhuast
+from pyext.src.myitertools import forp, exhaust
 from utility import data_setup as ds
 from utility.meta import pipe
 
