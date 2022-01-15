@@ -4,3 +4,16 @@ Data -> data_in.obj -> model.obj
 The data_in module exposes a uniform interface for varied Data input
 to be placed into model objects
 """
+
+import itertools
+from types import Iterator
+
+try:
+    from IMP.pynet.typedefs import TsvPath
+except:
+    from pyext.src.typedefs import TsvPath
+
+def read_column_n(filepath: TsvPath, col_num: int) -> Itertor[str]:
+    with open(filepath, 'r') as f:
+        for line in f:
+            yield line.split('\t')[n]
