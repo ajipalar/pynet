@@ -5,11 +5,10 @@ import IMP.algebra
 import unittest
 import sys
 
-if __name__ == "__main__":
+try:
     import IMP.pynet.graph as graph
     from IMP.pynet.graph import Node 
-
-else:
+except:
     import pyext.src.graph as graph
     from pyext.src.graph import Node
 
