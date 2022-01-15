@@ -32,3 +32,4 @@ data/sars-cov-2-ppi
 data/genetic-screen
 *.png
 *.zip
+*.log
