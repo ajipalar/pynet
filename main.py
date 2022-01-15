@@ -1,3 +1,8 @@
+"""
+During development run \>>> from main import *
+in the python interpreter from the pynet home directory
+"""
+import graph_tool
 import IMP
 import jax
 import numpy
@@ -15,6 +20,7 @@ assert version.parse(pyversion) >= version.parse('3.9.7')
 import pyext.src.graph as graph
 #import pyext.src.get_network_overlap as get_network_overlap 
 import pyext.src.ii as ii
+
 import pyext.src.sampling as sampling
 import pyext.src.score as score
 import pyext.src.typedefs as typedefs
@@ -23,6 +29,7 @@ import pyext.src.vis as vis
 
 import test.test_graph
 
+from pyext.src.myitertools import forp, exhuast
 from utility import data_setup as ds
 from utility.meta import pipe
 
