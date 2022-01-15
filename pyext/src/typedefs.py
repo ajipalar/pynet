@@ -13,6 +13,8 @@ DataFrame = NewType('DataFrame', pd.DataFrame)
 DirPath = NewType('DirPath', Path)
 FilePath = NewType('FilePath', Path)
 AnyPath = NewType('AnyPath', Path)
+PlainTextDataPath = NewType('PlainTextDataPath', FilePath)
+TsvPath = NewType('TsvPath', PlainTextDataPath)
 
 #Column label types
 AnyCol = NewType('AnyCol', str)
