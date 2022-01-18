@@ -8,7 +8,7 @@ import numpy as np
 if __name__ == "__main__":
     import IMP.pynet.sampling as samp
 else:
-    import pyext.src.sampling as samp
+    import pyext.src.mcmc as samp
 
 class TestSampling(IMP.test.TestCase):
 
