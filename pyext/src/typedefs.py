@@ -1,14 +1,24 @@
-import graph_tool as gt
+#import graph_tool as gt
 import pandas as pd
 from pathlib import Path
-from typing import Any, Callable, NewType, ParamSpec, TypeVar
+from typing import (
+        Any, 
+        Callable, 
+        NewType, 
+        Optional,
+        ParamSpec, 
+        Sequence, 
+        Tuple,
+        TypeVar, 
+        Union
+)
 import typing
 import inspect
 import types
 
 T = TypeVar('T')
-P = ParamSpec('P')
 
+#Paths
 DataFrame = NewType('DataFrame', pd.DataFrame)
 DirPath = NewType('DirPath', Path)
 FilePath = NewType('FilePath', Path)
@@ -31,9 +41,27 @@ Organism = NewType('Organism', str)
 G = NewType('G', gt.Graph)
 
 #Functions
-Function = NewType('Function', Callable[[T], P])
+P = ParamSpec('P')
+R = TypeVar('R')
 
-PureFunction = NewType('PureFunction', Function)
-Parameters = NewType('Parameters', 
-             dict[str, inspect.Parameter])
+#jax related
+Array = Any
+RealArray = Array
+IntegerArray = Array
+DTypeLikeInt = Any
+DTypeLikeFloat = Any
+
+KeyArray = Union[Array, prng.PRNGKeyArray]
+
+UINT_DTYPES = prng.UINT_DTYPES
+
+#imp related - Types are not classes
+Score = NewType('Score', float)
+
+#Math related
+#Number = NewType('Number', Union[int, float, complex])
+Number = Union[int, float, complex]
+PRNGKey = NewType('PRNGKey', Tuple[int, int])
+Vector = NewType('Vector', Sequence[Number])
+Matrix = NewType('Matrix', Sequence[Sequence[Number]])
 

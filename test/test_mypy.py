@@ -1,3 +1,6 @@
+import jax
+import jax.numpy as jnp
+import numpy as np
 from typing import Any, Callable, Iterable, Tuple, NewType, TypeVar, ParamSpec
 
 #Conrete type declartions
@@ -31,3 +34,12 @@ my_func(my_concrete_type, my_derived_type)
 my_func(my_derived_type, my_derived_type)
 
 
+
+
+x: float = jnp.array(2)
+z: int = np.array([True, False])
+t: int = np.array([3.0 , 4.1])
+y: str = 1
+f: str = jnp.array([2, 0, 1, 3])
+h: int = jnp.array([2.0, 1.2, 3.0])
+reveal_type(jnp.array([3]))
