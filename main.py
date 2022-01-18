@@ -21,7 +21,7 @@ import pyext.src.graph as graph
 #import pyext.src.get_network_overlap as get_network_overlap 
 import pyext.src.ii as ii
 
-import pyext.src.mcmc as sampling
+import pyext.src.mcmc as mcmc
 import pyext.src.score as score
 import pyext.src.typedefs as typedefs
 import pyext.src.utils as utils

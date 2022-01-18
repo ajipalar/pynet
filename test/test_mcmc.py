@@ -6,9 +6,9 @@ import sys
 import numpy as np
 #printf("Done")
 if __name__ == "__main__":
-    import IMP.pynet.sampling as samp
+    import IMP.pynet.mcmc as mcmc
 else:
-    import pyext.src.mcmc as samp
+    import pyext.src.mcmc as mcmc
 
 class TestSampling(IMP.test.TestCase):
 
@@ -16,17 +16,17 @@ class TestSampling(IMP.test.TestCase):
         """ Testing degree prior. """
         a = np.arange(10)
         b = np.arange(10)
-        self.assertEqual(samp.degree_prior(a, b), 0)
-        self.assertEqual(samp.degree_prior(a, b, s=10), 0)
-        self.assertEqual(samp.degree_prior(a, b, s=-1), 0)
-        self.assertEqual(samp.degree_prior(a, b, s=-1), 0)
-        self.assertEqual(samp.degree_prior(a, b, s=-1), 0)
-        self.assertEqual(samp.degree_prior(a, b, s=-1), 0)
+        self.assertEqual(mcmc.degree_prior(a, b), 0)
+        self.assertEqual(mcmc.degree_prior(a, b, s=10), 0)
+        self.assertEqual(mcmc.degree_prior(a, b, s=-1), 0)
+        self.assertEqual(mcmc.degree_prior(a, b, s=-1), 0)
+        self.assertEqual(mcmc.degree_prior(a, b, s=-1), 0)
+        self.assertEqual(mcmc.degree_prior(a, b, s=-1), 0)
         b = b + 1
 
-        self.assertEqual(samp.degree_prior(a, b), 10)
-        self.assertEqual(samp.degree_prior(a, b, s=0.5), 40)
-        self.assertEqual(samp.degree_prior(a, b, s=100), ((1 / 100)**2)*10)
+        self.assertEqual(mcmc.degree_prior(a, b), 10)
+        self.assertEqual(mcmc.degree_prior(a, b, s=0.5), 40)
+        self.assertEqual(mcmc.degree_prior(a, b, s=100), ((1 / 100)**2)*10)
 
         print("Passed")
     
@@ -35,7 +35,7 @@ class TestSampling(IMP.test.TestCase):
         for v in range(2, 13):
             for i in range(v):
                 if i < v-1:
-                    self.assertEqual(samp.e_base(i, v), True)
+                    self.assertEqual(mcmc.e_base(i, v), True)
     
     def test_edge_id(self):
         """edge_id should return the unique edge identifier"""
@@ -49,10 +49,10 @@ class TestSampling(IMP.test.TestCase):
                 entered_outer_loop = True
                 for j in range(i+1, v):
                     entered_inner_loop = True
-                    eid = samp.get_immutable_edge_id(i, j, v)
+                    eid = mcmc.get_immutable_edge_id(i, j, v)
                     if v==2:
                         printf(f"{i, j, eid}") 
-                    s2, t2 = samp.edge_from_eid(eid, v)
+                    s2, t2 = mcmc.edge_from_eid(eid, v)
 
                     self.assertLessEqual(0, i)
                     self.assertEqual(i, s2)
