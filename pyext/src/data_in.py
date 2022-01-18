@@ -16,4 +16,4 @@ except:
 def read_column_n(filepath: TsvPath, col_num: int) -> Iterator[str]:
     with open(filepath, 'r') as f:
         for line in f:
-            yield line.split('\t')[col_num]
+            yield line.split('\t')[col_n]
