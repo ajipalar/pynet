@@ -1,40 +1,58 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
+from abc import ABC
+from typedefs import KeyArray
 
-class Distribution():
-    def __init__():
+class Distribution(ABC):
+    def __init__(self):
         pass
 
-    def logpdf():
+@abstractmethod
+    def logpdf(self):
         pass
 
-    def pdf():
+@abstractmethod
+    def pdf(self):
         pass
 
-    def logcdf():
+@abstractmethod
+    def logcdf(self):
         pass
 
-    def cdf():
+@abstractmethod
+    def cdf(self):
         pass
 
-    def logpmf():
+@abstractmethod
+    def logpmf(self):
         pass
 
-    def pmf():
+@abstractmethod
+    def pmf(self):
         pass
 
-    def ppf():
+@abstractmethod
+    def ppf(self):
         pass
 
-    def rv():
+@abstractmethod
+    def rv(self, key: KeyArray):
         pass
 
-    def sf():
+@abstractmethod
+    def sf(self):
         pass
 
-    def isf():
+@abstractmethod
+    def isf(self):
         pass
+
+@abstractmethod
+    def __call__(self, *args):
+        """Calls the pdf or pmf function"""
+        pass
+
 
     
 
