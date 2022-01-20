@@ -4,6 +4,10 @@
 import numpy as np
 import jax.numpy as jnp
 from typing import NewType
+try:
+    from IMP.pynet.typedefs import KeyArray
+except:
+    from pyext.src.typedefs import KeyArray
 
 Dist = NewType('Dist', float)
 EdgeID = NewType('EID', int)
@@ -224,5 +228,25 @@ def MH_MCMC(steps, target, seed, y, mustart, sigstart,
             chain[i] = mu, sigma, score2
         
     return chain
+
+def n_steps_mh(key: KeyArray, target_prob, 
+        target_params, mcmc_params):
+    """The n steps Metropolis Hastings Algorithm MCMC"""
+    n_steps = mcmc_params['n_steps']
+    x = mcmc_params['x']
+    n_dims = mcmc_params['n_dims']
+
+    for i in range(n_steps):
+        key, subkey = jax.random.split(key)
+        x_prime = x + target.rv(key) 
+        a = target(x_prime) / target(x)
+
+        if jax.random.uniform(subkey) < a:
+            x = x_prime
+    return x
+
+
+def l_mh(key: KeyArray, target_lprob, params):
+    pass
             
         
