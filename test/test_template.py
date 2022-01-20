@@ -1,7 +1,10 @@
 from __future__ import print_function
 import IMP.test
 import IMP.algebra
-import IMP.pynet
+try:
+    import IMP.pynet
+except:
+    pass
 import io
 import os
 import math
