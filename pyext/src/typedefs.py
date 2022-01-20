@@ -38,7 +38,7 @@ Bait = NewType('Bait', str)
 Organism = NewType('Organism', str)
 
 #Graph types
-G = NewType('G', gt.Graph)
+#G = NewType('G', gt.Graph)
 
 #Functions
 P = ParamSpec('P')

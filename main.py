@@ -2,7 +2,6 @@
 During development run \>>> from main import *
 in the python interpreter from the pynet home directory
 """
-import graph_tool
 import IMP
 import jax
 import numpy
@@ -34,30 +33,19 @@ from utility import data_setup as ds
 from utility.meta import pipe
 
 from pyext.src.repl import cl, ls, pwd
-
-home = Path(".")
-pyext = home / "pyext"
-data = pyext / "data"
-corum = data / "corum"
-ecoli = data / "ecoli"
-genetic_screen = data / "genetic-screen"
-sars_cov_2_lip = data / "sars-cov-2-LiP"
-sars_cov_2_ppi = data / "sars-cov-2-ppi"
-multi_proteomics = data / "multi-proteomics"
-synthetic = data / "synthetic"
-
-utility = home / "utility"
-
-
-
-
-
-
-
-
-
-
-
-
+from pyext.src.project_paths import (
+    home,
+    pyext, 
+    data,
+    corum,        
+    ecoli,
+    corum,
+    genetic_screen,
+    sars_cov_2_lip,
+    sars_cov_2_ppi,
+    multi_proteomics,
+    synthetic, 
+    utility 
+)
 
 
