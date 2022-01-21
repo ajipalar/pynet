@@ -45,7 +45,7 @@ def poisson_sqr(y, theta, phi) -> float:
     return score
 
 def move_poisson_sqr(key: PRNGKey, theta: Vector, phi: Matrix) -> Tuple[Vector, Matrix]:
-    theta = jax.random.uniform(key,
+#   theta = jax.random.uniform(key,
     return theta, phi
 
 def eta_1(s, i):
