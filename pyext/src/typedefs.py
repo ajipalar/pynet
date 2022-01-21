@@ -50,14 +50,12 @@ RealArray = Array
 IntegerArray = Array
 DTypeLikeInt = Any
 DTypeLikeFloat = Any
+PRNGKeyArray = Any #Change this to prng.PRNGKeyArray
+KeyArray = NewType('KeyArray', PRNGKeyArray) 
 
-KeyArray = Union[Array, prng.PRNGKeyArray]
-
-UINT_DTYPES = prng.UINT_DTYPES
+UINT_DTYPES = Any #TODO prng.UINT_DTYPES
 
 #imp related - Types are not classes
-Score = NewType('Score', float)
-
 #Math related
 #Number = NewType('Number', Union[int, float, complex])
 Number = Union[int, float, complex]
