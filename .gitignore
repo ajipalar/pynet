@@ -21,9 +21,7 @@ cmake-build-debug
 *.swp
 *.swo
 **/__pycache__
-data/sars-cov-2-LiP/*.xls
-data/sars-cov-2-ppi
-data/genetic-screen
+data
 *.png
 *.zip
 *.log
