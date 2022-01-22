@@ -20,7 +20,7 @@ def get_ppi_network_from_cartesian_table(table: CartesianTable) -> PPINetwork:
 
 def get_ppi_network_from_complex(protein_complex) -> PPINetwork:
     cartesian_table = load_protein_complex(protein_complex)
-    ppi_network = create_ppi_network_from_cartesian_table(table: CartesianTable)
+    ppi_network = create_ppi_network_from_cartesian_table(table)
     return ppi_network
 
 def get_synth_apms_data(bait_prey: PPINetwork,
