@@ -11,13 +11,4 @@ def write_example_benchmark():
     assert fpath.is_file == False, f"{fpath} exists\nAborting"
 
     with open(fpath, 'w') as f:
-        line = "interaction-id\t
-    
-
-
-
-    
-
-
-
-    
+        line = "interaction-id\t"
