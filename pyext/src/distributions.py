@@ -8,47 +8,47 @@ class Distribution(ABC):
     def __init__(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def logpdf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def pdf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def logcdf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def cdf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def logpmf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def pmf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def ppf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def rv(self, key: KeyArray):
         pass
 
-@abstractmethod
+    @abstractmethod
     def sf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def isf(self):
         pass
 
-@abstractmethod
+    @abstractmethod
     def __call__(self, *args):
         """Calls the pdf or pmf function"""
         pass
