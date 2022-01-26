@@ -13,6 +13,7 @@ ModuleBuild.cmake
 CMakeModules/
 utility/example
 cmake-build-debug
+.flake8
 .idea
 *.xlsx
 *.xls
