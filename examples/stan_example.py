@@ -25,8 +25,8 @@ model {
 """
 
 schools_data = {"J": 8,
-                "y": [28,  8, -3,  7, -1,  1, 18, 12],
-                "sigma": [15, 10, 16, 11,  9, 11, 10, 18]}
+                "y": [28, 8, -3, 7, -1, 1, 18, 12],
+                "sigma": [15, 10, 16, 11, 9, 11, 10, 18]}
 
 posterior = stan.build(schools_code, data=schools_data)
 fit = posterior.sample(num_chains=4, num_samples=1000)

@@ -1,13 +1,16 @@
 #Author Aji Palar
 
-#Our Goal is to map physical interaction networks of proteins and their small molecule ligands
-#We expect our method to accuratley predict molecular interaction networks via a Bayesian inferenctial
-#approach. We will maximized the accuracy, precition, completness, by using all information availible
+# Our Goal is to map physical interaction networks of proteins and their small 
+# molecule ligands. We expect our method to accuratley predict molecular 
+# interaction networks via a Bayesian inferenctial  approach. We will 
+# maximized the accuracy, precision, completeness, 
+# by using all information availible.
 
 from typing import List, Tuple, NewType, Iterable
 import numpy as np
 from jax import jit
-import jax; jax.config.update('jax_platform_name', 'cpu')
+import jax 
+import jax.config.update('jax_platform_name', 'cpu')
 import igraph as ig
 #Representation
 
@@ -23,6 +26,7 @@ Edge = NewType('Edge', (int, int))
 
 adj_matrix = np.zeros((V, V), dtype=np.int64)
 
+
 def enumerate_ordered_vertex_pairs(V: int) -> Iterable[Edge]:
     a = np.arange(V, dtype=np.int64) + 1
     ordered_pairs = np.zeros((Emax, 2), dtype=np.int64)
@@ -32,6 +36,7 @@ def enumerate_ordered_vertex_pairs(V: int) -> Iterable[Edge]:
             ordered_pairs[c] = [i, j]
             c+=1
     return ordered_pairs
+
 
 j_enumerate_ordered_pairs = jit(enumerate_ordered_vertex_pairs)(V)
 ordered_pairs = enumerate_ordered_vertex_pairs(V)

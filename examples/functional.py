@@ -13,6 +13,7 @@ it.__next__()
 #py > 3.7 iteration order same as insertion order
 #Files support iterations with readline
 
+
 def my_generator(x):
     i=0
     while i < x:
@@ -24,6 +25,7 @@ def my_generator(x):
 
 def my_gen2(x):
     yield x
+
 
 def my_gen3(x):
     while True:
@@ -40,6 +42,7 @@ def my_gen3(x):
 #sub routines entrance -> exit
 #co routines enter -> exit -> pause -> enter
 
+
 def counter(maximum):
     i = 0
     while i < maximum:
@@ -48,4 +51,3 @@ def counter(maximum):
             i = val
         else:
             i += 1
-
