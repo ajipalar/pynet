@@ -1,18 +1,19 @@
 def pipe_parse(s: str)-> str:
     """
     x | f | g -> g(f(x))
-    Inputs should be pure functions 
+    Inputs should be pure functions
     """
 
     assert type(s) == str
     s=s.replace(" ", "")
     s=s.replace("\t", "")
-    l = s.split('|')
-    assert len(l) > 0
+    l_s: list[str] = s.split('|')
+    assert len(l_s) > 0
     output = ""
-    for arg in l:
+    for arg in l_s:
         output = f'({arg}{output})'
     return output[1:-1]
+
 
 def pipe(fluid, *segments):
     """
@@ -21,11 +22,11 @@ def pipe(fluid, *segments):
     Those lead to oil spills
     """
     for segment in segments:
-        fluid = segment(fluid) 
+        fluid = segment(fluid)
     return fluid
+
 
 def pipe_depracated(s: str):
     """Evaluates the pipe s and returns the value"""
     pipes = pipe_parse(s)
     return eval(pipes)
-

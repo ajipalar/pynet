@@ -4,13 +4,13 @@ import IMP
 import unittest
 
 #Module specific imports
-if __name__ == "__main__":
+try:
     import IMP.test
     import IMP.algebra
     import IMP.pynet.config
     import IMP.pynet.utils as utils
     from IMP.pynet.ii import get_dataset_overlap
-else:
+except ModuleNotFoundError:
     import pyext.src.config
     import pyext.src.utils as utils
     from pyext.src.ii import get_dataset_overlap
@@ -29,25 +29,25 @@ class TestII(IMP.test.TestCase):
         h = set()
         l = [a, b, c, d, e, f, g, h]
         k = 'abcdefgh'
-    
+
         dataset_dict = dict(zip(k, l ))
-        
+
         m = get_dataset_overlap(dataset_dict, dataset_names=dataset_dict.keys())
-    
+
         #Check that the diagonal elements of the matrix are equal to the length of the ipput
         for i in range(len(m)):
             self.assertEqual(m[i, i] == len(l[i]))
-    
+
         #Check for symmetry
         result_bool = np.equal(m, m.T).all()
         self.assertEqual(True, result_bool)
-    
+
         #Test A
         a_inter = [3, 3, 1, 0, 0, 0, 0, 0]
         for i in range(len(m)):
             self.assertEqual(m[i, 0], a_inter[i])
             self.assertEqual(m[0, i], a_inter[i])
-    
+
     @unittest.expectFailure
     def test_fail(self):
         self.assertEqual(False, True)
@@ -66,10 +66,9 @@ class TestII(IMP.test.TestCase):
         test_list = [test_get_dataset_overlap]
         for test in test_list:
             if config.PRINT_TEST_RESULTS:
-               test = decorate_print_test_results(test, __name__)
+                test = decorate_print_test_results(test, __name__)
             test()
+
 
 if __name__ == "main":
     IMP.test.main()
-
-

@@ -3,7 +3,7 @@ import IMP.test
 import IMP.algebra
 try:
     import IMP.pynet
-except:
+except ModuleNotFoundError:
     pass
 import io
 import os

@@ -21,6 +21,8 @@ dpath_TC = "pyext/data/sars-cov-2-LiP/20210430_084629_lgillet_SARS2_NSP9_TC_Spec
 df_lip = pd.read_csv(dpath_lip, delimiter="\t")
 
 #Read In Data, Transform it, Train, test, holdout
+
+
 def import_all_data():
     """Read in the LiP data"""
     dflip = import_lip_data()
@@ -29,17 +31,17 @@ def import_all_data():
     dfapms_stukalov = import_apms_stukalov()
     return dflip, dfbioid, dfapms_gordon, dfapms_stukalov
 
+
 def transform_data(x: List)-> List:
     y = []
     for df in x:
         y.append(transform_data(df))
     return y
-        
+
+
 def train_test_holdout_split():
     return dtrain, dtest, dholdout
 
-def transform_data(x):
-    return t_x
 
 def t_lip(x):
     """ Transform Lip Data """
@@ -52,15 +54,18 @@ def t_BioID(x):
     """
     pass
 
+
 def t_apms_g(x):
     """
     Transform APMS Gordon Data
     """
     pass
 
+
 def t_apms_s(x):
     """Transform APMS Data."""
     pass
+
 
 def impute_missing_values_LiP():
     pass 
@@ -70,14 +75,18 @@ def impute_missing_values_LiP():
 #Adjacency Matrix Representation
 
 #Define Scoring Function
+
 def prior(M):
     pass
+
 
 def likelihood(D, M):
     pass
 
+
 def score(D, M):
     return -np.log10(likelihood(D, M) + -np.log10(prior(M)))
+
 
 def scoreSA(score, beta=1):
     return score**beta
@@ -90,35 +99,44 @@ def MHSA(M, S, D):
      
     return post
 
+
 def kernal_mh_simple():
     pass
 
 #Analysis
 
+
 def get_degree_dist():
     pass
+
 
 #Generate Synthetic Benchmarks
 def generate_synthetic_benchmarks():
     pass
 
+
 #Define Prior Predictive Check
 def ppc():
     pass
+
 
 #Define Prior Predictive Check Criteria
 def ppc_Criteria():
     pass
 
+
 #Define Posterior Predictive Check
 def postPP():
     pass
 
+
 def PostPP_Criteria():
     pass
+
 #Define Accuracy and Precision
 def edge_accuracy(M, T):
     pass
+
 
 def edge_precision(M, T):
     pass
@@ -277,7 +295,8 @@ def Rhat(I_k, mu, sigma, ngen):
     # I = R*A
     # A ~ Norm(mu, sigma)
     npep = len(I_k)
-    reshape = lambda x: reshape(x, npep=npep, ngen=ngen)
+    def reshpe(x):
+        reshape(x, npep=npep, ngen=ngen)
     sigma = reshape(sigma)
     mu = reshape(mu)
     A = np.random.randn(npep, ngen)*sigma + mu #Pep
@@ -289,6 +308,7 @@ def Rhat(I_k, mu, sigma, ngen):
     I_mu = reshape(I_mu)
     
     I = np.random.randn(npep, ngen)*I_sig + I_mu #npep
+    print('Warning - use jax prng')
     
     #npep x ngen
     r = 10**(np.log10(I) - np.log10(A))

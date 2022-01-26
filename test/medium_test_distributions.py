@@ -1,4 +1,9 @@
 from __future__ import print_function
+try:
+    pass
+except ModuleNotFoundError:
+    pass
+
 import numpyro
 import numpyro.distributions as dist
 import jax
@@ -8,10 +13,6 @@ import unittest
 
 import IMP.test
 import IMP.algebra
-try:
-    import IMP.pynet
-except:
-    pass
 
 import io
 import os

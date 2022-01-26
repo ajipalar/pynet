@@ -10,8 +10,9 @@ from typing import List, Tuple, NewType, Iterable
 import numpy as np
 from jax import jit
 import jax 
-import jax.config.update('jax_platform_name', 'cpu')
 import igraph as ig
+
+jax.config.update('jax_platform_name', 'cpu')
 #Representation
 
 #Number of vertices, proteins, ligands

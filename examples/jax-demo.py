@@ -2,8 +2,8 @@ import numpy as np
 from jax import jit, grad, vmap
 import jax.numpy as jnp
 import jax 
-import jax.config.update('jax_platform_name', 'cpu')
 import timeit
+jax.config.update('jax_platform_name', 'cpu')
 
 
 def myfunc(x, y):
@@ -32,7 +32,6 @@ if __name__ == "__main__":
     def j1():
         jx_myfunc(a, b)
 
-    import timeit
     print(timeit.timeit(f1, number=n))
     print(timeit.timeit(j1, number=n))
     print(timeit.timeit(f2, number=n))

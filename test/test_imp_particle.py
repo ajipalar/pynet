@@ -16,6 +16,3 @@ p1 = pi_list[1]
 
 print(f"particle 0: {model.get_particle(p0)}")
 print(f"particle 1: {model.get_particle(p1)}")
-
-
-

@@ -1,14 +1,14 @@
-PRINT_ON = False
-printf = lambda s: print(s) if PRINT_ON else None
-printf("Importing modules...")
-import sys
-#sys.path.append("../examples")
-import numpy as np
-#printf("Done")
-if __name__ == "__main__":
+try:
     import IMP.pynet.mcmc as mcmc
-else:
+except ModuleNotFoundError:
     import pyext.src.mcmc as mcmc
+
+import sys
+import numpy as np
+
+PRINT_ON = False
+def printf(s):
+    print(s) if PRINT_ON else None
 
 class TestSampling(IMP.test.TestCase):
 
@@ -26,32 +26,32 @@ class TestSampling(IMP.test.TestCase):
 
         self.assertEqual(mcmc.degree_prior(a, b), 10)
         self.assertEqual(mcmc.degree_prior(a, b, s=0.5), 40)
-        self.assertEqual(mcmc.degree_prior(a, b, s=100), ((1 / 100)**2)*10)
+        self.assertEqual(mcmc.degree_prior(a, b, s=100), ((1 / 100)**2) * 10)
 
         print("Passed")
-    
+
     def test_e_base(self):
         """e_base should return the base edge id. """
         for v in range(2, 13):
             for i in range(v):
-                if i < v-1:
+                if i < v - 1:
                     self.assertEqual(mcmc.e_base(i, v), True)
-    
+
     def test_edge_id(self):
         """edge_id should return the unique edge identifier"""
         for v in range(2, 101):
             printf(f"Testing size {v} graph")
-            Emax = v*(v-1)//2
+            Emax = v * (v - 1) // 2
             entered_outer_loop = False
             entered_inner_loop= False
 
             for i in range(v):
                 entered_outer_loop = True
-                for j in range(i+1, v):
+                for j in range(i + 1, v):
                     entered_inner_loop = True
                     eid = mcmc.get_immutable_edge_id(i, j, v)
                     if v==2:
-                        printf(f"{i, j, eid}") 
+                        printf(f"{i, j, eid}")
                     s2, t2 = mcmc.edge_from_eid(eid, v)
 
                     self.assertLessEqual(0, i)
@@ -59,11 +59,11 @@ class TestSampling(IMP.test.TestCase):
                     self.assertLess(s2, j)
                     self.assertEqual(j, t2)
                     self.assertLess(eid, Emax)
-                    if (i == v  - 1) and (t==v):
+                    if (i == v - 1) and (t == v):
                         self.assertEqual(eid, Emax)
             self.assertTrue(entered_outer_loop)
             self.assertTrue(entered_inner_loop)
-    
+
     def test_plot_dataset_overlap(self):
         a = {'a', 'b', 'c'}
         b = {'a', 'b', 'c'}
@@ -74,11 +74,11 @@ class TestSampling(IMP.test.TestCase):
         g = {'A', 'B', 'C'}
         h = {}
         self.assertEqual(False)
-    
+
     def run_tests(self):
         """
         Running tests
-        
+
         """
         tests = [test_degree_prior,
                  test_e_base,
@@ -91,13 +91,14 @@ class TestSampling(IMP.test.TestCase):
     @unittest.expectedFailure
     def test_fail(self):
         self.assertEqual(1, 2)
-        
+
     @expectedFailure
     def test_fail2(self):
         self.assertEqual(1, 2)
 
     def test_fail3(self):
         self.assertEqual(1, 2)
+
 
 if __name__ == "__main__":
     IMP.test.main()
