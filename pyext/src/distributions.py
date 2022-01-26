@@ -52,9 +52,3 @@ class Distribution(ABC):
     def __call__(self, *args):
         """Calls the pdf or pmf function"""
         pass
-
-
-    
-
-
-
