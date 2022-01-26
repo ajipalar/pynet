@@ -1,23 +1,7 @@
 """
-During development run \>>> from main import *
+# During development run >>> from main import *
 in the python interpreter from the pynet home directory
 """
-import IMP
-import jax
-import numpy
-import matplotlib
-import matplotlib.pyplot as plt
-from packaging import version
-from pathlib import Path
-import scipy
-import sys
-
-pyversion = sys.version.split('|')[0]
-assert version.parse(pyversion) >= version.parse('3.9.7')
-
-
-import pyext.src.graph as graph
-#import pyext.src.get_network_overlap as get_network_overlap 
 import pyext.src.ii as ii
 
 import pyext.src.mcmc as mcmc
@@ -39,7 +23,6 @@ from pyext.src.project_paths import (
     data,
     corum,        
     ecoli,
-    corum,
     genetic_screen,
     sars_cov_2_lip,
     sars_cov_2_ppi,
@@ -47,5 +30,19 @@ from pyext.src.project_paths import (
     synthetic, 
     utility 
 )
+import pyext.src.graph as graph
+import IMP
+import jax
+import numpy
+import matplotlib
+import matplotlib.pyplot as plt
+from packaging import version
+from pathlib import Path
+import scipy
+import sys
+
+pyversion = sys.version.split('|')[0]
+assert version.parse(pyversion) >= version.parse('3.9.7')
 
 
+#import pyext.src.get_network_overlap as get_network_overlap
