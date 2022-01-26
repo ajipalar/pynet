@@ -16,7 +16,7 @@ import sys
 try:
     import IMP.pynet.config
     import IMP.pynet.utils as utils
-except:
+except ModuleNotFoundError:
     import pyext.src.config as config
     import pyext.src.utils as utils
 
@@ -73,5 +73,3 @@ def get_dataset_overlap(dataset_dict, dataset_names=None):
         for j, key2 in enumerate(dataset_names):
             intersection_matrix[i, j] = overlap(dataset_dict[key], dataset_dict[key2])
     return intersection_matrix
-
-

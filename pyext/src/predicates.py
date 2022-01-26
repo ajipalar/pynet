@@ -8,7 +8,7 @@ e.g., filter(predicate, iterator)
 from pathlib import Path
 try:
     from IMP.pynet.typedefs import AnyPath, FilePath, DirPath
-except:
+except ModuleNotFoundError:
     from pyext.src.typedefs import AnyPath, FilePath, DirPath
 
 

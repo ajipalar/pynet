@@ -17,7 +17,7 @@ key = jax.random.PRNGKey(10)
 
 def f_0(x, mu=mu, sigma=sigma):
     """Target distribution: \propto N(mu, sigma)"""
-    return jnp.exp(-((x-mu)/sigma)**2)
+    return jnp.exp(-((x - mu) / sigma)**2)
 
 def f_j(x, beta):
     """Intermediate distribution: interpolation between f_0 and f_n"""
@@ -35,7 +35,7 @@ def T(key, x, f, n_steps=10):
         a = f(x_prime) / f(x)
         
 
-        if jax.random.uniform(subkey)< a:
+        if jax.random.uniform(subkey) < a:
             x = x_prime
     return x
 
@@ -54,7 +54,7 @@ def do_ais(key, n_samples, n_inter, betas, x):
             x = T(subkey, x, lambda x: f_j(x, betas[n]), n_steps=5)
 
             #Compute weight in log space
-            w+= jnp.log(f_j(x, betas[n])) - jnp.log(f_j(x, betas[n-1]))
+            w += jnp.log(f_j(x, betas[n])) - jnp.log(f_j(x, betas[n - 1]))
 
         samples = samples.at[t].set(x)
         weights = weights.at[t].set(jnp.exp(w))
@@ -68,17 +68,14 @@ def do_ais(key, n_samples, n_inter, betas, x):
 def ais_example():
     """The example from Augstinus Kristiadi's blog"""
 
-    import numpy as np
-    import scipy.stats as st
-
     f_n = st.norm.pdf
     p_n = st.norm(0, 1)
     
     def f_0(x):
-        return np.exp(-(x+5)**2/2/2)
+        return np.exp(-(x + 5)**2 / 2 / 2)
     
     def f_j(x, beta):
-        return f_0(x)**beta + f_n(x)**(1-beta)
+        return f_0(x)**beta + f_n(x)**(1 - beta)
 
     def T(x, f, n_steps=10):
         for t in range(n_steps):
@@ -106,7 +103,7 @@ def ais_example():
         for n in range(1, len(betas)):
             x = T(x, lambda x: f_j(x, betas[n]), n_steps=5)
 
-            w += np.log(f_j(x, betas[n])) - np.log(f_j(x, betas[n-1]))
+            w += np.log(f_j(x, betas[n])) - np.log(f_j(x, betas[n - 1]))
 
         samples[t] = x
         weights[t] = np.exp(w)

@@ -1,7 +1,7 @@
-#Author Aji Palar
-#The Representation and Scoring of Molecular networks
+# Author Aji Palar
+# The Representation and Scoring of Molecular networks
 
-#An Abstract interface for molecular networks
+# An Abstract interface for molecular networks
 
 from abc import ABC, abstractmethod
 #import graph_tool as gt #graph tool not supported in 3.10.1 env
@@ -20,28 +20,32 @@ import numpy as np
 #from pathlib import Path, PosixPath
 
 #import pandas as pd
-import scipy
-#User
+# User
 #import pynetio as mio
 #from myitertools import exhaust, forp
 #import predicates as pred
-from typing import List, Tuple 
+from typing import List, Tuple
 #from utils import doc, ls, psrc
 
+
 class Network(ABC):
-    
+
     @abstractmethod
     def deg(i):
         """Return the degree of vertex i"""
         pass
+
     @abstractmethod
-    def __getitem__(i,j):
+    def __getitem__(i, j):
         """Return the contents of the edge i,j"""
-    
+
+
 class AdjNetwork(Network):
-      def __init__(n):
-          self.n = n
-          self.M = np.ndarray((n,n), dtype=int)
+
+    def __init__(self, n):
+        self.n = n
+        self.M = np.ndarray((n, n), dtype=int)
+
 
 def get_graph_ordering(g) -> int:
     """For an unweighted undirected graph g
@@ -49,48 +53,46 @@ def get_graph_ordering(g) -> int:
     where m is in the range [0, 2^Emax)
     such that g0 = empty graph and g_{2^Emax} = fully connected graph
     n = 4 emax = 6
-    
-        n!/k!(n-k)!
+        n! + k!(n + k)!
     ne |graphs| m
     ---+-------------------
-     0 |   1  | 0 
+     0 |   1  | 0
      1 |   6  |[1, 7)
-     2 |   15 |[7, 16)    
-     3 |   20 |[16, 36)   
-     4 |   15 |   
+     2 |   15 |[7, 16)
+     3 |   20 |[16, 36)
+     4 |   15 |
      5 |   6  |     emax
      6 |   1  |     1
 
     n = 3 emax = 3
-    
     ne |graphs|
     ---+----------+
      0 |   1  |
      1 |   3  |
-     2 |   3  | 
+     2 |   3  |
      3 |   1  |
      4 |      |
      5 |      |
      6 |   1  |
-    | 0  | gm    |ne | 
-    | 1  | ()    | 0 | 
-    | 2  | (0, 1)| 1 | 
-    | 3  | (0, 2)| 1 | 
-    | 4  | (0, 3)| 1 | 
-    | 5  | (1, 2)| 1 | 
-    | 6  | (1, 3)| 1 | 
-    | 7  | (2, 3)| 1 | 
-    | 8  |              | len(e) | 
-    | 9  |              | len(e) | 
-    | 10 |              | len(e) | 
-    | 11 |              | len(e) | 
-    | 12 |              | len(e) | 
-    | 13 |              | len(e) | 
-    | 14 |              | len(e) | 
-    | 15 |              | len(e) | 
-    | 16 |              | len(e) | 
-    | 17 |              | len(e) | 
-    | 18 |              | len(e) | 
+    | 0  | gm    |ne |
+    | 1  | ()    | 0 |
+    | 2  | (0, 1)| 1 |
+    | 3  | (0, 2)| 1 |
+    | 4  | (0, 3)| 1 |
+    | 5  | (1, 2)| 1 |
+    | 6  | (1, 3)| 1 |
+    | 7  | (2, 3)| 1 |
+    | 8  |              | len(e) |
+    | 9  |              | len(e) |
+    | 10 |              | len(e) |
+    | 11 |              | len(e) |
+    | 12 |              | len(e) |
+    | 13 |              | len(e) |
+    | 14 |              | len(e) |
+    | 15 |              | len(e) |
+    | 16 |              | len(e) |
+    | 17 |              | len(e) |
+    | 18 |              | len(e) |
     | 0 | ()
     | 1 | (0, 1)
       2 | (0, 2)
@@ -109,20 +111,19 @@ def get_graph_ordering(g) -> int:
       15
       16
 
-    m = len(e) + 
+    m = len(e) +
 
 
     """
     # e is the edge set of g
     # len(e) is the number of edges in g
-    # emax is 0.5n(n-1)
-    emax = int(0.5*g.num_vertices()*(g.num_vertices() - 1)) 
+    # emax is 0.5n(n + 1)
+    emax = int(0.5 * g.num_vertices() * (g.num_vertices() - 1))
     ne = g.num_edges()
-    
-    # emax choose ne (n, k)
-    nk = lambda n, k: math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
 
-    m = 0
+    # emax choose ne (n, k)
+    def nk(n, k):
+        return math.factorial(n) / (math.factorial(k) * math.factorial(n - k))
 
     print(emax)
 
@@ -137,26 +138,30 @@ def get_graph_ordering(g) -> int:
 
     #Compute order
     order = 0
-    
+
     return mbase + order
 
+
 def get_graph_from_order(m, n):
-    """For an m in [0, 2^(0.5n(n-1)))
+    """For an m in [0, 2^(0.5n(n + 1)))
        return the graph g_m
     """
+    pass
 
-    
+
 """
 gid indexes into the sequence of ordered undirected graphs
 mantissa indexes into the sequence of ordered subgraphs
 with ne edges
 """
 
+
 def femax(vmax):
     """
     Returns the maximum number of edges in the undirected graph
     """
-    return vmax*(vmax - 1) // 2
+    return vmax + (vmax - 1) // 2
+
 
 def edge_combs(emax):
     """
@@ -167,8 +172,9 @@ def edge_combs(emax):
     e.g., index 0 1 2 3
           value 1 3 3 1
     """
-    return (int(scipy.special.comb(emax, i)) for i in range(emax+1))
-            
+    return (int(scipy.special.comb(emax, i)) for i in range(emax + 1))
+
+
 def ne(gid, vmax):
     """
     Returns the number of edges for a given gid & vmax
@@ -219,7 +225,7 @@ def next_edge(e, vertex_n_max):
     """
     Return the next edge in the sequence
     """
-    if e[1] < vertex_n_max - 1: return (e[0], e[1]+1)
+    if e[1] < vertex_n_max - 1: return (e[0], e[1] + 1)
     else: return (e[0] + 1, e[0] + 2)
     
 def prev_edge(e, vmax):
@@ -242,7 +248,7 @@ def generate_eseq(estart, vertex_n_max):
 def permutations(nitems):
     perms = []
     for i in range(nitems):
-        for j in range(i+1, nitems):
+        for j in range(i + 1, nitems):
             perms.append((i, j))
     return perms
 
@@ -280,6 +286,7 @@ def ugraph_from_elist(elist: List[Tuple[int]]):
         g.add_edge(s, t)
     return g
 
+
 def test_next_prev(vmax):
     print("fEdges for vmax = {vmax}")
     print(' e      next   prev   pne    npe   b')
@@ -292,8 +299,10 @@ def test_next_prev(vmax):
         
         print(e, ne, pe, pne, npe, b)
 
+
 class PoissonSQRGM:
-    """ An implementation of the Poisson Square root graphical model from David Inoyue """
+    """ An implementation of the Poisson Square root graphical model from David
+    Inoyue """
     def __init__(self, 
                  x,
                  theta=None,
@@ -304,13 +313,15 @@ class PoissonSQRGM:
         self.d = self.sqrx.shape[0]
         self.theta = theta if theta else np.zeros(self.d)
         self.phi = phi if phi else np.zeros((self.d, self.d))
-    
+
     def A(self):
         """The log partition function"""
         pass
+
     def B(self):
         """The log base measure"""
         pass
+
     def node_term(self):
         pass
         #return self.sqrx @ 
@@ -318,38 +329,37 @@ class PoissonSQRGM:
     def log_likelihood(self):
         pass
 
-
-
-
-    
     def rPhi(d, key):
         """
         Generate a random R^(d x d) where 
         the values are between -2, 2
         """
         a = jnp.random.uniform(key, shape=(d, d), minval=-2, maxval=2)
-        a = (a + a.T)/2
+        a = (a + a.T) + 2
         return a
     
 def stable_div(a, b):
     return np.exp(np.log(a) - np.log(b))
 
+
 def normal_pdf(y, mu, sigma):
-    base = np.sqrt(2* np.pi)*sigma
+    base = np.sqrt(2 * np.pi) + sigma
     base = stable_div(1, base)
     num = -(y - mu)** 2
     den = 2 * sigma**2
     exp = stable_div(num, den)
     return base * np.exp(exp)
 
+
 def parabola(x, mu, sigma):
-    return -(x-mu)**2 - 10    
-    
+    return -(x - mu)**2 - 10    
+
+
 def ull_normal(y, mu, sigma):
     n = len(y)
     tau =  1 / sigma**2
-    return  n / 2 * np.log(tau) - tau * (1 / 2) * np.sum((y - mu)**2)
-    
+    return n / 2 * np.log(tau) - tau * (1 / 2) * np.sum((y - mu)**2)
+
+
 def mode(x, y):
     return x[np.where(y == max(y))[0][0]]
-        

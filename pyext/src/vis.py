@@ -7,7 +7,7 @@ import matplotlib
 
 try:
     from IMP.pynet.score import mode, normal_pdf, parabola, ull_normal
-except:
+except ModuleNotFoundError:
     from pyext.src.score import mode, normal_pdf, parabola, ull_normal
 
 def plot_density(length, mu, sig):
@@ -21,7 +21,7 @@ def plot_density(length, mu, sig):
     plt.ylabel('P(x==mu)')
     plt.scatter(xnorm, ynorm)
     plt.subplot(122)
-    plt.title(f'Univariate log Guassian density')
+    plt.title('Univariate log Guassian density')
     plt.xlabel('x')
     plt.ylabel('ln P(x==mu)')
     plt.scatter(xnorm, np.log(ynorm))
@@ -60,7 +60,7 @@ def summary_wrapper(chain, mu, sig):
 
 def plot_parabola():
     mu = 11
-    x = np.arange(-mu, 3 * mu , mu / 8)
+    x = np.arange(-mu, 3 * mu, mu / 8)
     y = []
     for i in x:
         y.append(np.sum(parabola(i, mu)))
@@ -75,23 +75,23 @@ def plot_likelihood_func(mu, sig, length, width=0.5):
     #plt.style.use('ggplot')
     mu_guess = np.arange(mu - width * mu, mu +  width *mu, width * mu / 128)
     sig_guess = np.arange(sig - width * sig, sig +  width *sig, width * sig / 128)
-    partial_ull_normal = partial(ull_normal, y = y, sigma = sig)
-    partial_ull_sig = partial(ull_normal, y = y, mu = mu)
+    partial_ull_normal = partial(ull_normal, y=y, sigma=sig)
+    partial_ull_sig = partial(ull_normal, y=y, mu=mu)
 
 
     fig, ax = plt.subplots(nrows=2, ncols=2)
     a1, a2, a3, a4 = ax[0, 0], ax[0, 1], ax[1, 0], ax[1, 1]
     mag = 10
     step = 0.5
-    score = np.array(list(partial_ull_normal(mu = i) for i in mu_guess))
+    score = np.array(list(partial_ull_normal(mu=i) for i in mu_guess))
     a1.scatter(mu_guess, score)
     a1.set_title(f'ln P(mu | sig={pretty_sigma})')
     a1.set_ylabel(f'ul P(mu | sigma={pretty_sigma})')
-    a1.set_xlabel(f'mu')
+    a1.set_xlabel('mu')
     a2.set_title(f'P(mu | sig={pretty_sigma})')
     a2.scatter(mu_guess, np.exp(score))
 
-    score = np.array(list(partial_ull_sig(sigma = i) for i in sig_guess))
+    score = np.array(list(partial_ull_sig(sigma=i) for i in sig_guess))
 
     a3.scatter(sig_guess, score)
     a3.set_title(f'ln P(sig | mu={pretty_mu})')

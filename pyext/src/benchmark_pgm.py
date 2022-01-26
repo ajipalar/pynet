@@ -1,30 +1,38 @@
 import IMP
 import jax
+import jax.numpy as jnp
+import numpy as np
 import math
 from typedefs import (
-        Container,
-        FilePath,
-        PPINetwork, 
-        PRNGKey
+    CartesianTable,
+    Container,
+    FilePath,
+    Matrix,
+    PPINetwork,
+    PRNGKey,
+    Vector
 )
 
 
 # get_ something that exists
 # set_ something that exists
-################################################################################
-def load_protein_complex(protein_complex: FilePath) -> CartesianTable:
+###############################################################################
+def load_protein_complex(pcomplex: FilePath) -> CartesianTable:
     pass
+
 
 def get_ppi_network_from_cartesian_table(table: CartesianTable) -> PPINetwork:
     pass
 
+
 def get_ppi_network_from_complex(protein_complex) -> PPINetwork:
-    cartesian_table = load_protein_complex(protein_complex)
-    ppi_network = create_ppi_network_from_cartesian_table(table)
+    xyz_coords = load_protein_complex(protein_complex)
+    ppi_network = get_ppi_network_from_cartesian_table(xyz_coords)
     return ppi_network
 
+
 def get_synth_apms_data(bait_prey: PPINetwork,
-        prng_key: PRNGKey) -> M: 
+                        prng_key: PRNGKey) -> Matrix:
     """Use the prng_key to generate random APMS
        spectral counts data
        return a bait prey matrix
@@ -40,28 +48,37 @@ def get_synth_apms_data(bait_prey: PPINetwork,
     """
     return y_synth
 
+
 def poisson_sqr(y, theta, phi) -> float:
     """The Poisson Square Root Graphical Model"""
     return score
 
-def move_poisson_sqr(key: PRNGKey, theta: Vector, phi: Matrix) -> Tuple[Vector, Matrix]:
+
+def move_poisson_sqr(key: PRNGKey, theta:
+                     Vector, phi: Matrix) -> tuple[Vector, Matrix]:
     theta = jax.random.uniform(key)
     return theta, phi
 
+
 def eta_1(s, i):
-    pass 
+    pass
+
 
 def eta_2(s, i):
     pass
 
+
 def base_measure(x, s, i):
     pass
+
 
 def Anode(eta1, eta2, s, i):
     pass
 
+
 def Lambda():
     pass
+
 
 def magPhi():
     pass
@@ -87,29 +104,19 @@ def A(theta, phi):
     # Compute a "slice sample" for node conditional distributions
     # The bounds are computed in closed form
 
-    #Use the slice sample to develop a Gibbs sampler
+    # Use the slice sample to develop a Gibbs sampler
 
-    #Derive an annealed importance sampler
+    # Derive an annealed importance sampler
 
-    #Use the Gibbs as an intermediate sampler
+    # Use the Gibbs as an intermediate sampler
 
-    #Combine off-diagonal part phi_off
+    # Combine off-diagonal part phi_off
 
-    #Linearly changing gamma from 0 to 1
+    # Linearly changing gamma from 0 to 1
 
-    #Start from base exponential
+    # Start from base exponential
 
-    #Pr(x|eta1=phi_ss, eta_2=0) -> Pr(x|theta, phi)
-        
-        
-        
-
-
-
-
-   
-
-
+    # Pr(x|eta1=phi_ss, eta_2=0) -> Pr(x|theta, phi)
 
 
 """
@@ -139,4 +146,3 @@ Glossary:
     Some children have Leaves
 
 """
-

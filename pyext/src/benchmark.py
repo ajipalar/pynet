@@ -8,7 +8,7 @@ def write_example_benchmark():
     """
 
     fpath = benchmark / "ppi_benchmark_example.tsv"
-    assert fpath.is_file == False, f"{fpath} exists\nAborting"
+    assert fpath.is_file is False, f"{fpath} exists\nAborting"
 
     with open(fpath, 'w') as f:
         line = "interaction-id\t"

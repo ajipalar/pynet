@@ -33,6 +33,8 @@ def swap_keys(d):
         t = d[key]
         d2[t] = key
     return d2
+
+
 summary_json = swap_keys(summary_json)
 
 def find_key(query, pydict):
@@ -40,6 +42,8 @@ def find_key(query, pydict):
         if query in key:
             return key
     return None
+
+
 effectome_p = multi_omnics_p / summary_json[find_key("effectome", summary_json)]
 #effectome_d = pd.read_excel(table5.as_posix(), sheet_name=1)
 
@@ -66,4 +70,3 @@ dout.loc['Stukalov', 'n prey genes'] = len(gene_names)
 
 
 dout
-

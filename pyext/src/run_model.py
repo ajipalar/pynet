@@ -13,6 +13,7 @@ def represent_network(n):
     """represent a network of n nodes."""
     return network
 
+
 """
 Vertex sets have restraints
 Restraints have vertex sets
@@ -30,34 +31,35 @@ def register_restraints():
     ID | functor | *args (vertex_set, data, PRNGKey, other_params)
     """
 
+
 def poisson_sqrgm(vertex_set, data):
     return score
 
-#Sample model
+
 def sample(M, D, PRNGKey):
     return samples
 
-#Analyze results
 
 def plot_MCMC_chain(samples):
     """x: step, y: score"""
     return None
 
+
 def check_R_hat(samples):
     return R_hat
+
 
 def KL_divergence_test(samples):
     return KL_statistic
 
+
 def plot_sample_edge_mean(samples):
     return None
+
 
 def plot_sample_edge_variance(samples):
     return None
 
+
 def cluster_models(samples):
     return clustered_samples
-
-
-
-
