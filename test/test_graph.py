@@ -12,6 +12,8 @@ import unittest
 import sys
 
 class TestGraph(IMP.test.TestCase):
+    module = graph
+
     def test_print(self):
         pass
 
@@ -22,30 +24,21 @@ class TestGraph(IMP.test.TestCase):
         y = Node(structure=0)
         self.assertEqual(Node.nnodes , 2)
 
-    @IMP.test.expectedFailure
-    def test_fail(self):
-        self.assertEqual(0, 1)
+    def test_equal(self):
+        self.assertEqual(1, 1)
 
-    @unittest.expectedFailure
-    def test_fail2(self):
-        self.assertEqual(0, 1)
+    def test_neg(self):
+        self.assertNotEqual(0, 1)
 
-    def test_fail3(self):
-        self.assertEqual(0, 1)
+    def test_class_names(self):
+        exceptions = []
+        words = []
+        self.assertClassNames(self.module, exceptions, words)
 
-
-class TestEID(IMP.test.TestCase):
-    @IMP.test.expectedFailure
-    def test_fail(self):
-        self.assertEqual(0, 1)
-
-    @unittest.expectedFailure
-    def test_fail2(self):
-        self.assertEqual(0, 1)
-
-    def test_fail3(self):
-        self.assertEqual(0, 1)
-
+    def test_function_names(self):
+        exceptions = []
+        words = []
+        self.assertFunctionNames(self.module, exceptions, words)
 
 if __name__ == "__main__":
     IMP.test.main()
