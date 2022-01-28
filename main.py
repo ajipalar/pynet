@@ -33,7 +33,7 @@ from pyext.src.project_paths import (
 import pyext.src.graph as graph
 import IMP
 import jax
-import numpy
+import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from packaging import version
