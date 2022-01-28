@@ -48,26 +48,18 @@ class TestII(IMP.test.TestCase):
             self.assertEqual(m[i, 0], a_inter[i])
             self.assertEqual(m[0, i], a_inter[i])
 
-    @unittest.expectFailure
-    def test_fail(self):
+    def test_neg(self):
         self.assertEqual(False, True)
 
-    @expectFailure
-    def test_fail2(self):
-        self.assertEqual(False, True)
+    def test_neg2(self):
+        self.assertNotEqual(False, True)
 
+    @unittest.skip
     def test_fail3(self):
         self.assertEqual(False, True)
 
     def test_pass(self):
         self.assertEqual(True, True)
-
-    def run_tests():
-        test_list = [test_get_dataset_overlap]
-        for test in test_list:
-            if config.PRINT_TEST_RESULTS:
-                test = decorate_print_test_results(test, __name__)
-            test()
 
 
 if __name__ == "main":
