@@ -12,30 +12,32 @@ from typing import (
     TypeVar,
     Union
 )
+
 import typing
 import inspect
 import types
 
 T = TypeVar('T')
 
+
 # Paths
-DataFrame = NewType('DataFrame', pd.DataFrame)
+AnyPath = NewType('AnyPath', Path)
 DirPath = NewType('DirPath', Path)
 FilePath = NewType('FilePath', Path)
-AnyPath = NewType('AnyPath', Path)
 PlainTextDataPath = NewType('PlainTextDataPath', FilePath)
 TsvPath = NewType('TsvPath', PlainTextDataPath)
 
 # Column label types
+DataFrame = NewType('DataFrame', pd.DataFrame)
 AnyCol = NewType('AnyCol', str)
 PGGroupCol = NewType('PGGroupCol', AnyCol)
 
 # Data Types (entries in the excel sheets)
+Bait = NewType('Bait', str)
 ExcelEntry = NewType('ExcelEntry', str)
+Organism = NewType('Organism', str)
 UID = NewType('UID', str)  # UniProtID
 PreyUID = NewType('PreyUID', UID)
-Bait = NewType('Bait', str)
-Organism = NewType('Organism', str)
 
 # Graph types
 #G = NewType('G', gt.Graph)
