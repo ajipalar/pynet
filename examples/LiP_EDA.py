@@ -306,7 +306,7 @@ def Rhat(I_k, mu, sigma, ngen):
     I_mu = np.mean(I_k, axis=1)
     I_sig = reshape(I_sig)
     I_mu = reshape(I_mu)
-    
+
     I = np.random.randn(npep, ngen)*I_sig + I_mu #npep
     print('Warning - use jax prng')
     
