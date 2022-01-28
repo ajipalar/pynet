@@ -7,11 +7,9 @@ import unittest
 try:
     import IMP.test
     import IMP.algebra
-    import IMP.pynet.config
     import IMP.pynet.utils as utils
     from IMP.pynet.ii import get_dataset_overlap
 except ModuleNotFoundError:
-    import pyext.src.config
     import pyext.src.utils as utils
     from pyext.src.ii import get_dataset_overlap
 
