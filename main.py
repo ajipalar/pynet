@@ -31,6 +31,7 @@ from pyext.src.project_paths import (
     utility 
 )
 import pyext.src.graph as graph
+import pyext.src.plot as plot
 import IMP
 import jax
 import numpy as np

@@ -50,6 +50,7 @@ R = TypeVar('R')
 Array = Any
 RealArray = Array
 IntegerArray = Array
+Array1d = NewType('Array1d', Array)
 DTypeLikeInt = Any
 DTypeLikeFloat = Any
 PRNGKeyArray = Any  # Change this to prng.PRNGKeyArray
