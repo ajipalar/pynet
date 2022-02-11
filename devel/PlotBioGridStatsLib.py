@@ -1,6 +1,23 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+try:
+    from IMP.pynet.typedefs import (
+        Array, 
+        DataFrame, 
+        Series,
+        ColName, 
+        ProteinName
+    )
+except ModuleNotFoundError:
+    from pyext.src.typedefs import (
+        Array, 
+        DataFrame, 
+        Series,
+        ColName, 
+        ProteinName
+    )
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,9 +29,6 @@ from typing import Any, Callable, NewType
 import graphviz
 import inspect
 
-DataFrame = NewType('DataFrame', Any)
-ColName = NewType('ColName', str)
-ProteinName = NewType('ProteinName', str)
 
 def load_biogrid_v4_4() -> DataFrame:
     """biogrid tab3 database to pandas dataframe"""

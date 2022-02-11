@@ -27,17 +27,23 @@ FilePath = NewType('FilePath', Path)
 PlainTextDataPath = NewType('PlainTextDataPath', FilePath)
 TsvPath = NewType('TsvPath', PlainTextDataPath)
 
-# Column label types
+# Pandas 
 DataFrame = NewType('DataFrame', pd.DataFrame)
+Series = NewType('Series', Any)
 AnyCol = NewType('AnyCol', str)
 PGGroupCol = NewType('PGGroupCol', AnyCol)
+ColName = NewType('ColName', str)
 
-# Data Types (entries in the excel sheets)
+
+
+# str Data Types (entries in the excel sheets)
 Bait = NewType('Bait', str)
 ExcelEntry = NewType('ExcelEntry', str)
 Organism = NewType('Organism', str)
 UID = NewType('UID', str)  # UniProtID
 PreyUID = NewType('PreyUID', UID)
+ProteinName = NewType('ProteinName', str)
+
 
 # Graph types
 #G = NewType('G', gt.Graph)
