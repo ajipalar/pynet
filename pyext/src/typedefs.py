@@ -6,7 +6,7 @@ from typing import (
     Callable,
     NewType,
     Optional,
-    ParamSpec,
+    # ParamSpec,
     Sequence,
     Tuple,
     TypeVar,
@@ -43,13 +43,15 @@ Organism = NewType('Organism', str)
 UID = NewType('UID', str)  # UniProtID
 PreyUID = NewType('PreyUID', UID)
 ProteinName = NewType('ProteinName', str)
+GeneID = NewType('GeneID', str)  # NCBI Entrez Gene identifier
 
+#Other Types
 
 # Graph types
 #G = NewType('G', gt.Graph)
 
 # Functions
-P = ParamSpec('P')
+# P = ParamSpec('P')
 R = TypeVar('R')
 
 # jax related
