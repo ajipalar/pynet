@@ -7,24 +7,25 @@ try:
         ColName, 
         DataFrame, 
         Dimension,
+        GeneID,
         Index,
         Matrix,
-        ProteinName,
         PRNGKey,
+        ProteinName,
         Series,
         Vector
     )
 except ModuleNotFoundError:
     from pyext.src.typedefs import (
         Array, 
+        ColName, 
         DataFrame, 
         Dimension,
+        GeneID,
         Index,
-        Series,
-        ColName, 
+        Matrix,
         ProteinName,
         PRNGKey,
-        Matrix,
         Series,
         Vector
     )
@@ -32,8 +33,10 @@ except ModuleNotFoundError:
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import mygene
 import jax
 import jax.numpy as jnp
+import Bio.PDB
 from pathlib import Path
 from functools import partial
 from typing import Any, Callable, NewType
@@ -52,9 +55,9 @@ def minmaxlen(col):
         min_l = synlen if synlen < min_l else min_l
     return max_l, min_l
 
-def load_biogrid_v4_4() -> DataFrame:
+def load_biogrid_v4_4(dpath) -> DataFrame:
     """biogrid tab3 database to pandas dataframe"""
-    dpath = Path("../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt")
+    # dpath = Path("../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt")
     biogrid_df : DataFrame = pd.read_csv(dpath, sep="\t")
     return biogrid_df
 
@@ -142,10 +145,10 @@ def plot_physical_experiments(d):
 def prepare_biogrid_fpipe():
     return [load_biogrid_v4_4, drop_columns, filter_missing_entrez_interactors]
 
-def prepare_biogrid():
+def prepare_biogrid(dpath):
     """Preprocesses biogrid dataframe for downstream analysis"""
     
-    d = load_biogrid_v4_4()
+    d = load_biogrid_v4_4(dpath)
     d = drop_columns(d)
     d = filter_missing_entrez_interactors(d)
     
@@ -576,6 +579,43 @@ def test_matrix_minus_slice(slicef):
             assert jnp.all(col[0:p-1] == sl)
 
 
+def get_ncbi_gene_id(name, mg) -> GeneID:
+    """
+    params:
+        name :
+        mg : mygene.MyGeneInfo() object
+    return :
+        An NCBI gene id -> int or str?
+    """
+
+    return mg.query(name)['hits'][0]['_id']
+
+def get_mmcif_structure(name : str, dpath: Path) -> object:
+    """Devnote: Nothing consumes this function
+       get a structure parser object from an mmcif data path.
+       
+       params:
+          name : a non-unique identifier ascociated with the structure
+          dpath: the pathlib.Path to the mmcif file containing the structure
+
+       return:
+          structure : a Bio.PDB.Structure.Structure object 
+    """
+
+    parser = Bio.PDB.MMCIFParser()
+    structure = parser.get_structure(name, str(dpath))
+    return structure 
+
+def get_saga_mmcif_structure() -> object:
+    """Gets the saga complex for benchmarking the Poisson SQR Model
+    
+    return : a Bio.PDB.Structure.Structure object
+    """
+
+    saga_path = Path('../data/saga_complex/7KTR.cif')
+    structure = get_mmcif_structure('SAGA', saga_path)
+    return structure
+    
 
 
 
