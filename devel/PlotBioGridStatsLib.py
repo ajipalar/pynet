@@ -4,18 +4,29 @@
 try:
     from IMP.pynet.typedefs import (
         Array, 
-        DataFrame, 
-        Series,
         ColName, 
-        ProteinName
+        DataFrame, 
+        Dimension,
+        Index,
+        Matrix,
+        ProteinName,
+        PRNGKey,
+        Series,
+        Vector
     )
 except ModuleNotFoundError:
     from pyext.src.typedefs import (
         Array, 
         DataFrame, 
+        Dimension,
+        Index,
         Series,
         ColName, 
-        ProteinName
+        ProteinName,
+        PRNGKey,
+        Matrix,
+        Series,
+        Vector
     )
 
 import pandas as pd
@@ -29,6 +40,17 @@ from typing import Any, Callable, NewType
 import graphviz
 import inspect
 
+
+def minmaxlen(col):
+    """Use to determine the max, min length of a pipe
+       delimeted entry in a dataframe"""
+    max_l = 0
+    min_l = 1e9
+    for syn in col:
+        synlen = len(syn.split("|"))
+        max_l = synlen if synlen > max_l else max_l
+        min_l = synlen if synlen < min_l else min_l
+    return max_l, min_l
 
 def load_biogrid_v4_4() -> DataFrame:
     """biogrid tab3 database to pandas dataframe"""
@@ -400,3 +422,162 @@ def filter_biogrid(tip49 : DataFrame, biogrid : DataFrame):
 
     biogrid = biogrid.drop(index=rownames_to_drop)
     return biogrid
+
+
+def jbuild(f, **partial_kwargs) -> Callable:
+    """jit compile a function with static *args and **kwargs
+       params:
+         partial_kwargs : kwargs for the functools partial function
+       return:
+         jf : a jit complied function"""
+
+    pf = partial(f, **partial_kwargs)
+    jf = jax.jit(pf)
+    return jf
+
+def _get_vec_minus_s(i, vec, vec_l):
+    """Returns the vector minus the ith element"""
+    a = jnp.zeros(vec_l - 1, dtype=vec.dtype)
+    
+    a = jax.lax.fori_loop(0, i, lambda j, a: a.at[j].set(vec[j]), a)
+    a = jax.lax.fori_loop(i+1, vec_l, lambda j, a: a.at[j-1].set(vec[j]), a)
+    return a
+
+    
+
+def get_matrix_col_minus_s(i, phi, p):
+    """Returns the ith column of the matrix phi with the ith element removed
+       to jit compile. O(p)
+         pf = parital(f, p=literal_p)
+         jf = jax.jit(pf)
+         or jbuild(f, **{'p':p})
+         
+    """
+    #a = jnp.zeros(p-1, dtype=phi.dtype)
+    col = phi[:, i]
+    #a = jax.lax.fori_loop(0, i, lambda j, a: a.at[j].set(col[j]), a)
+    #a = jax.lax.fori_loop(i+1, p, lambda j, a: a.at[j-1].set(col[j]), a)
+    
+    a = _get_vec_minus_s(i, col, p)
+    return a
+
+
+
+def get_poisson_matrix(key : PRNGKey, p : Dimension, lam : float) -> Matrix:
+    """Generates the matrix phi for use in the
+       Poisson Square Root Graphical Model Inouye 2016
+       params:
+         key : jax.random.PRNGKey
+         p   : Dimension 
+         lam : 
+       return:
+         phi : p x p matrix whose entries are sampled from independant
+               univariate poisson distributions with rate lam"""
+
+    phi = jax.random.poisson(key, lam, (p, p))
+    phi_diag = phi.diagonal()
+    phi = jnp.tril(phi) + jnp.tril(phi).T
+    phi, diag = set_diag(phi, phi_diag)
+    return phi
+
+def set_diag(phi: Matrix, diag: Vector) -> tuple[Matrix, Vector]:
+    p = len(phi)
+    return jax.lax.fori_loop(0, p, lambda i, t: (t[0].at[(i, i)].set(t[1][i]), t[1]), (phi, diag))   
+    
+
+def get_eta1(theta, phi, x_s, s, i):
+    """
+    params:
+      theta : length p vector
+      phi   : p x p matrix
+      x_s   : p length vector
+        s   : index from 1 to p
+        i   : index from 1 to n
+    return:
+      eta1 : float
+    """
+    return phi[s - 1, s - 1]
+
+def get_eta2(theta, phi, x_s, s, i, p):
+    """
+    params:
+      theta : length p vector
+      phi   : p x p matrix
+      x_s   : p length vector
+        s   : index from 1 to p
+        i   : index from 1 to
+        p   : the problem dimensionality
+    return:
+      eta2 : float
+      
+    """
+    
+    t1 = theta[s - 1] #  theta_s
+    t2 = 2 * get_matrix_col_minus_s(i, phi, p).T
+    
+
+def logsum(x):
+    """Sum i=1 to x log(i)
+    """
+    return jax.lax.fori_loop(1, x + 1, lambda i, val: val + jnp.log(i), 0)
+    
+def logfactorial(x_si):
+    """Jit compileable log factorial log(n!) = Sum i=1 to n log(n)
+    if n == 0 return log(0!) = log(1) = 0
+    if n == 1 return log(1!) = log(1) = 0
+    
+    """
+    return jax.lax.cond(x_si <= 1, lambda x : 0.0 , logsum, x_si)
+    
+def Zexp(eta1, eta2):
+    """Not jittable because we use the scipy erfc implementation
+    eta1 < 0 by 13
+    """
+    t1 = jnp.sqrt(jnp.pi) * eta1 * jnp.exp( - eta2 ** 2 / (4 * eta1))
+    erf_arg = - eta2 / (2 * (jnp.sqrt(-1j) * jnp.sqrt(eta1)))
+    t2 = scipy.special.erfc(erf_arg)
+    d1 = -2 * ((jnp.sqrt(-1j) * jnp.sqrt(eta1)) ** 3)
+    s2 = 1 / eta1
+    
+    return t1 * t2 / d1 - s2
+    
+
+def f0(xsi, eta1, eta2):
+    return jnp.exp(eta1 * xsi + eta2 * jnp.sqrt(xsi) - logfactorial(xsi))
+
+def fn(xsi, eta1):
+    return jnp.exp(eta1 * xsi)
+
+
+# In[58]:
+
+
+def test_matrix_minus_slice(slicef):
+    seed = 7
+    key = jax.random.PRNGKey(seed)
+    p = 5
+    poisson_lam = 8
+    phi = get_poisson_matrix(key, p, poisson_lam)
+    
+    jslice_neg_s = jbuild(slicef, **{'p':p})
+
+    for i in range(13):
+        print(i)
+        col = phi[:, i]
+        sl = jslice_neg_s(i, phi)
+        #print(i, col, sl)
+        if i == 0:
+            #print(i, col, sl)
+            assert jnp.all(col[1:p] == sl)
+        elif i < len(phi):
+            assert jnp.all(col[0:i] == sl[0:i])
+            assert jnp.all(col[i+1:p] == sl[i:len(sl)])
+        else:
+            assert jnp.all(col[0:p-1] == sl)
+
+
+
+
+
+
+
