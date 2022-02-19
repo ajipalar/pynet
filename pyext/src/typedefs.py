@@ -63,6 +63,8 @@ DTypeLikeInt = Any
 DTypeLikeFloat = Any
 PRNGKeyArray = Any  # Change this to prng.PRNGKeyArray
 KeyArray = NewType('KeyArray', PRNGKeyArray)
+Index = NewType('Index', int)
+Dimension = NewType('Dimension', int)
 
 UINT_DTYPES = Any  # TODO prng.UINT_DTYPES
 
