@@ -15,6 +15,8 @@ try:
         Series,
         Vector
     )
+
+    from IMP.pynet.jittools import is_jittable
 except ModuleNotFoundError:
     from pyext.src.typedefs import (
         Array, 
@@ -29,6 +31,7 @@ except ModuleNotFoundError:
         Series,
         Vector
     )
+    from pyext.src.jittools import is_jittable
 
 import pandas as pd
 import numpy as np
@@ -438,17 +441,22 @@ def jbuild(f, **partial_kwargs) -> Callable:
     jf = jax.jit(pf)
     return jf
 
-def _get_vec_minus_s(i, vec, vec_l):
-    """Returns the vector minus the ith element"""
+def _get_vec_minus_s(b_zero_indx : Index, 
+                     vec : Vector, 
+                     vec_l : int ) -> Vector:
+    """Returns a vec_l - 1 length vector equal to 
+       vec with the ith element removed"""
     a = jnp.zeros(vec_l - 1, dtype=vec.dtype)
     
-    a = jax.lax.fori_loop(0, i, lambda j, a: a.at[j].set(vec[j]), a)
-    a = jax.lax.fori_loop(i+1, vec_l, lambda j, a: a.at[j-1].set(vec[j]), a)
+    a = jax.lax.fori_loop(0, b_zero_indx, lambda j, a: a.at[j].set(vec[j]), a)
+    a = jax.lax.fori_loop(b_zero_indx +1, vec_l, lambda j, a: a.at[j-1].set(vec[j]), a)
     return a
 
     
 
-def get_matrix_col_minus_s(i, phi, p):
+def get_matrix_col_minus_s(s : Index, # base 1 index 
+                           phi : Matrix, 
+                           p : Dimension) -> Vector:
     """Returns the ith column of the matrix phi with the ith element removed
        to jit compile. O(p)
          pf = parital(f, p=literal_p)
@@ -457,16 +465,18 @@ def get_matrix_col_minus_s(i, phi, p):
          
     """
     #a = jnp.zeros(p-1, dtype=phi.dtype)
-    col = phi[:, i]
+    col : Vector  = phi[:, s - 1]  # a p length vector
     #a = jax.lax.fori_loop(0, i, lambda j, a: a.at[j].set(col[j]), a)
     #a = jax.lax.fori_loop(i+1, p, lambda j, a: a.at[j-1].set(col[j]), a)
     
-    a = _get_vec_minus_s(i, col, p)
+    a : Vector = _get_vec_minus_s(s - 1, col, p) # a p-1 length vector
     return a
 
 
 
-def get_poisson_matrix(key : PRNGKey, p : Dimension, lam : float) -> Matrix:
+def get_poisson_matrix(key : PRNGKey, 
+                       p : Dimension, 
+                       lam : float) -> Matrix:
     """Generates the matrix phi for use in the
        Poisson Square Root Graphical Model Inouye 2016
        params:
@@ -481,14 +491,27 @@ def get_poisson_matrix(key : PRNGKey, p : Dimension, lam : float) -> Matrix:
     phi_diag = phi.diagonal()
     phi = jnp.tril(phi) + jnp.tril(phi).T
     phi, diag = set_diag(phi, phi_diag)
+
     return phi
 
 def set_diag(phi: Matrix, diag: Vector) -> tuple[Matrix, Vector]:
+    """Set the diagonal elements of the DeviceArray phi"""
     p = len(phi)
-    return jax.lax.fori_loop(0, p, lambda i, t: (t[0].at[(i, i)].set(t[1][i]), t[1]), (phi, diag))   
+    phi_diag = jax.lax.fori_loop(0, 
+                                 p, 
+                                 lambda i, t: (t[0]
+                                     .at[(i, i)]
+                                     .set(t[1][i]), t[1]), 
+                                 (phi, diag))   
+
+    return phi_diag 
     
 
-def get_eta1(theta, phi, x_s, s, i):
+def get_eta1(theta : Vector, 
+             phi : Matrix, 
+             x_s : Vector, 
+             s : Index, 
+             i : Index) -> float:
     """
     params:
       theta : length p vector
@@ -499,9 +522,16 @@ def get_eta1(theta, phi, x_s, s, i):
     return:
       eta1 : float
     """
-    return phi[s - 1, s - 1]
 
-def get_eta2(theta, phi, x_s, s, i, p):
+    eta1 = phi[s - 1, s - 1]
+    return eta1
+
+def get_eta2(theta_s : float,  # theta at index s-1 
+             phi : Matrix, 
+             x: Vector, 
+             s : Index,  # base 1 index 
+             i : Index, 
+             p : Dimension) -> float:
     """
     params:
       theta : length p vector
@@ -517,6 +547,10 @@ def get_eta2(theta, phi, x_s, s, i, p):
     
     t1 = theta[s - 1] #  theta_s
     t2 = 2 * get_matrix_col_minus_s(i, phi, p).T
+
+    eta2 = t2
+    return eta2
+
     
 
 def logsum(x):
@@ -840,3 +874,55 @@ def dev_roc_examples_block():
     plt.title('PRC')
     plt.tight_layout()
     plt.show()
+
+def dev_get_dev_state_poisson_sqr():
+    seed = 7
+    key = jax.random.PRNGKey(seed)
+    k1, k2, k3 = jax.random.split(key, num=3 )
+    p : Dimension = 5
+    lam : float = 9.1
+    phi = get_poisson_matrix(k1, p, lam)
+    theta = jax.random.normal(k2, shape=(p, ))
+    return theta, phi
+
+def dev_is_jittable(theta : Vector, 
+        phi : Matrix, 
+        x_s : Vector, 
+        s : Index, 
+        i : Index):
+
+    test_cases = {'get_eta1': get_eta1,
+            'get_eta2': get_eta2,
+            'get_poisson_matrix': get_poisson_matrix,
+            'logfactorial': logfactorial,
+            'logsum': logsum,
+            'f0': f0,
+            'fn': fn,
+            'get_matrix_col_minus_s': get_matrix_col_minus_s,
+            '_get_vec_minus_s': _get_vec_minus_s
+            }
+
+    args = {'get_eta1': ,
+            'get_eta2': ,
+            'get_poisson_matrix': ,
+            'logfactorial': ,
+            'logsum': ,
+            'f0': ,
+            'fn': ,
+            'get_matrix_col_minus_s': ,
+            '_get_vec_minus_s': ,
+            }
+
+    kwargs = {'get_eta1': ,
+            'get_eta2': ,
+            'get_poisson_matrix': ,
+            'logfactorial': ,
+            'logsum': ,
+            'f0': ,
+            'fn': ,
+            'get_matrix_col_minus_s': ,
+            '_get_vec_minus_s': ,
+            }
+
+            
+
