@@ -615,9 +615,228 @@ def get_saga_mmcif_structure() -> object:
     saga_path = Path('../data/saga_complex/7KTR.cif')
     structure = get_mmcif_structure('SAGA', saga_path)
     return structure
+
+def dev_surface_plot_block():
+
+    from mpl_toolkits.mplot3d import Axes3D  
+    # Axes3D import has side effects, it enables using projection='3d' in add_subplot
+    import random
     
+    def fun(x, y):
+        return - x ** 2 - y ** 2
+    
+    fs = 8
+    fig = plt.figure(figsize=(fs, fs))
+    ax = fig.add_subplot(111, projection='3d')
+    x = y = np.arange(-3.0, 3.0, 0.05)
+    X, Y = np.meshgrid(x, y)
+    zs = np.array(fun(np.ravel(X), np.ravel(Y)))
+    Z = zs.reshape(X.shape)
+    
+    ax.plot_surface(X, Y, Z)
+    
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+    
+    plt.tight_layout()
+    
+    plt.show()
 
 
-
-
-
+def dev_numerical_approximation_block():
+    # Numerical Approximation
+    
+    # integral 1/5 dx/x
+    
+    def f(x): return 1/x
+    
+    n = 50
+    a = 1
+    b = 5
+    deltax = (b - a) / n
+    
+    def xk(k, n): return 1 + 4*k / n
+    
+    xkarr = np.array(list(xk(k, n) for k in iter(range(0,n + 1))))
+    Mn = sum(list(f((xkarr[i] + xkarr[i-1])/2) * deltax for i in range(1, n + 1)))
+    Tn = sum(list((f(xkarr[i]) + f(xkarr[i-1]))/2 * deltax for i in range(1, n+1)))
+    S2n = 2/3 * Mn + 1/3 * Tn
+    
+    
+    # In[ ]:
+    
+    
+    def integrate(dx):
+        x = np.arange(1, 5, dx)
+        y = 1/x
+        return sum(dx * y)
+    
+    
+    # In[ ]:
+    
+    
+    dxs = np.exp(range(0, -13, -1))
+    y = list(integrate(dx) for dx in dxs)
+    plt.plot(np.log(dxs), y)
+    
+    # The numerical approximation converages at the value of the integral
+    
+    
+    # In[ ]:
+    
+    
+    dMn = list(Mn - i for i in y)
+    dTn = list(Tn - i for i in y)
+    dS2n = list(S2n - i for i in y)
+    
+    plt.plot(dxs, dMn)
+    plt.plot(dxs, dTn)
+    plt.plot(dxs, dS2n)
+    plt.ylim()
+    
+    
+    # In[ ]:
+    
+    
+    import math
+    erf = math.erf
+    jerf = jax.jit(erf)
+    
+    
+    # In[ ]:
+    
+    
+    
+    
+    
+    # In[ ]:
+    
+    
+    import inspect
+    
+    
+    # In[ ]:
+    
+    
+    z = np.arange(0.1, 10, 0.1)
+    x = map(lambda i: math.gamma(i), iter(z))
+    x = list(x)
+    y = x
+    x = np.arange(0.1 , 10, 0.1)
+    plt.plot(x, y)
+    
+    
+    # In[ ]:
+    
+    
+    x = map(lambda i: math.factorial, iter(np.arange()))
+    
+    
+def dev_ncbi_block():
+    """From ipynb block for development"""
+    import requests
+    
+    def pyiter_to_slist(pyiter : list) -> str:
+        s=""
+        for i in pyiter:
+            s += str(i) + ","
+        s = s.strip(",")
+        return s
+    
+    def post_ncbi(genelist):
+        q = pyiter_to_slist(genelist)
+        headers = {'content-type': 'application/x-www-form-urlencoded'}
+        params = f'q={q}&scopes=symbol&fields=_id&species=human'
+        res = requests.post('http://mygene.info/v3/query', data=params, headers=headers)
+        return res
+    
+    POSTs = NewType('POSTs', str)
+    def get_geneid_from_respone(response : POSTs) -> list[GeneID]:
+        gene_ids : list[GeneID] = []
+        for i, d in enumerate(response.json()):
+            try:
+                gene_ids.append(d['_id'])
+            except KeyError:
+                print(d)
+        return gene_ids
+    
+    def get_ncbi_gene_id(name):
+        
+        return mg.query(name).json()['hits'][0]['_id']
+    
+    def test_post_ncbi(biogrid):
+        
+        test_case = biogrid['Official Symbol Interactor A']
+        q = list(test_case)
+        q = pyiter_to_slist(test_case)
+        q = test_case
+        
+        res = post_ncbi(q)
+        gene_ids = get_geneid_from_respone(res)
+        
+        for i, (rname, row) in enumerate(biogrid.iterrows()):
+            if i % 100 == 0 : print("=", end="")
+            gene_id = str(gene_ids[i])
+            biogrid_id = str(row['Entrez Gene Interactor A'])
+            assert gene_id == biogrid_id
+            
+    
+    
+    # In[ ]:
+    
+    
+    test_post_ncbi(biogrid.iloc[0:1000])
+    
+    
+    
+    mg.query('MRE11A', species='human')
+    
+    
+    
+    
+    
+    genelist = list(set(spec_counts_df['Bait']))
+    res = post_ncbi(genelist)
+    
+    
+    
+    list(biogrid['Official Symbol Interactor A'])
+    
+    
+    
+    pyiter_to_slist(biogrid['Official Symbol Interactor A'].iloc[0:20])
+    
+    
+    
+    for i in biogrid['Official Symbol Interactor A'].iloc[0:20]:
+        print(i)
+    
+    
+    
+def dev_roc_examples_block(): 
+    """dev block, roc prc curves"""
+    #ROC Examples
+    key = jax.random.PRNGKey(10)
+    y_true = jax.random.bernoulli(key, p=0.1, shape=(len(spec_counts_df), ))
+    y_true = np.array(y_true, dtype=int)
+    
+    y_score = spec_counts_df['SAINT'].values
+    y_score = map(lambda i: float(i), iter(y_score))
+    y_score = list(y_score)
+    fpr, tpr, thresholds = roc_curve(y_true, y_score)
+    prec, recall, pthresh = precision_recall_curve(y_true, y_score)
+    
+    
+    plt.subplot(121)
+    plt.xlabel('fpr')
+    plt.ylabel('tpr')
+    plt.plot(fpr, tpr)
+    plt.title('ROC')
+    plt.subplot(122)
+    plt.xlabel('recall')
+    plt.ylabel('precision')
+    plt.plot(recall, prec)
+    plt.title('PRC')
+    plt.tight_layout()
+    plt.show()
