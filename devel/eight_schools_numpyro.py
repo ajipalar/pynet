@@ -8,7 +8,6 @@ sigma = np.array([15.0, 10.0, 16.0, 11.0, 9.0, 11.0, 10.0, 18.0])
 
 import numpyro
 import numpyro.distributions as dist
-
 #Eight schools example
 
 def eight_schools(J, sigma, y=None):
@@ -17,8 +16,8 @@ def eight_schools(J, sigma, y=None):
     #Standard deviation in treatment effects
     tau = numpyro.sample('tau', dist.HalfCauchy(5))
     with numpyro.plate('J', J):
-         theta = numpyro.sample('theta', dist.Normal(mu, tau))
-         numpyro.sample('obs', dist.Normal(theta, sigma), obs=y)
+        theta = numpyro.sample('theta', dist.Normal(mu, tau))
+        numpyro.sample('obs', dist.Normal(theta, sigma), obs=y)
 
 from jax import random
 from numpyro.infer import MCMC, NUTS
