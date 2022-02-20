@@ -441,15 +441,18 @@ def jbuild(f, **partial_kwargs) -> Callable:
     jf = jax.jit(pf)
     return jf
 
-def _get_vec_minus_s(b_zero_indx : Index, 
+def _get_vec_minus_s(s : Index,  # base 1 index
                      vec : Vector, 
                      vec_l : int ) -> Vector:
     """Returns a vec_l - 1 length vector equal to 
        vec with the ith element removed"""
-    a = jnp.zeros(vec_l - 1, dtype=vec.dtype)
+
     
-    a = jax.lax.fori_loop(0, b_zero_indx, lambda j, a: a.at[j].set(vec[j]), a)
-    a = jax.lax.fori_loop(b_zero_indx +1, vec_l, lambda j, a: a.at[j-1].set(vec[j]), a)
+    a = np.zeros(vec_l - 1, dtype=vec.dtype)
+
+    
+    a = jax.lax.fori_loop(0, s - 1, lambda j, a: a.at[j].set(vec[j]), a)
+    a = jax.lax.fori_loop(s, vec_l, lambda j, a: a.at[j-1].set(vec[j]), a)
     return a
 
     
@@ -474,9 +477,8 @@ def get_matrix_col_minus_s(s : Index, # base 1 index
 
 
 
-def get_poisson_matrix(key : PRNGKey, 
-                       p : Dimension, 
-                       lam : float) -> Matrix:
+def get_random_phi_matrix(key : PRNGKey, 
+                       p : Dimension) -> Matrix:
     """Generates the matrix phi for use in the
        Poisson Square Root Graphical Model Inouye 2016
        params:
@@ -487,19 +489,28 @@ def get_poisson_matrix(key : PRNGKey,
          phi : p x p matrix whose entries are sampled from independant
                univariate poisson distributions with rate lam"""
 
-    phi = jax.random.poisson(key, lam, (p, p))
+    phi = jax.random.normal(key, (p, p))
     phi_diag = phi.diagonal()
     phi = jnp.tril(phi) + jnp.tril(phi).T
     phi, diag = set_diag(phi, phi_diag)
-
     return phi
+
+def get_random_X_matrix(key : PRNGKey,
+                        p : Dimension,
+                        n : Dimension,
+                        lam : float
+                        ) -> Matrix:
+
+    return jax.random.poisson(key, lam, (p, n))
+
 
 def set_diag(phi: Matrix, diag: Vector) -> tuple[Matrix, Vector]:
     """Set the diagonal elements of the DeviceArray phi"""
     p = len(phi)
     phi_diag = jax.lax.fori_loop(0, 
                                  p, 
-                                 lambda i, t: (t[0]
+                                 lambda i, t: 
+                                     (t[0]
                                      .at[(i, i)]
                                      .set(t[1][i]), t[1]), 
                                  (phi, diag))   
@@ -507,11 +518,9 @@ def set_diag(phi: Matrix, diag: Vector) -> tuple[Matrix, Vector]:
     return phi_diag 
     
 
-def get_eta1(theta : Vector, 
-             phi : Matrix, 
-             x_s : Vector, 
-             s : Index, 
-             i : Index) -> float:
+def get_eta1(phi : Matrix,  # R^{p x p} 
+             s : Index  # base 1 index
+             ) -> float:
     """
     params:
       theta : length p vector
@@ -526,11 +535,10 @@ def get_eta1(theta : Vector,
     eta1 = phi[s - 1, s - 1]
     return eta1
 
-def get_eta2(theta_s : float,  # theta at index s-1 
-             phi : Matrix, 
-             x: Vector, 
+def _get_eta2(theta_s : float,  # theta at index s-1 
+             phi_minus_s : Vector, # a p - 1 length vector 
+             x_minus_s : Vector, # a p-1 length data vector
              s : Index,  # base 1 index 
-             i : Index, 
              p : Dimension) -> float:
     """
     params:
@@ -544,12 +552,24 @@ def get_eta2(theta_s : float,  # theta at index s-1
       eta2 : float
       
     """
-    
-    t1 = theta[s - 1] #  theta_s
-    t2 = 2 * get_matrix_col_minus_s(i, phi, p).T
 
-    eta2 = t2
+    eta2 = theta_s + 2 * phi_minus_s @ jnp.sqrt(x_minus_s)
     return eta2
+
+def get_eta2(theta : Vector,
+             phi : Matrix,
+             x_i : Vector,
+             s : Index,
+             p : Dimension) -> float:
+
+    
+    col_s = phi[: , s-1]
+    theta_s = theta[s-1]
+    phi_minus_s = _get_vec_minus_s(s, col_s, p)
+    x_minus_s = _get_vec_minus_s(s, x_i, p)
+    eta2 = _get_eta2(theta_s, phi_minus_s, x_minus_s, s, p)
+    return eta2
+
 
     
 
@@ -786,6 +806,7 @@ def dev_ncbi_block():
         return res
     
     POSTs = NewType('POSTs', str)
+    
     def get_geneid_from_respone(response : POSTs) -> list[GeneID]:
         gene_ids : list[GeneID] = []
         for i, d in enumerate(response.json()):
@@ -880,16 +901,25 @@ def dev_get_dev_state_poisson_sqr():
     key = jax.random.PRNGKey(seed)
     k1, k2, k3 = jax.random.split(key, num=3 )
     p : Dimension = 5
+    n = 3
     lam : float = 9.1
-    phi = get_poisson_matrix(k1, p, lam)
-    theta = jax.random.normal(k2, shape=(p, ))
-    return theta, phi
+    X = get_random_X_matrix(k1, p, n, lam)
+    phi = get_random_phi_matrix(k2, p)
+    theta = jax.random.normal(k3, shape=(p, ))
+    
+    return theta, phi, X, p, n
+
+"""
 
 def dev_is_jittable(theta : Vector, 
         phi : Matrix, 
-        x_s : Vector, 
+        x_minus_s : Vector, # p-1 length vector
+        x : Vector, # a p length vector
         s : Index, 
-        i : Index):
+        i : Index,
+        p : Dimension):
+
+    theta_s = theta[s - 1]
 
     test_cases = {'get_eta1': get_eta1,
             'get_eta2': get_eta2,
@@ -902,8 +932,8 @@ def dev_is_jittable(theta : Vector,
             '_get_vec_minus_s': _get_vec_minus_s
             }
 
-    args = {'get_eta1': ,
-            'get_eta2': ,
+    args = {'get_eta1': (phi, s),
+            'get_eta2': (theta_s, phi, x_minus_s, s, p), 
             'get_poisson_matrix': ,
             'logfactorial': ,
             'logsum': ,
@@ -923,6 +953,4 @@ def dev_is_jittable(theta : Vector,
             'get_matrix_col_minus_s': ,
             '_get_vec_minus_s': ,
             }
-
-            
-
+"""
