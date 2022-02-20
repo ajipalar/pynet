@@ -22,16 +22,14 @@ def get_test_path():
 class TestMyGene(IMP.test.TestCase):
     """Test functionality that depends on the third party python module mygene
        used to query bioinformatic databases such as NCBI"""
-
-    def test_magnitude(self):
-        """Write the test cast, print statemetns ok"""
-        pass
+    pass
 
 class TestPoissonSQR(IMP.test.TestCase):
     """Test functionality related to Poisson Square Root Graphical Models
        as shown in Inouye 2016"""
 
     def test_matrix_minus_slice(slicef):
+        print("Running test_matrix_minus_slice")
         slicef = nblib.get_matrix_col_minus_s
         seed = 7
         key = jax.random.PRNGKey(seed)
@@ -58,16 +56,15 @@ class TestPoissonSQR(IMP.test.TestCase):
 
 class TestBiogridDataLoading(IMP.test.TestCase):
     """Test the loading of biogrid data into python structures"""
+    pass
     
         
-    def test_magnitude(self):
-        """Write the test cast, print statemetns ok"""
-        pass
-
     @unittest.skip
     def test_ncbi_gene_id(self):
         """This test fails because it takes too long to run
            must reimplement the functionality"""
+
+        print("Running test_ncbi_gene_id")
         get_ncbi_gene_id = nblib.get_ncbi_gene_id
         dpath = Path("data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt")
         mg = mygene.MyGeneInfo()
@@ -107,10 +104,7 @@ class TestBiogridDataLoading(IMP.test.TestCase):
     
 class TestSpectralCountsDataLoading(IMP.test.TestCase):
     """Test the loading of spectral counts data into pyhton structures"""
-
-    def test_magnitude(self):
-        """Write the test cast, print statemetns ok"""
-        pass
+    pass
 
 
 
