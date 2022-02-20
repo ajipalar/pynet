@@ -72,7 +72,7 @@ def gibbsf(key: KeyArray, *args, N=10, thin=10,
            **kwargs) -> DeviceArray:
     
     def outer_body_fun(i: int, val):
-        key, samples, params, rho, thin  = val
+        key, samples, params, rho, thin = val
         key, samples, params, rho, thin = jax.lax.fori_loop(0, thin, inner_body_fun, val)
         samples = samples.at[i].set(params)
         return key, samples, params, rho, thin
@@ -205,7 +205,7 @@ def py_compile_inner_body(f : PyFname ,
     param_list = param_list.strip(', ')
     param_list +=']'
     c+=o(f'    params = {param_list}')
-    c+=o( f'    return {comma_seperated_values}')
+    c+=o(f'    return {comma_seperated_values}')
     
     #c = inspect.getsource(inner_body_fun)
     #pattern = 'key, samples, params, rho, thin'
@@ -234,7 +234,7 @@ def py_compile_initialize(init_function_str, dof,
                          offset=0,
                          comma_seperated_values="",
                          N=5000) -> PyBlock:
-        # initiate
+    # initiate
     c=""""""
     o = partial(offset_str, offset)
     # c = OffsetStr(offset=offset)
