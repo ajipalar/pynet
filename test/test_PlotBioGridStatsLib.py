@@ -3,8 +3,9 @@ import IMP.test
 import IMP.algebra
 try:
     import IMP.pynet
+    import IMP.pynet.PlotBioGridStatsLib as nblib
 except ModuleNotFoundError:
-    import devel.PlotBioGridStatsLib as nblib
+    import pyext.src.PlotBioGridStatsLib as nblib
 
 from functools import partial
 import io
