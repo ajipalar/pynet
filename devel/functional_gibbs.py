@@ -169,18 +169,21 @@ def offset_str(off: int, s: str, newline = True) -> str:
         return s + '\n'
     else:
         return s
-    
+
+"""
 def define_inner_body_fun():
     def inner_body_fun(i : int,
                        init_val) -> tuple[KeyArray, float, float]:
         pass
-    
+   
     def stmnt():
         (key, *k) = jax.random.split(key, 1 + {dof})
-    ss = inspect.getsource(stmnt)
-    fs = inspect.getsource(inner_body_fun)
+        ss = inspect.getsource(stmnt)
+        fs = inspect.getsource(inner_body_fun)
+
     return fs, ss
-    
+"""    
+
 def get_paramlist_str(dof : int) -> PyObj:
     start = '['
     for i, j in enumerate(range(dof)):
@@ -867,7 +870,8 @@ def f1(x, y, *args, **kwargs):
 
 def f2(x, *args, **kwargs):
     return x + 2
-print(jax.make_jaxpr(f2)b)
+
+print(jax.make_jaxpr(f2))
 
 
 # In[ ]:
