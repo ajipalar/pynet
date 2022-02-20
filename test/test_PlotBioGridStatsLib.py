@@ -6,6 +6,7 @@ try:
 except ModuleNotFoundError:
     import devel.PlotBioGridStatsLib as nblib
 
+from functools import partial
 import io
 import jax
 import jax.numpy as jnp
@@ -28,31 +29,96 @@ class TestPoissonSQR(IMP.test.TestCase):
     """Test functionality related to Poisson Square Root Graphical Models
        as shown in Inouye 2016"""
 
-    def test_matrix_minus_slice(slicef):
+    def test__get_vec_minus_s(self):
+        print('Running test__get_vec_minus_s')
+
+        test_vec = jnp.arange(31) * 2.1
+
+        vec_l = len(test_vec)
+
+        b1 = False
+        b2 = False
+
+        for s in range(1, vec_l + 1):
+            vec_minus_s = nblib._get_vec_minus_s(s, test_vec, vec_l)
+
+            if s - 1 == 0:
+                assert jnp.all(test_vec[1:vec_l] == vec_minus_s)
+                b1 = True
+
+            elif s - 1 < vec_l:
+                assert jnp.all(test_vec[0] == vec_minus_s[0])
+                assert test_vec[s-1] not in vec_minus_s
+                assert jnp.all(test_vec[s:vec_l] == vec_minus_s[s-1: vec_l -1]) 
+                assert jnp.all(test_vec[0:s-1] == vec_minus_s[0:s-1])
+                assert jnp.all(test_vec[s:vec_l] == vec_minus_s[s-1:vec_l-1]) 
+                b2 = True
+
+        assert b1
+        assert b2
+        print('End test__get_vec_minus_s')
+
+    def test_matrix_minus_slice(self):
         print("Running test_matrix_minus_slice")
-        slicef = nblib.get_matrix_col_minus_s
         seed = 7
         key = jax.random.PRNGKey(seed)
         p = 5
         poisson_lam = 8
-        phi = nblib.get_poisson_matrix(key, p, poisson_lam)
-        
-        jslice_neg_s = nblib.jbuild(slicef, **{'p':p})
+        phi = nblib.get_random_phi_matrix(key, p)
+      
+        # jit compile the function
+        slicef = nblib.get_matrix_col_minus_s
+        slicef = partial(slicef, p=p)
+        slicef = jax.jit(slicef)
+      
+        rtol = 1e-05
+        is_close = lambda a, b: jnp.allclose(a, b, rtol=rtol)
+        is_close2 = lambda a, b: np.allclose(a, b, rtol=rtol)
+
+        branch1_executed = False
+        branch2_executed = False
     
-        for i in range(13):
-            print(i)
-            col = phi[:, i]
-            sl = jslice_neg_s(i, phi)
+        for s in range(1, p + 1):
+            col = phi[:, s - 1]
+            sl = slicef(s, phi)
             #print(i, col, sl)
+            i = s - 1
             if i == 0:
-                #print(i, col, sl)
-                assert jnp.all(col[1:p] == sl)
-            elif i < len(phi):
-                assert jnp.all(col[0:i] == sl[0:i])
-                assert jnp.all(col[i+1:p] == sl[i:len(sl)])
-            else:
-                assert jnp.all(col[0:p-1] == sl)
-    
+                branch1_executed = True 
+                a = col[1:p]
+                b = sl
+                print(f'b1 {s} {a} {b} {col} {sl}')
+                assert is_close(a, b)
+                assert is_close2(a, b)
+
+            else: 
+                branch2_executed = True
+                a = col[0:i]
+                b = sl[0:i]
+                print(f'b2a {s} {a} {b} {col} {sl}')
+                assert is_close(a, b)
+                assert is_close2(a, b)
+
+                a = col[s:p]
+                b = sl[i:len(sl)]
+                print(f'b2b {s} {a} {b} {col} {sl}')
+                assert is_close(a, b)
+                assert is_close2(a, b)
+
+        assert branch1_executed
+        assert branch2_executed
+
+
+    def test_eta1_eta2_jittable(self):
+        theta, phi, X, p, n = nblib.dev_get_dev_state_poisson_sqr()
+        for i in range(0, len(X)):
+            x_i = X[:, i]
+            jget_eta1 = jax.jit(nblib.get_eta1)
+            jget_eta2 = partial(nblib.get_eta2, p=p)
+            jget_eta2 = jax.jit(jget_eta2)
+            for s in range(p+1):    
+                print(jget_eta1(phi, s))
+                print(jget_eta2(theta, phi, x_i, s))
 
 class TestBiogridDataLoading(IMP.test.TestCase):
     """Test the loading of biogrid data into python structures"""

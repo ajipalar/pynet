@@ -472,7 +472,7 @@ def get_matrix_col_minus_s(s : Index, # base 1 index
     #a = jax.lax.fori_loop(0, i, lambda j, a: a.at[j].set(col[j]), a)
     #a = jax.lax.fori_loop(i+1, p, lambda j, a: a.at[j-1].set(col[j]), a)
     
-    a : Vector = _get_vec_minus_s(s - 1, col, p) # a p-1 length vector
+    a : Vector = _get_vec_minus_s(s, col, p) # a p-1 length vector
     return a
 
 
