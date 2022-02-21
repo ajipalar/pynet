@@ -2,7 +2,7 @@
 # coding: utf-8
 
 # In[1]:
-
+from pyext.src.typedefs import KeyArray, DeviceArray, State, Output
 
 import jax
 import numpy as np
@@ -15,10 +15,10 @@ from typing import Any
 from sklearn.metrics import roc_curve, precision_recall_curve
 import inspect
 import re
-State = Any
-Output = Any
-KeyArray = Any
-DeviceArray = Any
+#State = Any
+#Output = Any
+#KeyArray = Any
+#DeviceArray = Any
 
 
 # In[2]:
@@ -299,40 +299,41 @@ def compile_gibbsf(init_f : PyFname,
 
 # In[6]:
 
-
-N = 5000
-thin = 100
-dof = 2
-rho=-0.99
-
-init_func = 'jax.random.bernoulli'
-func = 'jax.random.bernoulli'
-#init_func = 'jax.random.normal'
-#func = 'jax.random.normal'
-
-#init_func = 'cond_norm'
-#func = 'cond_norm'
-
-#init_func = cond_bern_str
-#func = 'cond_bern'
-
-
-init_sig = ''
-func_sig = ''
-inter_rep = compile_gibbsf(init_func, func, N=N, dof=dof, 
-                           thin=thin, rho=rho)
-
-#Exec brings the meta function gibbsf into the global scope
-exec(inter_rep)
-gibbsf_jaxpr = jax.make_jaxpr(gibbsf)
-gibbsf_jit = jax.jit(gibbsf)
-
+def run_block_6():
+    N = 5000
+    thin = 100
+    dof = 2
+    rho=-0.99
+    
+    init_func = 'jax.random.bernoulli'
+    func = 'jax.random.bernoulli'
+    #init_func = 'jax.random.normal'
+    #func = 'jax.random.normal'
+    
+    #init_func = 'cond_norm'
+    #func = 'cond_norm'
+    
+    #init_func = cond_bern_str
+    #func = 'cond_bern'
+    
+    
+    init_sig = ''
+    func_sig = ''
+    inter_rep = compile_gibbsf(init_func, func, N=N, dof=dof, 
+                               thin=thin, rho=rho)
+    
+    #Exec brings the meta function gibbsf into the global scope
+    exec(inter_rep)
+    gibbsf_jaxpr = jax.make_jaxpr(gibbsf)
+    gibbsf_jit = jax.jit(gibbsf)
+    return N, thin, dof, rho, init_func, func, init_sig, func_sig, inter_rep, gibbsf_jaxpr, gibbsf_jit
+    
 
 # In[7]:
 
-
-print(compile_gibbsf(init_func, func, N=N, dof=dof, 
-                           thin=thin, rho=rho))
+def run_block_7():
+    print(compile_gibbsf(init_func, func, N=N, dof=dof, 
+                               thin=thin, rho=rho))
 
 
 # In[8]:
@@ -347,16 +348,18 @@ def make_gibbs_jit(sampler, rho, N, thin, dof):
 
 # gibbsf_jit = make_gibbs_jit(gibbsf, 0.99, 5000, 100, 2)
 # gibbsf_jit  = jax.jit(gibbsf)
-key = jax.random.PRNGKey(12)
-samples = np.array(gibbsf_jit(key))
-x, y = samples[:, 0], samples[:, 1]
-plot.scatter(x, y)
+def run_block_8():
+    key = jax.random.PRNGKey(12)
+    samples = np.array(gibbsf_jit(key))
+    x, y = samples[:, 0], samples[:, 1]
+    plot.scatter(x, y)
+    return key, samples, x, y
 
 
 # In[9]:
 
-
-print(f'{samples.size * 32 / 10**6} megabytes')
+def run_block_8() -> None:
+    print(f'{samples.size * 32 / 10**6} megabytes')
 
 
 # In[10]:
@@ -368,8 +371,9 @@ def get_probability_estimates(samples):
 
 # In[11]:
 
-
-prob_estimate = get_probability_estimates(samples)
+def run_block_11(samples):
+    prob_estimate = get_probability_estimates(samples)
+    return prob_estimate
 
 
 # In[12]:
@@ -389,9 +393,10 @@ def ROC_PRC_test():
 
 # In[13]:
 
-
-val = ROC_PRC_test()
-fpr, tpr, thre, prec, recall, pthre = val
+def run_block_13():
+    val = ROC_PRC_test()
+    fpr, tpr, thre, prec, recall, pthre = val
+    return fpr, tpr, thre, prec, recall, pthre
 
 
 # In[14]:
@@ -409,13 +414,14 @@ def multi_plot(fpr, tpr, xlabel='fpr', ylabel='tpr'):
     plt.ylabel(ylabel)
     plt.show()
 
-multi_plot(fpr, tpr)
+def run_block_14() -> None:
+    multi_plot(fpr, tpr)
 
 
 # In[15]:
 
-
-multi_plot(prec, recall)
+def run_block_15() -> None:
+    multi_plot(prec, recall)
 
 
 # In[16]:
@@ -426,32 +432,37 @@ def f3(k1, x):
     n, x = f2(k1, x)
     u, x = f1(k2, x)
     return u, x
-f3(testkey, 2)
+
+def run_block_16() -> None:
+    f3(testkey, 2)
 
 
 # In[ ]:
 
 
-get_ipython().run_cell_magic('bash', '', 'conda list scikit-learn')
+#get_ipython().run_cell_magic('bash', '', 'conda list scikit-learn')
 
 
 # In[ ]:
 
 
-samples = gibbsf_jit(key, rho=0)
-plot.scatter(samples[:, 0], samples[:, 1])
+def run_block_17(key, rho, gibbsf_jit):
+    samples = gibbsf_jit(key, rho=0)
+    plot.scatter(samples[:, 0], samples[:, 1])
+    return samples
 
 
 # In[ ]:
 
 
-plot.marginal(x, xlabel='x')
+def run_block_18() -> None:
+    plot.marginal(x, xlabel='x')
 
 
 # In[ ]:
 
-
-plot.marginal(y, xlabel='y')
+def run_block_19() -> None:
+    plot.marginal(y, xlabel='y')
 
 
 # In[ ]:
@@ -488,54 +499,59 @@ def mh_f(key, steps):
     key, samples = jax.lax.fori_loop(1, steps, body, (key, samples))
     return samples
 
-key = jax.random.PRNGKey(10)
-key, j1 = jax.random.split(key, 2)
-steps = 100000
-mh_f(key, steps)
+def run_block_20():
+    
+    key = jax.random.PRNGKey(10)
+    key, j1 = jax.random.split(key, 2)
+    steps = 100000
+    key, x = mh_f(key, steps)
+    return key, steps, x
+    
+
+# In[ ]:
+
+
+#get_ipython().run_line_magic('timeit', 'mh_f(key, steps)')
+
+
+# In[ ]:
+
+def run_block_21():
+    mh_fp = partial(mh_f, steps=100000)
+    return mh_fp
+
+
+# In[ ]:
+
+def run_block_22():
+    mh_f_p_jit = jax.jit(mh_fp)
+    return mh_f_p_jit
 
 
 # In[ ]:
 
 
-get_ipython().run_line_magic('timeit', 'mh_f(key, steps)')
+#get_ipython().run_line_magic('timeit', 'mh_f_p_jit(key).block_until_ready()')
 
 
 # In[ ]:
 
 
-mh_fp = partial(mh_f, steps=100000)
+#jnp.all(mh_fp(key) == mh_f_p_jit(key))
 
 
 # In[ ]:
 
 
-mh_f_p_jit = jax.jit(mh_fp)
+#x = np.array(mh_f_p_jit(key))
+#plot.marginal(x)
 
 
 # In[ ]:
 
 
-get_ipython().run_line_magic('timeit', 'mh_f_p_jit(key).block_until_ready()')
-
-
-# In[ ]:
-
-
-jnp.all(mh_fp(key) == mh_f_p_jit(key))
-
-
-# In[ ]:
-
-
-x = np.array(mh_f_p_jit(key))
-plot.marginal(x)
-
-
-# In[ ]:
-
-
-s = np.array(score(x))
-plot.marginal(s)
+#s = np.array(score(x))
+#plot.marginal(s)
 
 
 # In[ ]:
@@ -547,32 +563,32 @@ plot.marginal(s)
 # In[ ]:
 
 
-np.quantile(x, np.arange(0, 1, 0.1))
+#np.quantile(x, np.arange(0, 1, 0.1))
 
 
 # In[ ]:
 
 
-np.arange(0, 1, 0.1)
+#np.arange(0, 1, 0.1)
 
 
 # In[ ]:
 
 
-k1 = jax.random.PRNGKey(23)
-k2 = jax.random.PRNGKey(23)
+#k1 = jax.random.PRNGKey(23)
+#k2 = jax.random.PRNGKey(23)
 
 
 # In[ ]:
 
 
-get_ipython().run_line_magic('timeit', 'gibbsf_jit(k1).block_until_ready()')
+#get_ipython().run_line_magic('timeit', 'gibbsf_jit(k1).block_until_ready()')
 
 
 # In[ ]:
 
 
-get_ipython().run_line_magic('timeit', 'gibbs(k2, N=5000, thin=100)')
+#get_ipython().run_line_magic('timeit', 'gibbs(k2, N=5000, thin=100)')
 
 
 # In[ ]:
@@ -596,7 +612,7 @@ def error():
 # In[ ]:
 
 
-jax.make_jaxpr(f)
+#jax.make_jaxpr(f)
 
 
 # In[ ]:
@@ -617,68 +633,47 @@ plot.scatter(samples[:, 0], samples[:, 1])
 
 # In[ ]:
 
-
-key = jax.random.PRNGKey(5)
-gibbs_jit = jax.jit(gibbs)
-samples = gibbs_jit(key)
-
-
-# In[ ]:
-
-
-key = jax.random.PRNGKey(5)
-gibbsf_jit = jax.jit(gibbsf)
-samplesf = gibbsf_jit(key)
-
-# samples == samplesf
-# In[ ]:
+def run_block_23(gibbs):
+    key = jax.random.PRNGKey(5)
+    gibbs_jit = jax.jit(gibbs)
+    samples = gibbs_jit(key)
+    return samples, gibbs_jit
+    
 
 
-key2 = jax.random.PRNGKey(17)
-samples = gibbs_jit(key2)
-key2 = jax.random.PRNGKey(17)
-samplesf = gibbsf_jit(key2)
 
+
+def run_block_24():
+    gibbs_partial = partial(gibbsf, N=50000, thin=1000)
+    gibbsf_jit = jax.jit(gibbs_partial)
+    key = jax.random.PRNGKey(5)
+    samples = np.array(gibbsf_jit(key))
+    plt.scatter(samples[:, 0], samples[:, 1])
+    
 
 # In[ ]:
 
 
-plt.scatter(samplesf[:, 0], samplesf[:, 1])
+#x, y, z, *args = (1, 2, 3)
 
 
 # In[ ]:
 
-
-gibbs_partial = partial(gibbsf, N=50000, thin=1000)
-gibbsf_jit = jax.jit(gibbs_partial)
-key = jax.random.PRNGKey(5)
-samples = np.array(gibbsf_jit(key))
-plt.scatter(samples[:, 0], samples[:, 1])
-
-
-# In[ ]:
-
-
-x, y, z, *args = (1, 2, 3)
-
-
-# In[ ]:
-
-
-try:  # Doesn't work; fori_loop requires f(i, val)
-    f = lambda x: x+1
-    jax.lax.fori_loop(0, 100, f, 0)
-except TypeError:
-    # Works
-    # Can jit through the funciton
-    def iwrapper(f):
-        def wrap(i, val):
-            return f(val)
-        return wrap
-    f = iwrapper(lambda x: x+1)
-    print(jax.lax.fori_loop(0, 10, f, 0))
-    print(jax.jit(lambda : jax.lax.fori_loop(0, 10, f, 0))().block_until_ready())
-
+def run_block_25():
+    try:  # Doesn't work; fori_loop requires f(i, val)
+        f = lambda x: x+1
+        jax.lax.fori_loop(0, 100, f, 0)
+    except TypeError:
+        # Works
+        # Can jit through the funciton
+        def iwrapper(f):
+            def wrap(i, val):
+                return f(val)
+            return wrap
+        f = iwrapper(lambda x: x+1)
+        print(jax.lax.fori_loop(0, 10, f, 0))
+        print(jax.jit(lambda : jax.lax.fori_loop(0, 10, f, 0))().block_until_ready())
+    
 
 # In[ ]:
 
@@ -704,19 +699,23 @@ def inner_body_fun(i: int,
     samples = samples.at[i].set([x, y])
     return key, samples, x, y, thin
 
-key = jax.random.PRNGKey(10)
-key, k1, k2 = jax.random.split(key, 3)
-N = 1000
-thin = 5
-x = jax.random.uniform(k1)
-y = jax.random.uniform(k2)
-samples = jnp.zeros((N, 2))
-val = key, samples, x, y, thin
+def run_block_26():
+    key = jax.random.PRNGKey(10)
+    key, k1, k2 = jax.random.split(key, 3)
+    N = 1000
+    thin = 5
+    x = jax.random.uniform(k1)
+    y = jax.random.uniform(k2)
+    samples = jnp.zeros((N, 2))
+    val = key, samples, x, y, thin
+
 def outer(val):
     return jax.lax.fori_loop(0, N, inner_body_fun, val)
 
-opartial = partial(outer, val=val)
-otest = jax.jit(opartial)
+def run_block_27():
+    opartial = partial(outer, val=val)
+    otest = jax.jit(opartial)
+    return otest
 
 
 # In[ ]:
@@ -803,7 +802,9 @@ def local_block():
     class P:
         def __lt__(self, div):
             print(div)
-    
+   
+
+def run_unkown_block(): 
     state = (1, 2)
     pipe_in = (11, 12)
     p = P()
@@ -812,7 +813,7 @@ def local_block():
     p < jax.make_jaxpr(pipe)((1, 2), (11, 12))
     
         
-local_block()
+#local_block()
 
 
 # In[ ]:
@@ -822,9 +823,10 @@ def f(x, y, z, *args, file=None, **kwargs):
     print(file)
     return x, (y + z, ), args, kwargs
 
-state, ret, args, kwargs = f(*(1, 2, 3, 4, 5), **{'j': 2, 'file':4})
-state, ret, args, kwargs
-
+def run_unkown_block2():
+    state, ret, args, kwargs = f(*(1, 2, 3, 4, 5), **{'j': 2, 'file':4})
+    state, ret, args, kwargs
+    
 
 # In[ ]:
 
