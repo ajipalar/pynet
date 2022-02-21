@@ -88,7 +88,7 @@ class TestPoissonSQR(IMP.test.TestCase):
                 branch1_executed = True 
                 a = col[1:p]
                 b = sl
-                print(f'b1 {s} {a} {b} {col} {sl}')
+                #print(f'b1 {s} {a} {b} {col} {sl}')
                 assert is_close(a, b)
                 assert is_close2(a, b)
 
@@ -96,18 +96,20 @@ class TestPoissonSQR(IMP.test.TestCase):
                 branch2_executed = True
                 a = col[0:i]
                 b = sl[0:i]
-                print(f'b2a {s} {a} {b} {col} {sl}')
+                #print(f'b2a {s} {a} {b} {col} {sl}')
                 assert is_close(a, b)
                 assert is_close2(a, b)
 
                 a = col[s:p]
                 b = sl[i:len(sl)]
-                print(f'b2b {s} {a} {b} {col} {sl}')
+                #print(f'b2b {s} {a} {b} {col} {sl}')
                 assert is_close(a, b)
                 assert is_close2(a, b)
 
         assert branch1_executed
         assert branch2_executed
+        print('End matrix minus s')
+
 
 
     def test_eta1_eta2_jittable(self):
@@ -121,6 +123,50 @@ class TestPoissonSQR(IMP.test.TestCase):
                 print(jget_eta1(phi, s))
                 print(jget_eta2(theta, phi, x_i, s))
 
+    def test_Aexp_evaluation(self):
+        print('Run test_Aexp_evaluation')
+        seed = 7
+        key= jax.random.PRNGKey(seed)
+        theta, phi, X, p ,n = nblib.dev_get_dev_state_poisson_sqr()
+
+        gamma = 0
+        theta = theta * gamma
+        phi = nblib.get_exp_random_phi(key, p)
+
+        for i in range(len(X)):
+            x_i = X[:, i]
+            for s in range(1, p+1):
+                eta1 = nblib.get_eta1(phi, s)
+                eta2 = nblib.get_eta2(theta, phi, x_i, s, p) 
+    
+                a_exp = nblib.Aexp(eta1, eta2)
+                z_exp = nblib.Zexp(eta1, eta2)
+                
+                rtols = [1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07]
+                for rtol in rtols:
+                    try:
+                       assert jnp.allclose(a_exp, jnp.log(z_exp), rtol=rtol)
+                       assert jnp.allclose(jnp.exp(a_exp), z_exp, rtol=rtol)
+                    except AssertionError:
+                        print(i, rtol, a_exp, jnp.log(z_exp))
+                        assert False
+        print('End test_Aexp_evalution')
+
+
+    
+    def not_implemented(self):
+        
+        for i in range(len(X)):
+            x_i = X[:, i]
+            for s in range(1, p+1):
+                eta1 = nblib.get_eta1(phi, s)
+                assert eta1 < 0
+                eta2 = nblib.get_eta2(theta, phi, x_i, s, p)
+
+                z_exp = nblib.Zexp(eta1, eta2)
+                a_exp = nblib.Aexp(eta1, eta2)
+                assert a_exp == jnp.log(z_exp) 
+    
 class TestBiogridDataLoading(IMP.test.TestCase):
     """Test the loading of biogrid data into python structures"""
     pass

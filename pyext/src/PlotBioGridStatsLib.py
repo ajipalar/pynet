@@ -6,6 +6,7 @@ try:
         Array, 
         ColName, 
         DataFrame, 
+        DeviceArray,
         Dimension,
         GeneID,
         Index,
@@ -13,6 +14,7 @@ try:
         PRNGKey,
         ProteinName,
         Series,
+        State,
         Vector
     )
 
@@ -22,6 +24,7 @@ except ModuleNotFoundError:
         Array, 
         ColName, 
         DataFrame, 
+        DeviceArray,
         Dimension,
         GeneID,
         Index,
@@ -29,22 +32,24 @@ except ModuleNotFoundError:
         ProteinName,
         PRNGKey,
         Series,
+        State,
         Vector
     )
     from pyext.src.jittools import is_jittable
 
-import pandas as pd
+import Bio.PDB
+from functools import partial
+import graphviz
+import inspect
+import jax
+import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
 import mygene
-import jax
-import jax.numpy as jnp
-import Bio.PDB
+import pandas as pd
 from pathlib import Path
-from functools import partial
-from typing import Any, Callable, NewType
-import graphviz
-import inspect
+import scipy
+from typing import Any, Callable, NewType, Union
 
 
 def minmaxlen(col):
@@ -589,15 +594,44 @@ def logfactorial(x_si):
 def Zexp(eta1, eta2):
     """Not jittable because we use the scipy erfc implementation
     eta1 < 0 by 13
+    sqrt(pi)*e^{-eta2^2/4eta1}(1 - erf(-eta2/2*sqrt(-eta1)))/-2*(-eta1)^{3/2} - 1/eta1
     """
-    t1 = jnp.sqrt(jnp.pi) * eta1 * jnp.exp( - eta2 ** 2 / (4 * eta1))
-    erf_arg = - eta2 / (2 * (jnp.sqrt(-1j) * jnp.sqrt(eta1)))
-    t2 = scipy.special.erfc(erf_arg)
-    d1 = -2 * ((jnp.sqrt(-1j) * jnp.sqrt(eta1)) ** 3)
-    s2 = 1 / eta1
+    real1 = jnp.sqrt(jnp.pi) * eta1 * jnp.exp( - eta2 ** 2 / (4 * eta1))
+
+    c1 = complex(eta1)
+    erf_arg = - eta2 / (2 * jnp.sqrt(c1))
+    complex1 = scipy.special.erfc(erf_arg)
+    denominator = -2 * (jnp.sqrt(c1) ** 3)
+    subtract = 1 / eta1
+
+    # Assumption, return the real component
     
-    return t1 * t2 / d1 - s2
-    
+    return jnp.real(real1 * complex1 / denominator - subtract)
+
+def get_exp_random_phi(key, p, unimin=-1.0, unimax=-1e-05):
+    """gamma = 0 thus phi_exp is 0 on the off diagonal elements
+
+       params:
+         key
+         p
+         unimin : min val for eta1
+         unimax : max val for eta1. Note eta < 0
+       return:
+         phi_exp : a p x p matrix. Note phi is negative definite
+    """
+
+    key, k1, k2 = jax.random.split(key, 3)
+    diag = jax.random.uniform(k1, shape=(p, ), minval=unimin, maxval=unimax)
+    phi_exp = jnp.zeros((p, p))
+    phi_exp, diag = set_diag(phi_exp, diag)
+    return phi_exp
+
+
+
+
+
+def Aexp(eta1, eta2):
+    return jnp.log(Zexp(eta1, eta2))
 
 def f0(xsi, eta1, eta2):
     return jnp.exp(eta1 * xsi + eta2 * jnp.sqrt(xsi) - logfactorial(xsi))
@@ -954,3 +988,67 @@ def dev_is_jittable(theta : Vector,
             '_get_vec_minus_s': ,
             }
 """
+
+def gibbs_sqr_init_params(key : PRNGKey, state : State) -> DeviceArray:
+    """Pairs with functional_gibbslib.generic_gibbs(f, theta, phi)"""
+
+    # sample from the base exponential distribution
+    params = jax.random.exponential(key)
+
+def gibbs_sqr_update_params(key : PRNGKey, state : State, params) -> DeviceArray:
+    """Paris with functional_gibbslib.generic_gibbs(f, theta, phi)"""
+
+
+def exponential_sqr_node_conditional(x : Vector,
+                                     eta1 : float,
+                                     eta2 : float,
+                                     s : Index,
+                                     Anode_Exp_natural) -> float:
+    """The nodex conditional distribution of the univariate exponential distribution
+       p(x_s | theta, phi, x_minus_s) for the Exponential SQR Graphical model as Inouye 2016""" 
+                                     
+    return jnp.exp(eta1 * x[s-1] + eta2 * jnp.sqrt(x[s-1]) - Anode_Exp_natural(eta1, eta2))  
+
+def log_exponential_sqr_node_conditional(x : Vector,
+                                     eta1 : float,
+                                     eta2 : float,
+                                     s : Index,
+                                     Anode_Exp_natural) -> float:
+
+    """The log exponential sqr node conditional distribution"""
+        
+    return eta1 * x[s-1] + eta2 * jnp.sqrt(x[s-1]) - Anode_Exp_natural(eta1, eta2) 
+
+
+def ll_exponential_sqr(x : Vector,
+                       eta1 : float,
+                       eta2 : float,
+                       p : Dimension,
+                       Anode_Exp_natural) -> float:
+
+    """The log likelihood of the Exponential sqr distribution""" 
+    ll = 0
+    def llbody(s, ll):
+        eta1 = get_eta1(phi, s)
+        eta2 = get_eta2(theta, phi, x_i, s, p)
+        ll = ll + log_exponential_sqr_node_conditional(x, eta1, eta2, s, Aexp)
+        return ll
+
+    ll = jax.lax.fori_loop(1, p+1, llbody, ll)
+
+
+def natural_sqr_likelihood(x : Vector,
+                           eta1: float,
+                           eta2: float,
+                           AexpNatural : Callable ) -> float:
+    pass
+
+
+
+
+
+    
+
+
+
+

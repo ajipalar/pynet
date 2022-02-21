@@ -15,13 +15,6 @@ from typing import Any
 from sklearn.metrics import roc_curve, precision_recall_curve
 import inspect
 import re
-#State = Any
-#Output = Any
-#KeyArray = Any
-#DeviceArray = Any
-
-
-# In[2]:
 
 
 class StateLess:
@@ -682,7 +675,6 @@ def f(x: KeyArray):
     def g(x):
         return 2*x
     return g(x) + 1
-f = jax.jit(f)
 
 
 # In[ ]:
@@ -721,7 +713,6 @@ def run_block_27():
 # In[ ]:
 
 
-a, b, *args = (1, 2, 3)
 
 
 # In[ ]:
@@ -741,7 +732,6 @@ def g(x, y, *args, **kwargs):
 
 def h(x, y, *args, **kwargs):
     return f2(f1(*args, **kwargs))
-g(1, 2, **{'rho': 4})
 
 
 # In[ ]:
@@ -816,7 +806,6 @@ def run_unkown_block():
 #local_block()
 
 
-# In[ ]:
 
 
 def f(x, y, z, *args, file=None, **kwargs):
@@ -828,7 +817,6 @@ def run_unkown_block2():
     state, ret, args, kwargs
     
 
-# In[ ]:
 
 
 def f(state, *args, **kwargs):
@@ -858,57 +846,4 @@ def consumer(z, *args):
     print(z)
     print(args)
     return z
-
-
-
-consumer(*middle(*producer()))
-
-
-# In[ ]:
-
-
-def f1(x, y, *args, **kwargs):
-    return x * y, args, kwargs
-
-def f2(x, *args, **kwargs):
-    return x + 2
-
-print(jax.make_jaxpr(f2))
-
-
-# In[ ]:
-
-
-jxp_f2 = jax.make_jaxpr(f2)
-
-
-# In[ ]:
-
-
-jxp_f2
-
-
-# In[ ]:
-
-
-g(1, 2, **{'rho': 10})
-
-
-# In[ ]:
-
-
-def f(x, y, **kwargs):
-    return x * y * rho
-
-
-# In[ ]:
-
-
-f(1, 2, **{'rho':10})
-
-
-# In[ ]:
-
-
-m[9]
 
