@@ -1,8 +1,11 @@
+from pyext.src.typedefs import Array, PRNGKey
+import pyext.src.PlotBioGridStatsLib as nblib
 import jax 
 import jax.numpy as jnp
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st
+from typing import Callable
 
 mu = 5
 sigma = 2
@@ -40,6 +43,8 @@ def T(key, x, f, n_steps=10):
     return x
 
 def do_ais(key, n_samples, n_inter, betas, x):
+    """Perform annealed importance sampling as Neal using the N-steps metropolis algoirthm
+    """
     samples = jnp.zeros(n_samples)
     weights = jnp.zeros(n_samples)
     for t in range(n_samples):
@@ -61,9 +66,59 @@ def do_ais(key, n_samples, n_inter, betas, x):
 
     return samples, weights
 
+def sampler(key, n_samples : int, 
+            n_inter, 
+            betas, 
+            x,
+            f_0 : Callable,
+            f_j : Callable,
+            f_n : Callable,
+            T,  # the transition rule
+            ) -> tuple[Array, Array]:
+
+    """Annealed Importance Sampling by Neal.
+       Obtain expectations or an estimate of the partition function
+       of the distribution of interest p0 = 1/z0 * f_0 begining
+       with the distribution p_n = 1/z_n * f_n using intermediate
+       distributions p_j = 1/z_j * f_j
+    """
+
+
+    return samples, weights
 
 #samples, weights = do_ais(key, n_samples, betas, n_inter, x)
 #a = 1/np.sum(weights) * np.sum(weights * samples)
+
+def ais_poisson_sqr(n_inter : int,  # the number of intermediate distributions
+                    f_0,
+                    f_n,
+                    f_j,
+                    phi,
+                    phi_diag,
+                    theta):
+
+    gamma_arr = jnp.arange(n_inter)  # from 0 to n_inter - 1
+    
+    def T(x, f, n_steps=10):
+        for t in range(n_steps):
+
+            x_prime = x + np.random.randn()
+
+            a = f(x_prime) / f(x)
+
+            if np.random.rand() < a:
+                x = x_prime
+
+    for zi in range(n_inter):
+        gamma = gamma_arr[zi]
+        theta_tilde = theta * gamma
+        phi_tilde = phi_off * gamma + phi_diag
+
+        
+
+
+
+    return weights, samples
 
 def ais_example():
     """The example from Augstinus Kristiadi's blog"""
