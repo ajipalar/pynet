@@ -30,6 +30,15 @@ class TestPoissonSQR(IMP.test.TestCase):
     """Test functionality related to Poisson Square Root Graphical Models
        as shown in Inouye 2016"""
 
+    seed0 = 7
+    key0 = jax.random.PRNGKey(seed0)
+    p0 = 5
+    phi0 = nblib.get_random_phi_matrix(key0, p0)
+
+    theta, phi, X, p, n = nblib.dev_get_dev_state_poisson_sqr()
+
+    
+
     def test__get_vec_minus_s(self):
         print('Running test__get_vec_minus_s')
 
@@ -61,11 +70,10 @@ class TestPoissonSQR(IMP.test.TestCase):
 
     def test_matrix_minus_slice(self):
         print("Running test_matrix_minus_slice")
-        seed = 7
-        key = jax.random.PRNGKey(seed)
-        p = 5
         poisson_lam = 8
-        phi = nblib.get_random_phi_matrix(key, p)
+
+        p = self.p0
+        phi = self.phi0
       
         # jit compile the function
         slicef = nblib.get_matrix_col_minus_s
@@ -113,7 +121,12 @@ class TestPoissonSQR(IMP.test.TestCase):
 
 
     def test_eta1_eta2_jittable(self):
-        theta, phi, X, p, n = nblib.dev_get_dev_state_poisson_sqr()
+        theta = self.theta
+        phi = self.phi
+        X = self.X
+        p = self.p
+        n = self.n
+
         for i in range(0, len(X)):
             x_i = X[:, i]
             jget_eta1 = jax.jit(nblib.get_eta1)
@@ -123,11 +136,16 @@ class TestPoissonSQR(IMP.test.TestCase):
                 print(jget_eta1(phi, s))
                 print(jget_eta2(theta, phi, x_i, s))
 
+
     def test_Aexp_evaluation(self):
+        key = self.key0
+        theta = self.theta
+        phi = self.phi
+        X = self.X
+        p = self.p
+        n = self.n
+
         print('Run test_Aexp_evaluation')
-        seed = 7
-        key= jax.random.PRNGKey(seed)
-        theta, phi, X, p ,n = nblib.dev_get_dev_state_poisson_sqr()
 
         gamma = 0
         theta = theta * gamma
@@ -152,20 +170,63 @@ class TestPoissonSQR(IMP.test.TestCase):
                         assert False
         print('End test_Aexp_evalution')
 
-
-    
-    def not_implemented(self):
+    def test_ll_exponential_sqr(self):
+        print('Run test_ll_expoential_sqr')
         
+        key = self.key0
+        theta = self.theta
+        phi = self.phi
+        X = self.X
+        p = self.p
+        n = self.n
+        
+        gamma = 0
+        theta = theta * gamma
+        phi = nblib.get_exp_random_phi(key, p)
+        Aexp = nblib.Aexp
+
+
         for i in range(len(X)):
             x_i = X[:, i]
             for s in range(1, p+1):
                 eta1 = nblib.get_eta1(phi, s)
-                assert eta1 < 0
                 eta2 = nblib.get_eta2(theta, phi, x_i, s, p)
 
-                z_exp = nblib.Zexp(eta1, eta2)
-                a_exp = nblib.Aexp(eta1, eta2)
-                assert a_exp == jnp.log(z_exp) 
+                ll = nblib.ll_exponential_sqr(x_i, eta1, eta2, p, Aexp)
+                assert ll < 0
+
+        print('End test_ll_expoential_sqr')
+
+
+    def test_log_exponential_sqr(self):
+        print('Run test_ll_expoential_sqr')
+        
+        key = self.key0
+        theta = self.theta
+        phi = self.phi
+        X = self.X
+        p = self.p
+        n = self.n
+        
+        gamma = 0
+        theta = theta * gamma
+        phi = nblib.get_exp_random_phi(key, p)
+        Aexp = nblib.Aexp
+
+
+        for i in range(len(X)):
+            x_i = X[:, i]
+            for s in range(1, p+1):
+                eta1 = nblib.get_eta1(phi, s)
+                eta2 = nblib.get_eta2(theta, phi, x_i, s, p)
+
+                log_exp = nblib.log_exponential_sqr_node_conditional(x_i, eta1, eta2, s, Aexp)
+                assert log_exp < 0
+
+
+        print('End test_ll_expoential_sqr')
+
+
     
 class TestBiogridDataLoading(IMP.test.TestCase):
     """Test the loading of biogrid data into python structures"""

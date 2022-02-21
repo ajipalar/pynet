@@ -1026,16 +1026,11 @@ def ll_exponential_sqr(x : Vector,
                        p : Dimension,
                        Anode_Exp_natural) -> float:
 
-    """The log likelihood of the Exponential sqr distribution""" 
+    """The log likelihood of the Exponential sqr distribution. Note this function is not jittable""" 
     ll = 0
-    def llbody(s, ll):
-        eta1 = get_eta1(phi, s)
-        eta2 = get_eta2(theta, phi, x_i, s, p)
+    for s in range(1, p+1):
         ll = ll + log_exponential_sqr_node_conditional(x, eta1, eta2, s, Aexp)
-        return ll
-
-    ll = jax.lax.fori_loop(1, p+1, llbody, ll)
-
+    return ll
 
 def natural_sqr_likelihood(x : Vector,
                            eta1: float,
