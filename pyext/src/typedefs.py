@@ -61,6 +61,7 @@ IntegerArray = Array
 Array1d = NewType('Array1d', Array)
 DTypeLikeInt = Any
 DTypeLikeFloat = Any
+DeviceArray = NewType('DeviceArray', Array)
 PRNGKeyArray = Any  # Change this to prng.PRNGKeyArray
 KeyArray = NewType('KeyArray', PRNGKeyArray)
 Index = NewType('Index', int)
@@ -76,3 +77,8 @@ PRNGKey = NewType('PRNGKey', Tuple[int, int])
 Vector = NewType('Vector', Sequence[Number])
 Matrix = NewType('Matrix', Sequence[Sequence[Number]])
 CartesianTable = NewType('CartesianTable', Matrix)
+
+# Generic types
+State = NewType('State', object)
+Output = NewType('Output', object)
+
