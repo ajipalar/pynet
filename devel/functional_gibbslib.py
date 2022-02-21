@@ -97,7 +97,11 @@ def generic_gibbsf(key : PRNGKey,
                    thin_every : int,
                    nparams : Dimension,
                    init_params : Callable,
-                   update_params : Callable ) -> DeviceArray:
+                   update_params : Callable,
+                   init_args=[],
+                   init_kwargs={},
+                   update_args=[],
+                   update_kwargs={}) -> DeviceArray:
     """Generic version of gibbs sampling, partial application with known nsamples,
        nparams, thin_every, init_params, update_params, yields a jit compilable gibbs sampler
 
@@ -128,13 +132,13 @@ def generic_gibbsf(key : PRNGKey,
 
         key, k1, thin_every, params, samples = init_val
         key, k1 = jax.random.split(k1) 
-        params = update_params(key, params)
+        params = update_params(key, params, *update_args, **update_kwargs)
 
         return key, k1, thin_every, params, samples
     
     # initiate
     key, k1 = jax.random.split(key, 2)
-    params = init_params(key)
+    params = init_params(key, *init_args, **init_kwargs)
     samples = jnp.zeros((nsamples, nparams))
 
     val = key, k1, thin_every, params, samples 
@@ -149,12 +153,15 @@ def generic_gibbs(key : PRNGKey,
                    nparams : Dimension,
                    init_params : Callable,
                    update_params : Callable,
-
+                   init_args=[],
+                   init_kwargs={},
+                   update_args=[],
+                   update_kwargs={}
                    ) -> DeviceArray:
 
     key, k1 = jax.random.split(key, 2)
 
-    param = init_params(key) 
+    param = init_params(key, *init_args, **update_kwargs) 
     samples = jnp.zeros((nsamples, nparams))
 
     for i in range(nsamples):
@@ -162,7 +169,7 @@ def generic_gibbs(key : PRNGKey,
 
             
             key, k1 = jax.random.split(k1)
-            param = update_params(key, param)
+            param = update_params(key, param, *update_args, **update_kwargs)
 
         samples = samples.at[i].set(param)
 
@@ -174,7 +181,7 @@ def x_cond_dens(key, m):
 
 y_cond_dens = x_cond_dens
 
-def example_generic_init_params(key):
+def example_generic_init_params(key, state=None):
     #print(key)
     k1, k2 = jax.random.split(key)
     x = jax.random.uniform(k1)
@@ -183,7 +190,7 @@ def example_generic_init_params(key):
     params = jnp.array([x, y])
     return params
 
-def example_generic_update_params(key, params):
+def example_generic_update_params(key, params, state=None):
     k1, k2 = jax.random.split(key, 2)
     x, y = params
     x = x_cond_dens(k1, y)
