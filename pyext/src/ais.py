@@ -72,6 +72,7 @@ def do_ais(key, n_samples, n_inter, betas, x):
 
     return samples, weights
 
+# AIS in the context of sqr models
 def get_phi_tilde(phi : Matrix, gamma : float) -> Matrix:
     phi_diag = phi.diagonal()
     phi_tilde = phi * gamma[j]
@@ -80,6 +81,7 @@ def get_phi_tilde(phi : Matrix, gamma : float) -> Matrix:
 
 
 def setup_sqr_ais():
+    f_j = fg.f0  # (xsi, eta1, eta2) -> float 
     pass
 
     
@@ -92,7 +94,7 @@ def do_sqr_ais(key : PRNGKey,
                f_j,
                f_n,
                f_0,
-               seed,
+               npseed : Vector,
                ngibbs_steps : Dimension,
                T) -> tuple[Array, Array]:
 
@@ -100,21 +102,38 @@ def do_sqr_ais(key : PRNGKey,
     weights = jnp.zeros(n_samples)
 
     gamma = jnp.arange(0, n_samples)
-    theta_tilde = theta * gamma[0]
-    phi_tilde = get_phi_tilde(phi, gamma[0])
-    phi_ss_vec = phi_tilde.diagonal() 
-
     # scale = beta = 1/-phi_ss for phi_ss == eta1 and eta1 < 0
 
     #Pr(x | eta1) = Pi s=1, p exp{eta1 -A(eta1)}
 
-    x_i = scipy.stats.expon.rvs(scale= 1/-phi_ss_vec, size=(p))
 
-    for j in range(1, n_samples):
+    # k index over the final number of samples
+    # may be able to vectorize this loop
+    for k in range(1, n_samples):
         # sample an initial point
 
-        theta_tilda = gamma[j] * theta
-        phi_tilde = get_phi_tilde(phi, gamma[j])
+        #Begin at the j=0 condition, sample from the base exponential distribution
+
+        phi_tilde = get_phi_tilde(phi, gamma[0])
+        phi_ss_vec = phi_tilde.diagonal() 
+        #define x0  # should change the indexing to be reverse as Neal 1998
+        x_kj = scipy.stats.expon.rvs(scale= 1/-phi_ss_vec, size=(p), random_state=npseed[k])
+        
+        # index over the number of intermediate distributions
+        for j in range(1, len(gamma)): 
+            # Define the intermediate distributions
+            phi_tilde = get_phi_tilde(phi, gamma[j])
+            theta_tilde = theta * gamma[j]  
+
+            key, k1 = jax.random.split(key)
+
+            # TODO Instead of passing the intermediate distribution f_j as a parameter
+            # could jit compile T(key, theta_tilde, phi_tilde)
+            # Better would be to vectorize ais and jit compile the entire kernal once
+            # therefore call x, w = ais(key)
+
+            x_kj = T(k1, theta_tilde, phi_tilde, f_j) 
+        
 
 
 
