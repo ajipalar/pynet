@@ -4,7 +4,7 @@ import IMP.algebra
 try:
     import IMP.pynet
 except ModuleNotFoundError:
-    import devel.functional_gibbslib as fg
+    import pyext.src.functional_gibbslib as fg
     pass
 
 from functools import partial

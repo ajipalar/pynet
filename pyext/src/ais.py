@@ -1,4 +1,5 @@
-from pyext.src.typedefs import Array, PRNGKey
+from pyext.src.typedefs import Array, PRNGKey, Dimension, DeviceArray
+import pyext.src.functional_gibbslib as fg
 import pyext.src.PlotBioGridStatsLib as nblib
 import jax 
 import jax.numpy as jnp
@@ -7,16 +8,21 @@ import matplotlib.pyplot as plt
 import scipy.stats as st
 from typing import Callable
 
-mu = 5
-sigma = 2
-f_n = jax.scipy.stats.norm.pdf
+def ais_prelude():
+    mu = 5
+    
+    sigma = 2
+    f_n = jax.scipy.stats.norm.pdf
+    
+    
+    x = np.arange(5, 15, 0.1)
+    n_inter = 50
+    n_samples = 100
+    betas = np.linspace(0, 1, n_inter)
+    key = jax.random.PRNGKey(10)
+    return mu, sigma, f_n, x, n_inter, n_samples, betas, key
+    
 
-
-x = np.arange(5, 15, 0.1)
-n_inter = 50
-n_samples = 100
-betas = np.linspace(0, 1, n_inter)
-key = jax.random.PRNGKey(10)
 
 def f_0(x, mu=mu, sigma=sigma):
     """Target distribution: \propto N(mu, sigma)"""
@@ -65,6 +71,64 @@ def do_ais(key, n_samples, n_inter, betas, x):
         weights = weights.at[t].set(jnp.exp(w))
 
     return samples, weights
+
+def get_phi_tilde(phi : Matrix, gamma : float) -> Matrix:
+    phi_diag = phi.diagonal()
+    phi_tilde = phi * gamma[j]
+    phi_tilde = nblib.set_diag(phi_tilde, phi_diag)
+    return phi_tilde
+
+
+def setup_sqr_ais():
+    pass
+
+    
+
+def do_sqr_ais(key : PRNGKey, 
+               n_samples : Dimension, 
+               theta : Vector,
+               phi : Matrix,
+               p : Dimension,
+               f_j,
+               f_n,
+               f_0,
+               seed,
+               ngibbs_steps : Dimension,
+               T) -> tuple[Array, Array]:
+
+    samples = jnp.zeros(n_samples)
+    weights = jnp.zeros(n_samples)
+
+    gamma = jnp.arange(0, n_samples)
+    theta_tilde = theta * gamma[0]
+    phi_tilde = get_phi_tilde(phi, gamma[0])
+    phi_ss_vec = phi_tilde.diagonal() 
+
+    # scale = beta = 1/-phi_ss for phi_ss == eta1 and eta1 < 0
+
+    #Pr(x | eta1) = Pi s=1, p exp{eta1 -A(eta1)}
+
+    x_i = scipy.stats.expon.rvs(scale= 1/-phi_ss_vec, size=(p))
+
+    for j in range(1, n_samples):
+        # sample an initial point
+
+        theta_tilda = gamma[j] * theta
+        phi_tilde = get_phi_tilde(phi, gamma[j])
+
+
+
+
+
+
+        
+
+        samples.at[j].set(x)
+        weights = weights.at[j].set(jnp.exp(w))
+
+
+
+
 
 def sampler(key, n_samples : int, 
             n_inter, 
@@ -162,5 +226,54 @@ def ais_example():
 
         samples[t] = x
         weights[t] = np.exp(w)
+
+    return samples, weights
+
+def gibbs_ais_sqr(key):
+    key, k1 = jax.random.split(key)
+
+    samples = jnp.zeros(n_samples)
+    weights = jnp.zeros(n_samples)
+
+
+    # 
+
+    x = jax
+
+    return samples, weights
+
+def gibbs_generic_ais(key,
+              f_m,
+              f_j,
+              f_0,
+              T,
+              m_inter : Dimension,
+              nsamples : Dimension,
+              f_0args=[],
+              f_0kwargs={},
+              f_jargs=[],
+              f_jkwargs={},
+              f_margs=[],
+              f_mkwargs={}) -> tuple[DeviceArray]:
+    """params:
+         f_m : the starting distribution
+         f_j : the intermediate distributions
+         f_0 : the distribution of interest
+         n_inter : the number of intermediate distributions from [1 to n_inter]
+         n_samples : number of samples and weights to return
+    """
+
+    # initiate the samples and weights
+    samples = jnp.zeros(n_samples)
+    weights = jnp.zeros(n_samples)
+
+
+    # sample the 
+
+    key, k1 = jax.random.split(key, 2)
+    x = jax.random.exponential(k1, shape=(nsamples, ))
+
+
+
 
     return samples, weights

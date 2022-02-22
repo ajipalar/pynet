@@ -1032,6 +1032,51 @@ def ll_exponential_sqr(x : Vector,
         ll = ll + log_exponential_sqr_node_conditional(x, eta1, eta2, s, Aexp)
     return ll
 
+def ll_f_sqr_unormalized(x : Vector,
+                         eta1,
+                         eta2,
+                         f_0,
+                         p) -> float:
+
+    ll = 0
+    def body(i, val):
+        #val = 
+        pass
+
+
+
+def gen_exponential(phi_exp : Matrix,
+                    p : Dimension,
+                    nsamples : Dimension):
+    """Generate a vector of points according to the univariate exponential distribution 
+       numpy function, not jittable
+
+       params:
+         npseed :
+         eta1 : the natural parameter of the univariate exponential distribution
+
+       return:
+         x_exp : a p x nsamples dimensional matrix
+                 each row in x_exp is an eta1 vector 
+       """
+
+
+
+    # eta1 < 0
+    lam = -eta1
+    # lam > 0
+    beta = 1 / lam   # the scale parameter
+    
+    # beta > 0
+    
+    return scipy.stats.expon.rvs(beta, size=shape, random_state = npseed)
+    
+
+
+
+       
+
+
 def natural_sqr_likelihood(x : Vector,
                            eta1: float,
                            eta2: float,

@@ -163,8 +163,8 @@ class TestPoissonSQR(IMP.test.TestCase):
                 rtols = [1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07]
                 for rtol in rtols:
                     try:
-                       assert jnp.allclose(a_exp, jnp.log(z_exp), rtol=rtol)
-                       assert jnp.allclose(jnp.exp(a_exp), z_exp, rtol=rtol)
+                        assert jnp.allclose(a_exp, jnp.log(z_exp), rtol=rtol)
+                        assert jnp.allclose(jnp.exp(a_exp), z_exp, rtol=rtol)
                     except AssertionError:
                         print(i, rtol, a_exp, jnp.log(z_exp))
                         assert False
