@@ -1,4 +1,4 @@
-from pyext.src.typedefs import ( Array, Dimension, 
+
         DeviceArray, Matrix, JitFunc, PRNGKey, Vector 
 )
 import pyext.src.functional_gibbslib as fg
@@ -27,7 +27,7 @@ def ais_prelude():
     mu = 5
     
     sigma = 2
-    f_n = jax.scipy.stats.norm.pdf
+    fn_pdf = jax.scipy.stats.norm.pdf
     
     
     x = np.arange(5, 15, 0.1)
@@ -35,32 +35,32 @@ def ais_prelude():
     n_samples = 100
     betas = np.linspace(0, 1, n_inter)
     key = jax.random.PRNGKey(10)
-    return mu, sigma, f_n, x, n_inter, n_samples, betas, key
+    return mu, sigma, fn_pdf, x, n_inter, n_samples, betas, key
     
 
 
-def f_0(x, mu, sig):
+def f0_pdf(x, mu, sig):
     """Target distribution: \propto N(mu, sigma)"""
     return np.exp(-(x - mu)**2 / (2 * sig ** 2))
 
-def f_n(x):
+def fn_pdf(x):
     return jax.scipy.stats.norm.pdf
 
-def log_fn(x):
+def fn_logpdf(x):
     return jax.scipy.stats.norm.logpdf(x)
 
-def log_f0(x, mu, sig):
+def f0_logpdf(x, mu, sig):
     """Log target distribution"""
     return -(x - mu)**2 / (2 * sig ** 2)
 
-def f_j(x, beta, f_0, f_n):
+def fj_pdf(x, beta, f0_pdf, fn_pdf):
     """Interpolating distribution"""
-    return f_0(x)**beta * f_n(x)**(1 - beta)
+    return f0_pdf(x)**beta * fn_pdf(x)**(1 - beta)
 
-def log_fj(x, beta, log_fn, log_f0):
+def fj_logpdf(x, beta, fn_logpdf, f0_logpdf):
     """Log interpolating distribution
-       use partial application of f_0, and f_"""
-    return beta * log_f0(x) + (1-beta) * log_fn(x)
+       use partial application of f0_pdf, and f_"""
+    return beta * f0_logpdf(x) + (1-beta) * fn_logpdf(x)
 
 
 
@@ -81,12 +81,12 @@ def T(key, x, f, n_steps=10):
             x = x_prime
     return x
 
-def do_ais(key, n_samples, n_inter, betas, x, f_0):
+def do_ais(key, n_samples, n_inter, betas, x, f0_pdf):
     """Perform annealed importance sampling as Neal using the N-steps metropolis algoirthm
     """
     samples = jnp.zeros(n_samples)
     weights = jnp.zeros(n_samples)
-    f_j = partial(f_j, f_0=f_0)
+    fj_pdf = partial(fj_pdf, f0_pdf=f0_pdf)
     for t in range(n_samples):
         # Sample initial point from q(x)
         #x = p_n.rvs() #random variates
@@ -96,10 +96,10 @@ def do_ais(key, n_samples, n_inter, betas, x, f_0):
 
         for n in range(1, len(betas)):
             # Transition
-            x = T(subkey, x, lambda x: f_j(x, betas[n]), n_steps=5)
+            x = T(subkey, x, lambda x: fj_pdf(x, betas[n]), n_steps=5)
 
             #Compute weight in log space
-            w += jnp.log(f_j(x, betas[n])) - jnp.log(f_j(x, betas[n - 1]))
+            w += jnp.log(fj_pdf(x, betas[n])) - jnp.log(fj_pdf(x, betas[n - 1]))
 
         samples = samples.at[t].set(x)
         weights = weights.at[t].set(jnp.exp(w))
@@ -110,8 +110,8 @@ def generic_ais(key,
                 ais_prelude : Callable,
                 n_samples : Dimension,
                 m_interpolating_dist : Dimension,
-                f_0,
-                f_j,
+                f0_pdf,
+                fj_pdf,
                 f_m,
                 T : Callable
                 ):
@@ -121,8 +121,8 @@ def generic_ais(key,
        There are m_interpolating_dist
 
        let f_m be the dist of interest
-       let f_j be an interpolating dist
-           f_j(j, val)
+       let fj_pdf be an interpolating dist
+           fj_pdf(j, val)
 
        let T be the markov transition rule
 
@@ -130,10 +130,10 @@ def generic_ais(key,
     samples = jnp.zeros(n_samples)
     weights = jnp.zeros(n_samples)
     def inner_loop_body(j : Index, val : tuple):
-        subkey, x, f_jargs = val
+        subkey, x, fj_pdfargs = val
 
         #Pass in a NUTS Sampler
-        x = T(j, subkey, x, f_j, f_jargs)
+        x = T(j, subkey, x, fj_pdf, fj_pdfargs)
         w += None
 
 
@@ -163,7 +163,7 @@ def get_phi_tilde(phi : Matrix, gamma : float) -> Matrix:
 
 def jit_compile_sqr_ais():
     """jit compiles the annealed importance sampling into a single kernal"""
-    f_j = fg.f0  # (xsi, eta1, eta2) -> float 
+    fj_pdf = fg.f0  # (xsi, eta1, eta2) -> float 
     pass
 
     
@@ -173,9 +173,9 @@ def get_sqr_ais_weights(key : PRNGKey,
                theta : Vector,
                phi : Matrix,
                p : Dimension,
-               f_j,
-               f_n,
-               f_0,
+               fj_pdf,
+               fn_pdf,
+               f0_pdf,
                npseed : Vector,
                ngibbs_steps : Dimension,
                T) -> tuple[Array, Array]:
@@ -198,10 +198,10 @@ def get_sqr_ais_weights(key : PRNGKey,
              phi parameter. For proteins in an AP-MS pulldown, the number of 
              proteins in the pulldown
 
-         f_j : the function that defines the intermediate distribution
-         f_n : the function that defines the starting distribution.
-         f_0 : the function for the distribution of interest. Note the functions
-               f_j, f_n, f_0 may or may not be normalized.
+         fj_pdf : the function that defines the intermediate distribution
+         fn_pdf : the function that defines the starting distribution.
+         f0_pdf : the function for the distribution of interest. Note the functions
+               fj_pdf, fn_pdf, f0_pdf may or may not be normalized.
 
          npseed : Vector. A vector defining the np seed for sampling the initial
                           multivariate exponential distribution. 
@@ -243,12 +243,12 @@ def get_sqr_ais_weights(key : PRNGKey,
 
             key, k1 = jax.random.split(key)
 
-            # TODO Instead of passing the intermediate distribution f_j as a parameter
+            # TODO Instead of passing the intermediate distribution fj_pdf as a parameter
             # could jit compile T(key, theta_tilde, phi_tilde)
             # Better would be to vectorize ais and jit compile the entire kernal once
             # therefore call x, w = ais(key)
 
-            x_kj = T(k1, theta_tilde, phi_tilde, f_j) 
+            x_kj = T(k1, theta_tilde, phi_tilde, fj_pdf) 
         
 
 
@@ -269,17 +269,17 @@ def sampler(key, n_samples : int,
             n_inter, 
             betas, 
             x,
-            f_0 : Callable,
-            f_j : Callable,
-            f_n : Callable,
+            f0_pdf : Callable,
+            fj_pdf : Callable,
+            fn_pdf : Callable,
             T,  # the transition rule
             ) -> tuple[Array, Array]:
 
     """Annealed Importance Sampling by Neal.
        Obtain expectations or an estimate of the partition function
-       of the distribution of interest p0 = 1/z0 * f_0 begining
-       with the distribution p_n = 1/z_n * f_n using intermediate
-       distributions p_j = 1/z_j * f_j
+       of the distribution of interest p0 = 1/z0 * f0_pdf begining
+       with the distribution p_n = 1/z_n * fn_pdf using intermediate
+       distributions p_j = 1/z_j * fj_pdf
     """
 
 
@@ -289,9 +289,9 @@ def sampler(key, n_samples : int,
 #a = 1/np.sum(weights) * np.sum(weights * samples)
 
 def ais_poisson_sqr(n_inter : int,  # the number of intermediate distributions
-                    f_0,
-                    f_n,
-                    f_j,
+                    f0_pdf,
+                    fn_pdf,
+                    fj_pdf,
                     phi,
                     phi_diag,
                     theta):
@@ -335,11 +335,11 @@ def ais_example(mu, sig, n_samples=600, n_inter=60, n_gibbs_steps=5):
 
     p_n = st.norm(0, 1)
     
-    f_0 = partial(f_0, mu=mu, sig=sig) 
-    f_j = partial(f_j, f_0=f_0, f_n=f_n)
+    f0_pdf = partial(f0_pdf, mu=mu, sig=sig) 
+    fj_pdf = partial(fj_pdf, f0_pdf=f0_pdf, fn_pdf=fn_pdf)
 
-    log_f0 = partial(log_f0, mu=mu, sig=sig)
-    log_fj = partial(log_fj, log_f0=log_f0, log_fn=log_fn)
+    f0_logpdf = partial(f0_logpdf, mu=mu, sig=sig)
+    fj_logpdf = partial(fj_logpdf, f0_logpdf=f0_logpdf, fn_logpdf=fn_logpdf)
 
     #x = np.arange(-10, 5, 0.1)
     betas = np.linspace(0, 1, n_inter)
@@ -352,15 +352,15 @@ def ais_example(mu, sig, n_samples=600, n_inter=60, n_gibbs_steps=5):
         w = 1
 
         for n in range(1, len(betas)):
-            x = T(x, lambda x: f_j(x, betas[n]), n_steps=n_gibbs_steps)
+            x = T(x, lambda x: fj_pdf(x, betas[n]), n_steps=n_gibbs_steps)
 
-            fn = f_j(x, betas[n])
-            fnm1 = f_j(x, betas[n-1])
+            fn = fj_pdf(x, betas[n])
+            fnm1 = fj_pdf(x, betas[n-1])
             if fn == 0 or fnm1 == 0:
                 print(f"t {t}, n {n}\nx {x}, w {w}\nfn {fn}, fnm1 {fnm1}\nbetas[n] {betas[n]},betas[n-1] {betas[n-1]}")
                 return None
 
-            w += np.log(f_j(x, betas[n])) - np.log(f_j(x, betas[n - 1]))
+            w += np.log(fj_pdf(x, betas[n])) - np.log(fj_pdf(x, betas[n - 1]))
 
         samples[t] = x
         weights[t] = np.exp(w)
@@ -382,21 +382,21 @@ def gibbs_ais_sqr(key):
 
 def gibbs_generic_ais(key,
               f_m,
-              f_j,
-              f_0,
+              fj_pdf,
+              f0_pdf,
               T,
               m_inter : Dimension,
               nsamples : Dimension,
-              f_0args=[],
-              f_0kwargs={},
-              f_jargs=[],
-              f_jkwargs={},
+              f0_pdfargs=[],
+              f0_pdfkwargs={},
+              fj_pdfargs=[],
+              fj_pdfkwargs={},
               f_margs=[],
               f_mkwargs={}) -> tuple[DeviceArray]:
     """params:
          f_m : the starting distribution
-         f_j : the intermediate distributions
-         f_0 : the distribution of interest
+         fj_pdf : the intermediate distributions
+         f0_pdf : the distribution of interest
          n_inter : the number of intermediate distributions from [1 to n_inter]
          n_samples : number of samples and weights to return
     """
