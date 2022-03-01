@@ -1,8 +1,16 @@
+try:
+    from IMP.pynet.typedefs import(
+        Array, DeviceArray, Dimension, JitFunc, Matrix, PRNGKey, Vector 
+    )
+    import IMP.pynet.functional_gibbslib as fg
+    import IMP.pynet.PlotBioGridStatsLib as nblib
+except ModuleNotFoundError:
+    from pyext.src.typedefs import(
+        Array, DeviceArray, Dimension, JitFunc, Matrix, PRNGKey, Vector 
+    )
+    import pyext.src.functional_gibbslib as fg
+    import pyext.src.PlotBioGridStatsLib as nblib
 
-        DeviceArray, Matrix, JitFunc, PRNGKey, Vector 
-)
-import pyext.src.functional_gibbslib as fg
-import pyext.src.PlotBioGridStatsLib as nblib
 from functools import partial
 import jax 
 import jax.numpy as jnp
