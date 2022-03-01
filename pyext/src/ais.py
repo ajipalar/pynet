@@ -114,17 +114,26 @@ def do_ais(key, n_samples, n_inter, betas, x, f0_pdf):
 
     return samples, weights
 
-def generic_ais(key,
-                ais_prelude : Callable,
-                n_samples : Dimension,
-                m_interpolating_dist : Dimension,
-                f0_pdf,
-                fj_pdf,
-                f_m,
-                T : Callable
-                ):
-    """Designed for partial application of functions followed by jit compilation
+def generic_ais(key : PRNGKey = None,
+                n_samples : Dimension = None,
+                m_inter: Dimension = None,
+                init_params : Callable = None,
+                f0_pdf : Callable = None,
+                fj_pdf : Callable = None,
+                T : Callable = None,
+                init_params_kwargs : dict = None,
+                f0_pdf_kwargs : dict = None,
+                fj_pdf_kwargs : dict = None,
+                T_kwargs : dict = None,
+                ) -> tuple[DeviceArray]:
+    """Warning, function must be partially compiled followed by a jax.jit compile
+       else dictionary assignments will result in undefined behaviour.
+
+       Designed for partial application of functions followed by jit compilation
        There are n_samples returned samples and weights.
+
+       The default arguments are intialized to None because we want the function to fail
+       loudly
 
        There are m_interpolating_dist
 
@@ -135,30 +144,67 @@ def generic_ais(key,
        let T be the markov transition rule
 
        """
+    def n_samples_loop_body(sample_index : int, n_samples_init_val : tuple[DeviceArray]):
+        # Generate an initial point
+        key, subkey = jax.random.split(n_samples_init_val['key'])
+        n_samples_init_val['key'] = key
+        xn = gen_xn(sample_index, subkey, inner_init, **gen_xn_kwargs) 
+        logw = 0
+        m_inter_init_val = {'xn':xn, 
+                            'sample_index':sample_index, 
+                            'n_samples_init_val':n_samples_init_val,
+                            'logw':logw}
+
+        m_inter_out_val = jax.lax.fori_loop(1, m_inter, m_inter_loop_body, m_inter_init_val)
+        samples_n, log_weights_n = n_samples_init_val
+        samples_n = samples_n.at[samples_index].set(m_inter_out_val['samples'])
+
+        return samples, weights
+
+    def m_inter_loop_body(m_inter_index : int, m_inter_init_val : dict):
+        """Use the Markov transition rule T(j, **kwargs) to compute p(xj | xj-1)
+           params:
+           return:
+             m_inter_val: dict. A dictionary containing the statefull information"""
+
+        #Apply the markov transition kernal
+        xn = T(m_inter_index, **m_inter_init_val, **T_kwargs)
+
+        #Compute the pdf of x_{j} and x{j-1}
+        yj =fj_pdf(m_inter_index, **m_inter_init_val, **fj_pdf_kwargs) 
+        yj_1 = fj_pdf(m_inter_index -1, **m_inter_init_val, **fj_pdf_kwargs)
+        #compute the log weight j
+        logw_m = jnp.log(yj) - jnp.log(yj_1)
+        logw = m_inter_init_val['logw']
+        #multiply current weight with the previous one
+        logw = logw + logw_m
+        #set the new weight and xj 
+        m_inter_init_val['logw'] = logw
+        m_inter_init_val['xn'] = xn
+        
+        return m_inter_init_val
+
+    params = init_params(**init_params_kwargs)
+
+    # initiate the samples and the weights
     samples = jnp.zeros(n_samples)
-    weights = jnp.zeros(n_samples)
-    def inner_loop_body(j : Index, val : tuple):
-        subkey, x, fj_pdfargs = val
+    log_weights = jnp.ones(n_samples)
 
-        #Pass in a NUTS Sampler
-        x = T(j, subkey, x, fj_pdf, fj_pdfargs)
-        w += None
+    # The outer loop over the number of samples
+    samples, log_weights = jax.lax.fori_loop(0, n_samples, n_samples_loop_body, (samples, log_weights))
+    return samples, log_weights
 
+def jit_generic_ais_as_ais_example(mu=10, sig=2, n_samples=600, n_inter=60, n_giibs_steps=5):
+    p_n = jax.random.normal
+    
+    f0_pdf = partial(f0_pdf, mu=mu, sig=sig) 
+    fj_pdf = partial(fj_pdf, f0_pdf=f0_pdf, fn_pdf=fn_pdf)
 
-    def inner_ais_loop(k : Index, val : tuple):
-        key = init_val
-        key, subkey = jax.random.split(key) 
-        x = ais_prelude(subkey) 
-        w = 1
-
-        return jax.lax.fori_loop(1, m_interpolating_dist, inner_loop_body, inner_val)
-
-
-    samples, weights = jax.lax.fori_loop(0, n_samples, inner_ais_loop, init_value)
+    f0_logpdf = partial(f0_logpdf, mu=mu, sig=sig)
+    fj_logpdf = partial(fj_logpdf, f0_logpdf=f0_logpdf, fn_logpdf=fn_logpdf)
 
 
 
-    x = None
 
 
 # AIS in the context of sqr models
