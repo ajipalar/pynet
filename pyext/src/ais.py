@@ -33,7 +33,7 @@ from typing import Callable
    The functions below are implemented as pure functions with no side effects.
    """
 
-def ais_prelude():
+def ais_prelude() -> tuple:
     mu = 5
     
     sigma = 2
@@ -49,89 +49,119 @@ def ais_prelude():
     
 
 
-def f0_pdf(x, mu, sig):
+def f0_pdf__j(x, mu, sig):
     """Target distribution: \propto N(mu, sigma)"""
     return np.exp(-(x - mu)**2 / (2 * sig ** 2))
 
-def fn_pdf(x):
+def fn_pdf__j(x):
     return jax.scipy.stats.norm.pdf
 
-def fn_logpdf(x):
+def fn_logpdf__j(x):
     return jax.scipy.stats.norm.logpdf(x)
 
-def f0_logpdf(x, mu, sig):
+def f0_logpdf__j(x, mu, sig):
     """Log target distribution"""
     return -(x - mu)**2 / (2 * sig ** 2)
 
-def fj_pdf(x : float  = None, 
+def fj_pdf__g(x : float  = None, 
            beta : float  = None, 
-           target : PDF = None, 
-           source : PDF = None):
+           target__j : PDF = None, 
+           source__j : PDF = None):
     """A univariate annealing interpolating distribution between
        the begining distribution f_n and the target f_0
        Designed for target = f0_pdf and source = fn_pdf
 
        """
-    return target(x)**beta * source(x)**(1 - beta)
+    return target__j(x)**beta * source__j(x)**(1 - beta)
 
-def fj_logpdf(x, beta, 
-              log_source : lPDF = None, 
-              log_target : lPDF = None):
+def fj_logpdf__g(x : float = None, 
+              beta : float = None, 
+              log_source__j : lPDF = None, 
+              log_target__j : lPDF = None):
     """Log interpolating distribution
        use partial application of f0_pdf, and f_"""
-    return beta * f0_logpdf(x) + (1-beta) * fn_logpdf(x)
+    return beta * log_target__j(x) + (1-beta) * log_source__j(x)
 
 
 
 
-def T(key, x, f, n_steps=10):
+def T_nsteps_mh__py(key, 
+                    x: Number = None, 
+                    pdf : PDF = None, 
+                    n_steps=10) -> float:
     """Transition distribtuion T(x'|x) using n-steps Metropolis sampler"""
-    key, subkey = jax.random.split(key)
 
     for t in range(n_steps):
         #Proposal
-        x_prime = x + jax.random.normal(key)
+        key, s1, s2 = jax.random.split(key)
+        x_prime = x + jax.random.normal(s1)
 
         #Acceptance prob
-        a = f(x_prime) / f(x)
+        a = pdf(x_prime) / pdf(x)
         
 
-        if jax.random.uniform(subkey) < a:
+        if jax.random.uniform(s2) < a:
             x = x_prime
     return x
 
-def do_ais(key : PRNGKey = None, 
+def T_nsteps_mh__g(key : PRNGKey = None, 
+         x : Number = None, 
+         intermediate__j : PDF = None, 
+         intermediate_rvs__j : Callable = None,
+         n_steps : int = 10):
+
+    key, subkey = jax.random.split(key)
+
+    def inner_loop_body(i, val):
+        key, x = val
+        key, s1, s2 = jax.random.split(key)
+        x_prime = x + intermediate_rvs__j(s1) #jax.random.normal(s1)
+
+        #Acceptance prob
+        a = intermediate__j(x_prime) / intermediate__j(x)
+        
+
+        if jax.random.uniform(s2) < a:
+            x = x_prime
+
+        return key, x
+
+    key, x = jax.lax.fori_loop(0, n_steps, inner_loop_body, (key, x))
+
+    return x
+
+
+def do_ais__g(key : PRNGKey = None, 
            mu : float = None,
            sigma : float = None,
            n_samples : Dimension = None, 
            n_inter : Dimension = None, 
            betas :  Array = None, 
-           f0_pdf : PDF = None, 
-           fj_pdf : PDF = None, 
-           fn_pdf : PDF = None,
-           T : Callable = None) -> tuple[Samples, Weights]:
+           target__j: PDF = None, 
+           intermediate__j: PDF = None, 
+           source__j: PDF = None,
+           source_rvs__j: Callable = None,
+           transition_rule__j : Callable = None) -> tuple[Samples, Weights]:
     """Perform the following steps
        1) partial function application
        2) AIS
     """
     samples : Samples = jnp.zeros(n_samples)
     weights : Weights = jnp.zeros(n_samples)
-    f0_pdf : Callable[[float], float] = partial(f0_pdf, mu=mu, sig=sigma)
-    fj_pdf : Callable[[float, float], float] = partial(fj_pdf, target=f0_pdf, source=fn_pdf)
-
+    
     for t in range(n_samples):
         # Sample initial point from q(x)
         #x = p_n.rvs() #random variates
         key, subkey = jax.random.split(key)
-        x = jax.random.normal(key)
-        w = 1
+        x = source_rvs__j(key) #jax.random.normal(key)
+        logw = 1
 
         for n in range(1, len(betas)):
             # Transition
-            x = T(subkey, x, lambda x: fj_pdf(x, betas[n]), n_steps=5)
+            x = transition_rule__j(subkey, x, lambda x: intermediate_j(x, betas[n]), n_steps=5)
 
             #Compute weight in log space
-            w += jnp.log(fj_pdf(x, betas[n])) - jnp.log(fj_pdf(x, betas[n - 1]))
+            w += jnp.log(intermediate__j(x, betas[n])) - jnp.log(intermediate__j(x, betas[n - 1]))
 
         samples = samples.at[t].set(x)
         weights = weights.at[t].set(jnp.exp(w))
