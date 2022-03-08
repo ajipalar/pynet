@@ -1,12 +1,14 @@
 try:
     from IMP.pynet.typedefs import(
-        Array, DeviceArray, Dimension, JitFunc, Matrix, PRNGKey, Vector 
+        Array, DeviceArray, Dimension, JitFunc, Matrix, Number, PartialF, 
+        PDF, lPDF, PMF, lPMF, PRNGKey, PureFunc, Samples, Vector, Weights
     )
     import IMP.pynet.functional_gibbslib as fg
     import IMP.pynet.PlotBioGridStatsLib as nblib
 except ModuleNotFoundError:
     from pyext.src.typedefs import(
-        Array, DeviceArray, Dimension, JitFunc, Matrix, PRNGKey, Vector 
+        Array, DeviceArray, Dimension, JitFunc, Matrix, Number, PartialF, 
+        PDF, lPDF, PMF, lPMF, PRNGKey, PureFunc, Samples, Vector, Weights
     )
     import pyext.src.functional_gibbslib as fg
     import pyext.src.PlotBioGridStatsLib as nblib
@@ -61,11 +63,20 @@ def f0_logpdf(x, mu, sig):
     """Log target distribution"""
     return -(x - mu)**2 / (2 * sig ** 2)
 
-def fj_pdf(x, beta, f0_pdf, fn_pdf):
-    """Interpolating distribution"""
-    return f0_pdf(x)**beta * fn_pdf(x)**(1 - beta)
+def fj_pdf(x : float  = None, 
+           beta : float  = None, 
+           target : PDF = None, 
+           source : PDF = None):
+    """A univariate annealing interpolating distribution between
+       the begining distribution f_n and the target f_0
+       Designed for target = f0_pdf and source = fn_pdf
 
-def fj_logpdf(x, beta, fn_logpdf, f0_logpdf):
+       """
+    return target(x)**beta * source(x)**(1 - beta)
+
+def fj_logpdf(x, beta, 
+              log_source : lPDF = None, 
+              log_target : lPDF = None):
     """Log interpolating distribution
        use partial application of f0_pdf, and f_"""
     return beta * f0_logpdf(x) + (1-beta) * fn_logpdf(x)
@@ -89,12 +100,25 @@ def T(key, x, f, n_steps=10):
             x = x_prime
     return x
 
-def do_ais(key, n_samples, n_inter, betas, x, f0_pdf):
-    """Perform annealed importance sampling as Neal using the N-steps metropolis algoirthm
+def do_ais(key : PRNGKey = None, 
+           mu : float = None,
+           sigma : float = None,
+           n_samples : Dimension = None, 
+           n_inter : Dimension = None, 
+           betas :  Array = None, 
+           f0_pdf : PDF = None, 
+           fj_pdf : PDF = None, 
+           fn_pdf : PDF = None,
+           T : Callable = None) -> tuple[Samples, Weights]:
+    """Perform the following steps
+       1) partial function application
+       2) AIS
     """
-    samples = jnp.zeros(n_samples)
-    weights = jnp.zeros(n_samples)
-    fj_pdf = partial(fj_pdf, f0_pdf=f0_pdf)
+    samples : Samples = jnp.zeros(n_samples)
+    weights : Weights = jnp.zeros(n_samples)
+    f0_pdf : Callable[[float], float] = partial(f0_pdf, mu=mu, sig=sigma)
+    fj_pdf : Callable[[float, float], float] = partial(fj_pdf, target=f0_pdf, source=fn_pdf)
+
     for t in range(n_samples):
         # Sample initial point from q(x)
         #x = p_n.rvs() #random variates
@@ -469,3 +493,11 @@ def gibbs_generic_ais(key,
 
 
     return samples, weights
+
+def get_mean(samples : Array = None, weights : Array = None)-> float:
+    """params:
+        samples: 1d array
+        weights: 1d array 
+       return:
+         mean: float"""
+    return jnp.sum(samples * weights) / jnp.sum(samples) 
