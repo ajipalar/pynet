@@ -6,10 +6,12 @@ try:
     import IMP.pynet.ais as ais
     import IMP.pynet.functional_gibbslib as fg
     import IMP.pynet.PlotBioGridStatsLib as bsl
+    import IMP.pynet.distributions as dist
 except ModuleNotFoundError:
     import pyext.src.ais as ais
     import pyext.src.functional_gibbslib as fg
     import pyext.src.PlotBioGridStatsLib as nblib
+    import pyext.src.distributions as dist
 
 import io
 import jax
@@ -23,6 +25,88 @@ from functools import partial
 class TestAIS(IMP.test.TestCase):
     """Test the various functions in the AIS module""" 
 
+    rtol = 1e-05
+    atol = 1e-05
+
+    def test_nsteps_mh__g(self):
+        mu = 100
+        sigma = 2
+        log_intermediate__j = partial(dist.norm.lpdf, loc=mu, scale=sigma)
+        n_steps = 100
+
+        key = jax.random.PRNGKey(2)
+        x = 0.0
+
+        kwargs_nsteps_mh = {
+                'log_intermediate__j': log_intermediate__j,
+                'intermediate_rvs__j': dist.norm.rv,
+                'n_steps': n_steps,
+                'kwargs_log_intermediate__j': {}
+        }
+                
+
+        #Callable
+        x = ais.nsteps_mh__g(key, x, **kwargs_nsteps_mh)
+
+        #Jittable
+        nsteps_mh__j = partial(ais.nsteps_mh__g, **kwargs_nsteps_mh)
+        nsteps_mh = jax.jit(nsteps_mh__j)
+
+        xj = nsteps_mh(key, 0.0)
+
+        assert xj == x
+
+    def test_nsteps_mh__g_accuracy(self):
+        mu = 100
+        sigma = 2
+        log_intermediate__j = partial(dist.norm.lpdf, loc=mu, scale=sigma)
+        n_steps = 50000
+
+        key = jax.random.PRNGKey(2)
+
+        kwargs_nsteps_mh = {
+                'log_intermediate__j': log_intermediate__j,
+                'intermediate_rvs__j': dist.norm.rv,
+                'n_steps': n_steps,
+                'kwargs_log_intermediate__j': {}
+        }
+                
+
+        #Jittable
+        nsteps_mh__j = partial(ais.nsteps_mh__g, **kwargs_nsteps_mh)
+        nsteps_mh = jax.jit(nsteps_mh__j)
+
+        xj = nsteps_mh(key, 0.0)
+        assert xj > mu - 4*sigma
+        assert xj < mu + 4*sigma
+
+
+
+
+        
+
+
+
+
+
+         
+
+    @IMP.test.skip
+    def test_apply_normal_context_to_sample(self):
+        mu = 1000
+        sigma = 2
+        n_mh_steps = 10
+        n_samples = 100
+        n_inter = 50
+
+        f = ais.apply_normal_context_to_sample__s
+        sample__j = f(mu, sigma, n_mh_steps, n_samples, n_inter)
+        #sample = jax.jit(sample__j)
+        key = jax.random.PRNGKey(10)
+
+        weights, samples, = sample__j(key)
+
+    @IMP.test.skip
     def test_f0_pdf__j(self):
         mu = 10
         sig = 2
@@ -32,14 +116,18 @@ class TestAIS(IMP.test.TestCase):
 
         f0 = ais.f0_pdf__j
         f0 = partial(f0, mu = mu, sig = sig)
+        jf0 = jax.jit(f0)
+        jf0(2.0).block_until_ready()
 
         assert f0(cases1[0]) > f0(cases2[0])
         assert f0(cases1[1]) == f0(cases2[1])
         assert f0(cases1[2]) > f0(cases2[2])
 
-        for n in jnp.arange(-1000, 1000):
+        for n in jnp.arange(-100, 100):
             assert 0 <= f0(n) <= 1
+            np.testing.assert_almost_equal(jf0(n), f0(n), decimal = 5)
 
+    @IMP.test.skip
     def test_fn_pdf__j(self):
         
         mu = 0
@@ -49,16 +137,38 @@ class TestAIS(IMP.test.TestCase):
         cases2 = [mu - 10, mu, mu + 10]
 
         f0 = ais.fn_pdf__j
+        print('class implementation')
+        f0 = ais.norm.pdf
+        jf0 = jax.jit(f0)
+        jf0(2.0).block_until_ready()
 
         assert f0(cases1[0]) > f0(cases2[0])
         assert f0(cases1[1]) == f0(cases2[1])
         assert f0(cases1[2]) > f0(cases2[2])
 
-        for n in jnp.arange(-1000, 1000):
+        for n in jnp.arange(-100, 100):
             assert 0 <= f0(n) <= 1
+            np.testing.assert_almost_equal(jf0(n), f0(n), decimal = 5)
 
-            
-            
+    @IMP.test.skip
+    def test_fj_pdf__g(self):
+        mu = 10
+        sig = 2
+
+        target__j = ais.f0_pdf__j
+        target__j = partial(target__j, mu = mu, sig = sig)
+        source__j = ais.fn_pdf__j
+
+        fj_pdf__j = partial(ais.fj_pdf__g, target__j = target__j, source__j = source__j)
+
+        jfj_pdf = jax.jit(fj_pdf__j)
+        jfj_pdf(2.0, 0.3).block_until_ready()
+
+        for beta in jnp.arange(0, 1, 0.1):
+            ...
+
+
+
 
 
     @IMP.test.skip
@@ -67,6 +177,8 @@ class TestAIS(IMP.test.TestCase):
         sig = 2
 
         T_j = ais.T_nsteps_mh__unorm2unorm__p(mu, sig)
+        T_j = ais.T.unorm2unorm__p(mu, sig)
+        print('class encapsulation')
 
         x = jnp.arange(0, 20)
         betas = jnp.arange(0, 1, 0.1)
@@ -138,11 +250,6 @@ class TestAIS(IMP.test.TestCase):
             np.testing.isclose(mean, mu, rtol = rtol)
             
 
-    def test_get_ais_mean(self):
-        pass
-
-    def test_do_ais_in_normal_context(self):
-        ...
 
         
 if __name__ == '__main__':

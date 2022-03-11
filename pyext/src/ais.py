@@ -2,19 +2,22 @@ try:
     from IMP.pynet.typedefs import(
         Array, DeviceArray, Dimension, JitFunc, Matrix, Number, PartialF, 
         PDF, lPDF, PMF, lPMF, PRNGKey, PureFunc, Samples, Vector, Weights,
-        RV, fParam, iParam, Prob
+        RV, fParam, iParam, Prob, lProb
     )
     import IMP.pynet.functional_gibbslib as fg
     import IMP.pynet.PlotBioGridStatsLib as nblib
+    import IMP.pynet.distributions as dist
 except ModuleNotFoundError:
     from pyext.src.typedefs import(
         Array, DeviceArray, Dimension, JitFunc, Matrix, Number, PartialF, 
         PDF, lPDF, PMF, lPMF, PRNGKey, PureFunc, Samples, Vector, Weights,
-        RV, fParam, iParam, Prob
+        RV, fParam, iParam, Prob, lProb
     )
     import pyext.src.functional_gibbslib as fg
     import pyext.src.PlotBioGridStatsLib as nblib
+    import pyext.src.distributions as dist
 
+from abc import ABC, abstractmethod
 from functools import partial
 import jax 
 import jax.numpy as jnp
@@ -22,7 +25,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st
 from typing import Callable
-import distributions as dist
 
 """This module contains functions that implement Annealed Importance Sampling.
    In particular Annealed Importance Sampling is implemented for the Poisson 
@@ -41,86 +43,101 @@ import distributions as dist
 # dist.norm.rv
 
 
-
-def ais_prelude() -> tuple:
-    mu = 5
+def normal_context(mu, sigma, n_steps):
+    source = dist.norm
+    log_target = partial(source.lpdf, loc = mu, scale = sigma)
     
-    sigma = 2
-    fn_pdf = jax.scipy.stats.norm.pdf
-    
-    
-    x = np.arange(5, 15, 0.1)
-    n_inter = 50
-    n_samples = 100
-    betas = np.linspace(0, 1, n_inter)
-    key = jax.random.PRNGKey(10)
-    return mu, sigma, fn_pdf, x, n_inter, n_samples, betas, key
-    
-def fj_pdf__g(x : float  = None, 
-           beta : float  = None, 
-           target__j : PDF = None, 
-           source__j : PDF = None):
-    """A univariate annealing interpolating distribution between
-       the begining distribution f_n and the target f_0
-       Designed for target = f0_pdf and source = fn_pdf
-       """
+    nealkwargs = {'log_source__j': source.lpdf, 
+                  'log_targert__j': log_target}
 
-    return target__j(x)**beta * source__j(x)**(1 - beta)
+    get_log_intermediate_score = partial(log_neal_interpolating_score_sequence__g, **nealkwargs) 
 
-def fj_logpdf__g(x : float = None, 
-              beta : float = None, 
-              log_source__j : lPDF = None, 
-              log_target__j : lPDF = None):
-    """Log interpolating distribution
-       use partial application of f0_pdf, and f_"""
-    return beta * log_target__j(x) + (1-beta) * log_source__j(x)
+    Tkwargs = {'intermediate__j': get_log_intermediate_score, 
+               'intermediate_rvs__j': dist.norm.rv,
+               'n_steps': n_steps,
+               'kwargs_log_intermediate__j': {}}
 
 
-def T_nsteps_mh__py(key, 
-                    x: Number = None, 
-                    pdf : PDF = None, 
-                    n_steps=10) -> float:
-    """Transition distribtuion T(x'|x) using n-steps Metropolis sampler"""
+    T = partial(nsteps_mh__g, **Tkwargs)
 
-    for t in range(n_steps):
-        #Proposal
-        key, s1, s2 = jax.random.split(key)
-        x_prime = x + jax.random.normal(s1)
+    def get_invariants(n_samples, n_inter):
+        betas = jnp.arange(0.0, 1.0, n_inter)
+        return betas
 
-        #Acceptance prob
-        a = pdf(x_prime) / pdf(x)
-        
+    return source, get_log_intermediate_score, T, get_invariants
 
-        if jax.random.uniform(s2) < a:
-            x = x_prime
-    return x
+def apply_normal_context_to_sample__s(mu, sigma, n_mh_steps, n_samples, n_inter) -> JitFunc:
 
-def T_nsteps_mh__g(key : PRNGKey = None, 
-         x : Number = None, 
-         intermediate__j : PDF = None, 
-         intermediate_rvs__j : Callable = None,
-         n_steps : int = 10,
-         kwargs_intermediate__j = None) -> RV:
-    """The transition distribution T(x' | x) implemented using the Metropolis Hastings Algorithm"""
+    source, get_log_inter, T, get_invars = normal_context(mu, sigma, n_mh_steps)
 
-    key, subkey = jax.random.split(key)
+    sample_kwargs = {'n_samples': n_samples, 
+            'n_inter': n_inter,
+            'get_log_intermediate_score' : get_log_inter,
+            'source': source,
+            'T': T,
+            'get_invariants': get_invars,
+            }
 
-    def inner_loop_body(i, val):
-        key, x = val
+    sample__j = partial(sample, **sample_kwargs)
+
+    return sample__j
+
+
+def sample(key : PRNGKey = None, 
+           n_samples : Dimension = None,
+           n_inter : Dimension = None, 
+           get_log_intermediate_score : JitFunc = None, 
+           source = None,
+           T: Callable = None,
+           get_invariants : Callable = None,
+           ) -> tuple[Samples, Weights]:
+    """Perform the following steps
+       1) partial function application
+       2) AIS
+    """
+    samples : Samples = jnp.zeros(n_samples)
+    log_weights : Weights = jnp.zeros(n_samples)
+
+    invariants = get_invariants(n_samples, n_inter)
+
+    for t in range(n_samples):
+        # Sample initial point from q(x)
+        #x = p_n.rvs() #random variates
+
         key, s1, s2 = jax.random.split(key, 3)
-        x_prime = x + intermediate_rvs__j(s1) #jax.random.normal(s1)
+        x = source.rv(s1) #jax.random.normal(key)
+        logw = 0.0
 
-        #Acceptance prob
-        a = intermediate__j(x_prime, **kwargs_intermediate__j) / intermediate__j(x, **kwargs_intermediate__j)
-        
-        if jax.random.uniform(s2) < a:
-            x = x_prime
+        for n in range(1, n_inter):
+            # Transition
+            #x = transition_rule__j(subkey, x, lambda x: intermediate_j(x, betas[n]), n_steps=5)
 
-        return key, x
+            s2, s3 = jax.random.split(s2, 2)
+            state = ((t, n), invariants)
+            x = T(s3, x, state) 
 
-    key, x = jax.lax.fori_loop(0, n_steps, inner_loop_body, (key, x))
+            #What about the betas? 
 
-    return x
+            #Compute weight in log space
+
+            logw += get_log_intermediate_score(x, n, state) - get_log_intermediate_score(x, n-1, state) 
+
+        samples = samples.at[t].set(x)
+        log_weights = weights.at[t].set(jnp.exp(w))
+
+    return samples, log_weights
+
+
+
+
+   # convention
+   # fname__context_name__tag
+   # tags
+   # __p : partial application
+   # __j : jittable function
+   # __g : generic function
+   # fname_context_name__p(fname__g, *args, **kwargs) -> fname__context_name__j
+   # __py : py function. Not jittable
 
 def T_nsteps_mh__unorm2unorm__p(mu : fParam, sig : fParam) -> JitFunc:
     source__j = fn_pdf__j
@@ -135,58 +152,11 @@ def T_nsteps_mh__unorm2unorm__p(mu : fParam, sig : fParam) -> JitFunc:
 
     T_nsteps_mh__unorm2unorm__j : Callable[[PRNGKey, RV, dict], RV]
 
-    T_nsteps_mh__unorm2unorm__j = partial(T_nsteps_mh__g,
+    T_nsteps_mh__unorm2unorm__j = partial(nsteps_mh__g,
             intermediate_rvs__j = intermediate_rvs__j,
             intermediate__j = intermediate__j)
 
     return T_nsteps_mh__unorm2unorm__j
-
-def do_ais__g(key : PRNGKey = None, 
-           n_samples : Dimension = None,
-           n_inter : Dimension = None, 
-           betas :  Array = None, 
-           target__j: PDF = None, 
-           intermediate__j: PDF = None, 
-           source__j: PDF = None,
-           source_rvs__j: Callable = None,
-           transition_rule__j : Callable = None,
-           ) -> tuple[Samples, Weights]:
-    """Perform the following steps
-       1) partial function application
-       2) AIS
-    """
-    samples : Samples = jnp.zeros(n_samples)
-    weights : Weights = jnp.zeros(n_samples)
-    
-    for t in range(n_samples):
-        # Sample initial point from q(x)
-        #x = p_n.rvs() #random variates
-        key, subkey = jax.random.split(key)
-        x = source_rvs__j(key) #jax.random.normal(key)
-        logw = 1
-
-        for n in range(1, n_inter):
-            # Transition
-            #x = transition_rule__j(subkey, x, lambda x: intermediate_j(x, betas[n]), n_steps=5)
-
-            x = transition_rule__j(subkey, x, *args_transition_rule__j, **kwargs_transition_rule__j)
-
-            #Compute weight in log space
-            w += jnp.log(intermediate__j(x, betas[n])) - jnp.log(intermediate__j(x, betas[n - 1]))
-
-        samples = samples.at[t].set(x)
-        weights = weights.at[t].set(jnp.exp(w))
-
-    return samples, weights
-
-   # convention
-   # fname__context_name__tag
-   # tags
-   # __p : partial application
-   # __j : jittable function
-   # __g : generic function
-   # fname_context_name__p(fname__g, *args, **kwargs) -> fname__context_name__j
-   # __py : py function. Not jittable
 
 def do_ais__unorm2unorm__p(mu : float = None,
                         sig : float = None,
@@ -202,7 +172,7 @@ def do_ais__unorm2unorm__p(mu : float = None,
             source__j = source__j)
 
     trans_rule__j : Callable[[PRNGKey, RV], RV]
-    trans_rule__j = partial(T_nsteps_mh__g, 
+    trans_rule__j = partial(nsteps_mh__g, 
             intermediate__j = interm__j,
             intermediate_rvs__j = jax.random.normal,
             n_steps = n_mh_steps)
@@ -408,6 +378,20 @@ def get_sqr_ais_weights(key : PRNGKey,
         samples.at[j].set(x)
         weights = weights.at[j].set(jnp.exp(w))
 
+def ais_prelude() -> tuple:
+    mu = 5
+    
+    sigma = 2
+    fn_pdf = jax.scipy.stats.norm.pdf
+    
+    
+    x = np.arange(5, 15, 0.1)
+    n_inter = 50
+    n_samples = 100
+    betas = np.linspace(0, 1, n_inter)
+    key = jax.random.PRNGKey(10)
+    return mu, sigma, fn_pdf, x, n_inter, n_samples, betas, key
+
 def get_mean__j(samples : Array = None, weights : Array = None)-> float:
     """params:
         samples: 1d array
@@ -415,3 +399,67 @@ def get_mean__j(samples : Array = None, weights : Array = None)-> float:
        return:
          mean: float"""
     return jnp.sum(samples * weights) / jnp.sum(samples) 
+
+def log_neal_interpolating_score_sequence__g(
+              x : float = None, 
+              beta : float = None, 
+              log_source__j : lPDF = None, 
+              log_target__j : lPDF = None ) -> float:
+    """As equation (3) from Neal 1998 Annealed Importance Sampling
+       Log interpolating distribution
+       use partial application of source and target"""
+
+    return beta * log_target__j(x) + (1-beta) * log_source__j(x)
+
+def T_nsteps_mh__py(key, 
+                    x: Number = None, 
+                    pdf : PDF = None, 
+                    n_steps=10) -> float:
+    """Transition distribtuion T(x'|x) using n-steps Metropolis sampler"""
+
+    for t in range(n_steps):
+        #Proposal
+        key, s1, s2 = jax.random.split(key)
+        x_prime = x + jax.random.normal(s1)
+
+        #Acceptance prob
+        a = pdf(x_prime) / pdf(x)
+        
+
+        if jax.random.uniform(s2) < a:
+            x = x_prime
+    return x
+
+def nsteps_mh__g(key : PRNGKey = None, 
+         x : float = None, 
+         log_intermediate__j : lPDF = None, 
+         intermediate_rvs__j : Callable = None,
+         n_steps : int = 10,
+         kwargs_log_intermediate__j = None) -> RV:
+    """The transition distribution T(x' | x) implemented using the Metropolis Hastings Algorithm"""
+
+    key, subkey = jax.random.split(key)
+
+    def inner_loop_body(i, val):
+        key, x = val
+        key, s1, s2 = jax.random.split(key, 3)
+        x_prime = x + intermediate_rvs__j(s1) #jax.random.normal(s1)
+
+        #Acceptance prob
+        a = log_intermediate__j(x_prime, **kwargs_log_intermediate__j) - log_intermediate__j(x, **kwargs_log_intermediate__j)
+        a = jnp.exp(a)
+
+        """ 
+        if jax.random.uniform(s2) < a:
+            x = x_prime
+        """
+        pred = jax.random.uniform(s2) < a
+
+        x = jax.lax.cond(pred, lambda x, x_prime: x_prime, lambda x, x_prime: x, x, x_prime)
+
+        return key, x
+
+    key, x = jax.lax.fori_loop(0, n_steps, inner_loop_body, (key, x))
+
+    return x
+
