@@ -22,6 +22,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as st
 from typing import Callable
+import distributions as dist
 
 """This module contains functions that implement Annealed Importance Sampling.
    In particular Annealed Importance Sampling is implemented for the Poisson 
@@ -34,6 +35,12 @@ from typing import Callable
 
    The functions below are implemented as pure functions with no side effects.
    """
+
+# dist.norm.pdf
+# dist.norm.lpdf
+# dist.norm.rv
+
+
 
 def ais_prelude() -> tuple:
     mu = 5
@@ -49,22 +56,6 @@ def ais_prelude() -> tuple:
     key = jax.random.PRNGKey(10)
     return mu, sigma, fn_pdf, x, n_inter, n_samples, betas, key
     
-
-
-def f0_pdf__j(x, mu, sig):
-    """Target distribution: \propto N(mu, sigma)"""
-    return jax.scipy.stats.norm.pdf(x, loc=mu, scale=sig) 
-
-def fn_pdf__j(x):
-    return jax.scipy.stats.norm.pdf(x)
-
-def fn_logpdf__j(x):
-    return jax.scipy.stats.norm.logpdf(x)
-
-def f0_logpdf__j(x, mu, sig):
-    """Log target distribution"""
-    return jax.scipy.stats.norm.logpdf(x, loc=mu, scale=sig) 
-
 def fj_pdf__g(x : float  = None, 
            beta : float  = None, 
            target__j : PDF = None, 
