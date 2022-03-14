@@ -103,12 +103,30 @@ def sample(key : PRNGKey = None,
            T: Callable = None,
            get_invariants : Callable = None,
            ) -> tuple[Samples, Weights]:
-    """Perform the following steps
-       1) partial function application
-       2) AIS
+    """A generic algorithm for AIS sampling.
+       Four objects are required.
+       params:
+
+       function signatures:
+  
+         get_invariants:
+           (Index, Index) -> (GenericInvariants)
+  
+         x: DeviceArray. shape, dtype t[s]
+  
+         source:
+           .rv : (key) -> (t[s])
+         T:
+           (PRNGKey, DeviceArray, Index, Index, GenericInvariants) -> (DeviceArray)
+         get_log_intermediate_score :
+           (t[s], Index, Kwargs) -> (log_score) 
+      return:
+        samples:
+        log_weights:
     """
-    samples : Samples = jnp.zeros(n_samples)
-    log_weights : Weights = jnp.zeros(n_samples)
+
+    log_weights: Weights = jnp.zeros(n_samples)
+    samples: Samples = jnp.zeros(n_samples)
 
     invariants = get_invariants(n_samples, n_inter)
 
@@ -125,17 +143,17 @@ def sample(key : PRNGKey = None,
             #x = transition_rule__j(subkey, x, lambda x: intermediate_j(x, betas[n]), n_steps=5)
 
             s2, s3 = jax.random.split(s2, 2)
-            sample_state = {'t': t, 'n': n, 'sample_invariants': invariants}
-            x = T(s3, x, sample_state=sample_state) 
+
+            x = T(s3, x, t, n, sample_state=invariants) 
 
             #What about the betas? 
 
             #Compute weight in log space
 
-            logw += get_log_intermediate_score(x, n, sample_state=sample_state) - get_log_intermediate_score(x, n-1, sample_state=sample_state) 
+            logw += get_log_intermediate_score(x, n, sample_state=invariants) - get_log_intermediate_score(x, n-1, sample_state=invariants) 
 
         samples = samples.at[t].set(x)
-        log_weights = weights.at[t].set(jnp.exp(w))
+        log_weights = log_weights.at[t].set(logw)
 
     return samples, log_weights
 

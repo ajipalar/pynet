@@ -7,10 +7,21 @@ try:
     import IMP.pynet.functional_gibbslib as fg
     import IMP.pynet.PlotBioGridStatsLib as bsl
     import IMP.pynet.distributions as dist
+    from IMP.pynet.typedefs import (
+        Index,
+        PRNGKey
+    )
+    import IMP.pynet.distributions as dist
+
 except ModuleNotFoundError:
     import pyext.src.ais as ais
     import pyext.src.functional_gibbslib as fg
     import pyext.src.PlotBioGridStatsLib as nblib
+    import pyext.src.distributions as dist
+    from pyext.src.typedefs import (
+        Index,
+        PRNGKey
+    )
     import pyext.src.distributions as dist
 
 import io
@@ -21,6 +32,40 @@ import numpy as np
 from functools import partial 
 from typing import Union, Any, Callable
 
+
+def sample(n_samples: int, n_inter: int, decimal_tolerance: int):
+    """Test that the sample algorithm is jittable"""
+
+    def get_invariants(n_samples: Index, n_inter: Index) -> tuple:
+        return ()
+
+    class Source:
+        def rv(key: PRNGKey):
+            return jax.random.uniform(key)
+
+    def T(key: PRNGKey, x, t, n, sample_state=None):
+        return jax.random.uniform(key)
+
+    def get_log_intermediate_score(x, n, sample_state=None):
+        return dist.norm.lpdf(x)
+
+    kwargs_partial = {'get_log_intermediate_score': get_log_intermediate_score,
+            'source': Source,
+            'T': T,
+            'get_invariants': get_invariants,
+            'n_samples': n_samples,
+            'n_inter': n_inter}
+
+    samplep = partial(ais.sample, **kwargs_partial) 
+    key = jax.random.PRNGKey(111)
+
+    jsample = jax.jit(samplep)
+
+    np.testing.assert_almost_equal(samplep(key=key), jsample(key=key), decimal_tolerance) 
+
+     
+
+    
 
 
 def nsteps_mh__g(mu : float, sigma: float, rseed : Union[float, int]):

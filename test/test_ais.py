@@ -31,6 +31,9 @@ class DevTestAIS(IMP.test.TestCase):
     rtol = 1e-05
     atol = 1e-05
 
+    def test_sample(self):
+        td.sample(n_samples=5, n_inter=5, decimal_tolerance=5)
+
     def test_nsteps_mh__g(self):
         mu = 100
         sigma = 2
