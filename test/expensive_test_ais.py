@@ -22,7 +22,7 @@ from functools import partial
 from hypothesis import given, settings, strategies as st
 
 
-deadline_ms = 200
+deadline_ms = 2000
 
 class TestAIS(IMP.test.TestCase):
     """Test the various functions in the AIS module""" 
@@ -31,21 +31,22 @@ class TestAIS(IMP.test.TestCase):
     atol = 1e-05
 
 
-    @IMP.test.skip
+    #@IMP.test.skip
     @settings(deadline=deadline_ms)
-    @given(st.floats(), st.floats(min_value=1e-5), st.integers())
-    def test_nsteps_mh__g(self, mu, sigma, rseed):
-        #mu = 100
-        #sigma = 2
+    @given(st.floats(), st.floats(min_value=1e-5))
+    def test_nsteps_mh__g(self, mu, sigma):
+    #def test_nsteps_mh__g(self):
+    #    mu = 100
+    #    sigma = 2
         log_intermediate__j = partial(dist.norm.lpdf, loc=mu, scale=sigma)
         n_steps = 100
 
-        key = jax.random.PRNGKey(rseed)
+        key = jax.random.PRNGKey(7)
         x = 0.0
 
         kwargs_nsteps_mh = {
                 'log_intermediate__j': log_intermediate__j,
-                'intermediate_rvs__j': dist.norm.rv,
+                'intermediate_rv__j': dist.norm.rv,
                 'n_steps': n_steps,
                 'kwargs_log_intermediate__j': {}
         }
@@ -62,16 +63,26 @@ class TestAIS(IMP.test.TestCase):
 
         assert xj == x
 
-    @given(st.floats(), st.floats(min_value=1e-5), st.integers())
-    def test_nsteps_mh__g_accuracy(self, mu, sigma, rseed):
+    @IMP.test.skip
+    #@given(st.floats(), st.floats(min_value=0.1, max_value=4.0))
+    #def test_nsteps_mh__g_accuracy(self, mu, cv):
+    def test_nsteps_mh__g_accuracy(self):
+        mu = 1000
+        cv = 0.2
+
+        if mu == 0:
+            sigma = cv
+        else:
+            sigma = jnp.abs(mu * cv)
+
         log_intermediate__j = partial(dist.norm.lpdf, loc=mu, scale=sigma)
 
-        key = jax.random.PRNGKey(rseed)
+        key = jax.random.PRNGKey(7)
         n_steps = 50000
 
         kwargs_nsteps_mh = {
                 'log_intermediate__j': log_intermediate__j,
-                'intermediate_rvs__j': dist.norm.rv,
+                'intermediate_rv__j': dist.norm.rv,
                 'n_steps': n_steps,
                 'kwargs_log_intermediate__j': {}
         }
@@ -85,15 +96,6 @@ class TestAIS(IMP.test.TestCase):
         xj = nsteps_mh(key, 0.0)
         assert xj > mu - 4*sigma
         assert xj < mu + 4*sigma
-
-
-
-
-        
-
-
-
-
 
          
 
@@ -210,7 +212,7 @@ class TestAIS(IMP.test.TestCase):
         kwargs = {}
 
         test_func = ais.T_nsteps_mh__g
-        kwargs_test_func = {'key': key, 'x': x, 'intermediate_rvs__j' : irvs,
+        kwargs_test_func = {'key': key, 'x': x, 'intermediate_rv__j' : irvs,
                 'intermediate__j': ij,  'kwargs_intermediate__j' : kwargs}
 
         test_func__j = partial(test_func, intermediate__j = ij__j) 

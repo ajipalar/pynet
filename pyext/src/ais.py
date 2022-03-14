@@ -48,17 +48,29 @@ def normal_context(mu, sigma, n_steps):
     log_target = partial(source.lpdf, loc = mu, scale = sigma)
     
     nealkwargs = {'log_source__j': source.lpdf, 
-                  'log_targert__j': log_target}
+                  'log_target__j': log_target}
 
-    get_log_intermediate_score = partial(log_neal_interpolating_score_sequence__g, **nealkwargs) 
+    
 
-    Tkwargs = {'intermediate__j': get_log_intermediate_score, 
-               'intermediate_rvs__j': dist.norm.rv,
-               'n_steps': n_steps,
-               'kwargs_log_intermediate__j': {}}
+    _get_log_intermediate_score = partial(log_neal_interpolating_score_sequence__g, **nealkwargs) 
+
+    def get_log_intermediate_score(x = None, 
+            j : Dimension =None, 
+            sample_state={}):
+        betas = sample_state['sample_invariants']
+        return _get_log_intermediate_score(x, betas[j])
+        
+
+    Tkwargs = {'log_intermediate__j': get_log_intermediate_score, 
+               'intermediate_rv__j': dist.norm.rv,
+               'n_steps': n_steps}
 
 
-    T = partial(nsteps_mh__g, **Tkwargs)
+    _T = partial(nsteps_mh__g, **Tkwargs)
+
+    def T(key, x, sample_state = {}):
+        return _T(key, x, kwargs_log_intermediate__j={'sample_state': sample_state})
+        
 
     def get_invariants(n_samples, n_inter):
         betas = jnp.arange(0.0, 1.0, n_inter)
@@ -113,14 +125,14 @@ def sample(key : PRNGKey = None,
             #x = transition_rule__j(subkey, x, lambda x: intermediate_j(x, betas[n]), n_steps=5)
 
             s2, s3 = jax.random.split(s2, 2)
-            state = ((t, n), invariants)
-            x = T(s3, x, state) 
+            sample_state = {'t': t, 'n': n, 'sample_invariants': invariants}
+            x = T(s3, x, sample_state=sample_state) 
 
             #What about the betas? 
 
             #Compute weight in log space
 
-            logw += get_log_intermediate_score(x, n, state) - get_log_intermediate_score(x, n-1, state) 
+            logw += get_log_intermediate_score(x, n, sample_state=sample_state) - get_log_intermediate_score(x, n-1, sample_state=sample_state) 
 
         samples = samples.at[t].set(x)
         log_weights = weights.at[t].set(jnp.exp(w))
@@ -145,7 +157,7 @@ def T_nsteps_mh__unorm2unorm__p(mu : fParam, sig : fParam) -> JitFunc:
     target__j = f0_pdf__j
     target__j : Callable[[RV], Prob] = partial(target__j, mu=mu, sig=sig)
 
-    intermediate_rvs__j = jax.random.normal
+    intermediate_rv__j = jax.random.normal
 
     intermediate__j : Callable[[RV, fParam], Prob]
     intermediate__j  = partial(fj_pdf__g, source__j = source__j, target__j = target__j)
@@ -153,7 +165,7 @@ def T_nsteps_mh__unorm2unorm__p(mu : fParam, sig : fParam) -> JitFunc:
     T_nsteps_mh__unorm2unorm__j : Callable[[PRNGKey, RV, dict], RV]
 
     T_nsteps_mh__unorm2unorm__j = partial(nsteps_mh__g,
-            intermediate_rvs__j = intermediate_rvs__j,
+            intermediate_rv__j = intermediate_rv__j,
             intermediate__j = intermediate__j)
 
     return T_nsteps_mh__unorm2unorm__j
@@ -174,7 +186,7 @@ def do_ais__unorm2unorm__p(mu : float = None,
     trans_rule__j : Callable[[PRNGKey, RV], RV]
     trans_rule__j = partial(nsteps_mh__g, 
             intermediate__j = interm__j,
-            intermediate_rvs__j = jax.random.normal,
+            intermediate_rv__j = jax.random.normal,
             n_steps = n_mh_steps)
 
     source_rvs__j = jax.random.normal
@@ -433,7 +445,7 @@ def T_nsteps_mh__py(key,
 def nsteps_mh__g(key : PRNGKey = None, 
          x : float = None, 
          log_intermediate__j : lPDF = None, 
-         intermediate_rvs__j : Callable = None,
+         intermediate_rv__j : Callable = None,
          n_steps : int = 10,
          kwargs_log_intermediate__j = None) -> RV:
     """The transition distribution T(x' | x) implemented using the Metropolis Hastings Algorithm"""
@@ -443,7 +455,7 @@ def nsteps_mh__g(key : PRNGKey = None,
     def inner_loop_body(i, val):
         key, x = val
         key, s1, s2 = jax.random.split(key, 3)
-        x_prime = x + intermediate_rvs__j(s1) #jax.random.normal(s1)
+        x_prime = x + intermediate_rv__j(s1) #jax.random.normal(s1)
 
         #Acceptance prob
         a = log_intermediate__j(x_prime, **kwargs_log_intermediate__j) - log_intermediate__j(x, **kwargs_log_intermediate__j)
@@ -453,7 +465,7 @@ def nsteps_mh__g(key : PRNGKey = None,
         if jax.random.uniform(s2) < a:
             x = x_prime
         """
-        pred = jax.random.uniform(s2) < a
+        pred = jnp.array(jax.random.uniform(s2) < a)
 
         x = jax.lax.cond(pred, lambda x, x_prime: x_prime, lambda x, x_prime: x, x, x_prime)
 
