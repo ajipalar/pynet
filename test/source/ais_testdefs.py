@@ -33,21 +33,85 @@ from functools import partial
 from typing import Union, Any, Callable
 
 
-def sample(n_samples: int, n_inter: int, decimal_tolerance: int):
-    """Test that the sample algorithm is jittable"""
-
+def testdef_get_trivial_model(n_samples, n_inter):
+    """Helper function to use in various testdefs"""
     def get_invariants(n_samples: Index, n_inter: Index) -> tuple:
         return ()
 
-    class Source:
-        def rv(key: PRNGKey):
-            return jax.random.uniform(key)
+    source = dist.norm
 
     def T(key: PRNGKey, x, t, n, sample_state=None):
         return jax.random.uniform(key)
 
     def get_log_intermediate_score(x, n, sample_state=None):
         return dist.norm.lpdf(x)
+    
+    return get_invariants, source, T, get_log_intermediate_score 
+
+
+def trvial_is_get_invariants_jittable(n_samples, n_inter):
+    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
+    jax.jit(g)(n_samples, n_inter)
+
+def trivial_is_s_rv_jittable(n_samples, n_inter):
+    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
+    key = jax.random.PRNGKey(111)
+    jax.jit(s.rv)(key)
+
+def trivial_is_T_jittable(n_samples, n_inter):
+    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
+    key = jax.random.PRNGKey(111)
+    jax.jit(T)(key, 1., 1, 1)
+
+def trivial_is_get_log_score_jittable(n_samples, n_inter):
+    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
+    key = jax.random.PRNGKey(111)
+    jax.jit(gl)(0.7, 2)
+
+
+def specialize_model_to_sampling_trivial(
+        n_samples : int,
+        n_inter : int,
+        decimals):
+    """Tests that the func is callable and that 
+       the return is jittable"""
+
+    sample__j = ais.specialize_model_to_sampling(
+        model_getter=testdef_get_trivial_model,
+        kwargs_params={},
+        n_samples=n_samples,
+        n_inter=n_inter)
+
+    key = jax.random.PRNGKey(111)
+    jsample=jax.jit(sample__j)
+    #jit compile
+    jsample(jax.random.PRNGKey(3))
+    np.testing.assert_almost_equal(jsample(key), sample__j(key), decimals)
+
+    packed = testdef_get_trivial_model(n_samples, n_inter)
+    get_invariants, Source, T, get_log_intermediate_score = packed
+
+    sampling2 = ais.sample
+    kwargs_sample2 = {
+        'n_samples': n_samples,
+        'n_inter': n_inter,
+        'get_log_intermediate_score': get_log_intermediate_score,
+        'source': Source,
+        'T': T,
+        'get_invariants': get_invariants
+    }
+
+    np.testing.assert_almost_equal(jsample(key), sampling2(key=key, **kwargs_sample2), decimals)
+
+            
+def sample_trivial(n_samples: int, n_inter: int, decimal_tolerance: int):
+    """Test definition for sample is callable and jittable"""
+
+    packed = testdef_get_trivial_model(
+        n_samples=n_samples,
+        n_inter=n_inter)
+
+    get_invariants, Source, T, get_log_intermediate_score = packed
 
     kwargs_partial = {'get_log_intermediate_score': get_log_intermediate_score,
             'source': Source,
@@ -60,12 +124,9 @@ def sample(n_samples: int, n_inter: int, decimal_tolerance: int):
     key = jax.random.PRNGKey(111)
 
     jsample = jax.jit(samplep)
+    jsample(jax.random.PRNGKey(3))
 
     np.testing.assert_almost_equal(samplep(key=key), jsample(key=key), decimal_tolerance) 
-
-     
-
-    
 
 
 def nsteps_mh__g(mu : float, sigma: float, rseed : Union[float, int]):
@@ -76,10 +137,10 @@ def nsteps_mh__g(mu : float, sigma: float, rseed : Union[float, int]):
     x = 0.0
 
     kwargs_nsteps_mh = {
-            'log_intermediate__j': log_intermediate__j,
-            'intermediate_rv__j': dist.norm.rv,
-            'n_steps': n_steps,
-            'kwargs_log_intermediate__j': {}
+        'log_intermediate__j': log_intermediate__j,
+        'intermediate_rv__j': dist.norm.rv,
+        'n_steps': n_steps,
+        'kwargs_log_intermediate__j': {}
     }
             
 
@@ -94,6 +155,7 @@ def nsteps_mh__g(mu : float, sigma: float, rseed : Union[float, int]):
 
     assert xj == x
 
+
 def nsteps_mh__g_accuracy(mu, cv):
 
     if mu == 0:
@@ -107,10 +169,10 @@ def nsteps_mh__g_accuracy(mu, cv):
     n_steps = 50000
 
     kwargs_nsteps_mh = {
-            'log_intermediate__j': log_intermediate__j,
-            'intermediate_rv__j': dist.norm.rv,
-            'n_steps': n_steps,
-            'kwargs_log_intermediate__j': {}
+        'log_intermediate__j': log_intermediate__j,
+        'intermediate_rv__j': dist.norm.rv,
+        'n_steps': n_steps,
+        'kwargs_log_intermediate__j': {}
     }
 
             
@@ -124,7 +186,6 @@ def nsteps_mh__g_accuracy(mu, cv):
     assert xj < mu + 4*sigma
 
      
-
 def apply_normal_context_to_sample(mu : float, sigma : float, 
         n_mh_steps  : int, n_samples : int, n_inter : int, rseed):
 
@@ -134,6 +195,7 @@ def apply_normal_context_to_sample(mu : float, sigma : float,
     key = jax.random.PRNGKey(rseed)
 
     weights, samples, = sample__j(key)
+
 
 def f0_pdf__j(mu, sig):
 

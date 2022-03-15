@@ -17,12 +17,14 @@ import io
 import jax
 import jax.numpy as jnp
 import math
+from math import isnan
 import numpy as np
 from functools import partial 
-from hypothesis import given, settings, strategies as st
+from hypothesis import assume, given, settings, strategies as st
+from .source import ais_testdefs as td
 
 
-deadline_ms = 2000
+deadline_ms = 10000 # 10s
 
 class TestAIS(IMP.test.TestCase):
     """Test the various functions in the AIS module""" 
@@ -30,25 +32,35 @@ class TestAIS(IMP.test.TestCase):
     rtol = 1e-05
     atol = 1e-05
 
+    @given(st.integers(min_value=1, max_value=50), st.integers(min_value=1, max_value=50))
+    @settings(deadline=deadline_ms)
+    def test_sample_trivial(self, n_samples, n_inter):
+        assume(not isnan(n_samples))
+        assume(not isnan(n_inter))
+        td.sample_trivial(n_samples, n_inter,
+                decimal_tolerance=5)
 
-    #@IMP.test.skip
+    @IMP.test.skip
+    @given(st.integers(min_value=5, max_value=8))
+    @settings(deadline=deadline_ms)
+    def test_specialized_model_to_sampling_trivial(decimal: int):
+        """Test the tolerance of the trivial model from 5 to 8 decimals"""
+        td.sample(n_samples=1, n_inter=1, decimal_tolerance=decimal)
+
+    @IMP.test.skip
     @settings(deadline=deadline_ms)
     @given(st.floats(), st.floats(min_value=1e-5))
     def test_nsteps_mh__g(self, mu, sigma):
-    #def test_nsteps_mh__g(self):
-    #    mu = 100
-    #    sigma = 2
-        log_intermediate__j = partial(dist.norm.lpdf, loc=mu, scale=sigma)
         n_steps = 100
 
         key = jax.random.PRNGKey(7)
         x = 0.0
 
         kwargs_nsteps_mh = {
-                'log_intermediate__j': log_intermediate__j,
-                'intermediate_rv__j': dist.norm.rv,
-                'n_steps': n_steps,
-                'kwargs_log_intermediate__j': {}
+            'log_intermediate__j': log_intermediate__j,
+            'intermediate_rv__j': dist.norm.rv,
+            'n_steps': n_steps,
+            'kwargs_log_intermediate__j': {}
         }
                 
 
@@ -81,10 +93,10 @@ class TestAIS(IMP.test.TestCase):
         n_steps = 50000
 
         kwargs_nsteps_mh = {
-                'log_intermediate__j': log_intermediate__j,
-                'intermediate_rv__j': dist.norm.rv,
-                'n_steps': n_steps,
-                'kwargs_log_intermediate__j': {}
+            'log_intermediate__j': log_intermediate__j,
+            'intermediate_rv__j': dist.norm.rv,
+            'n_steps': n_steps,
+            'kwargs_log_intermediate__j': {}
         }
 
                 
@@ -97,7 +109,6 @@ class TestAIS(IMP.test.TestCase):
         assert xj > mu - 4*sigma
         assert xj < mu + 4*sigma
 
-         
 
     @IMP.test.skip
     def test_apply_normal_context_to_sample(self):
@@ -174,10 +185,6 @@ class TestAIS(IMP.test.TestCase):
 
         for beta in jnp.arange(0, 1, 0.1):
             ...
-
-
-
-
 
     @IMP.test.skip
     def test_T_nsteps__unorm2unorm__p(self):
@@ -256,9 +263,6 @@ class TestAIS(IMP.test.TestCase):
         mean = ais.get_mean(samples, weights)
         for rtol in rtol_l:
             np.testing.isclose(mean, mu, rtol = rtol)
-            
 
-
-        
 if __name__ == '__main__':
     IMP.test.main()
