@@ -1,18 +1,18 @@
 from __future__ import print_function
 try:
     from IMP.pynet.typedefs import (
-        Array, DeviceArray, Dimension, JitFunc, Matrix, Number, PartialF, 
+        Array, DeviceArray, Dimension, Index, JitFunc, Matrix, Number, PartialF, 
         PDF, lPDF, PMF, lPMF, PRNGKey, PureFunc, Samples, Vector, Weights,
-        RV, fParam, iParam, Prob, lProb
+        RV, fParam, iParam, Prob, lProb, GenericInvariants
     )
     import IMP.pynet.functional_gibbslib as fg
     import IMP.pynet.PlotBioGridStatsLib as nblib
     import IMP.pynet.distributions as dist
 except ModuleNotFoundError:
     from pyext.src.typedefs import (
-        Array, DeviceArray, Dimension, JitFunc, Matrix, Number, PartialF, 
+        Array, DeviceArray, Dimension, Index, JitFunc, Matrix, Number, PartialF, 
         PDF, lPDF, PMF, lPMF, PRNGKey, PureFunc, Samples, Vector, Weights,
-        RV, fParam, iParam, Prob, lProb
+        RV, fParam, iParam, Prob, lProb, GenericInvariants
     )
     import pyext.src.functional_gibbslib as fg
     import pyext.src.PlotBioGridStatsLib as nblib
@@ -110,6 +110,24 @@ def get_normal_model(
         return dist.norm.lpdf(x, loc=mu, scale=sigma)
 
     return get_invariants, source, T, get_log_intermediate_score
+
+
+class ContractSample(ABC):
+    @abstractmethod
+    def get_invariants(n_samples: Index, n_inter: Index) -> GenericInvariants:
+        ...
+
+    @abstractmethod
+    def T(key: PRNGKey, x: DeviceArray, t: Index, n: Index, invariants: GenericInvariants) -> DeviceArray:
+        ...
+
+    @abstractmethod
+    def get_log_intermediate_score(x: DeviceArray, n: Index, sample_state: dict) -> float:
+        ...
+
+class DerivedTypeViolation(ContractSample):
+    def get_invariants(x: float, y: float) -> float:
+        return 2.0
 
 
 def sample(

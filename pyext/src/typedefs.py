@@ -124,3 +124,12 @@ Samples = NewType('Samples', Array)
 Weights = NewType('Weights', Array)  # AIS weights
 LogWeights = NewType('LogWeights', Array)  # AIS natural log w
 
+JitFunc = Any
+PartialF = Any
+PDF = Any
+lPDF = Any
+PMF = Any
+lPMF = Any
+PureFunc = Any
+DataFrame = Any
+GenericInvariants = Any
