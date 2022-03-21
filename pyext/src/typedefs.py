@@ -18,6 +18,7 @@ import typing
 import inspect
 import types
 import jax._src.prng as prng
+from jax._src.device_array import DeviceArray as DeviceArray
 
 T = TypeVar('T')
 T_co = TypeVar('T_co', covariant=True) 
@@ -75,12 +76,11 @@ R = TypeVar('R')
 
 # jax related
 Array = Any
-RealArray = Array
-IntegerArray = Array
-Array1d = NewType('Array1d', Array)
+RealArray = Any
+IntegerArray = Any
+Array1d = Any
 DTypeLikeInt = Any
 DTypeLikeFloat = Any
-DeviceArray = NewType('DeviceArray', Array)
 PRNGKeyArray = prng.PRNGKeyArray  # Change this to prng.PRNGKeyArray
 KeyArray = Any
 Index = NewType('Index', int)
@@ -113,9 +113,9 @@ State = NewType('State', object)
 Output = NewType('Output', object)
 
 # MCMC related
-Samples = NewType('Samples', Array)
-Weights = NewType('Weights', Array)  # AIS weights
-LogWeights = NewType('LogWeights', Array)  # AIS natural log w
+Samples = NewType('Samples', DeviceArray)
+Weights = NewType('Weights', DeviceArray)  # AIS weights
+LogWeights = NewType('LogWeights', DeviceArray)  # AIS natural log w
 
 JitFunc = Any
 PartialF = Any
