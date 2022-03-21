@@ -74,15 +74,7 @@ GeneID = NewType('GeneID', str)  # NCBI Entrez Gene identifier
 R = TypeVar('R')
 
 # jax related
-#Array = Any  # implemented as a class so that Array[int] can be typed
-class Array:
-    def __getitem__(self, idx):
-        return Any
-
-f__ = Array() # float using 32 or 64 bit integers 
-i__ = Array()
-
-#Array = Any  # implemented as a class so that Array[int] can be typed
+Array = Any
 RealArray = Array
 IntegerArray = Array
 Array1d = NewType('Array1d', Array)
