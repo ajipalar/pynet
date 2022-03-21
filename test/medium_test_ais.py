@@ -67,6 +67,9 @@ class MediumTestAIS(IMP.test.TestCase):
     def test_sample_trivial7(self):
         td.sample_trivial(225, 225, decimal_tolerance=9)
 
+    def test_not_ones_trivial(self):
+        td.not_ones_trivial(n_samples=5, n_inter=5)
+
 
     @IMP.test.skip
     @settings(deadline=deadline_ms)
