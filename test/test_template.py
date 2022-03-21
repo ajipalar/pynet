@@ -12,8 +12,9 @@ import math
 class Tests(IMP.test.TestCase):
 
     def test_magnitude(self):
-        """Write the test cast, print statemetns ok"""
-        pass
+        a = 1
+        b = 2
+        example._magnitude(a, b)
 
 
 if __name__ == '__main__':
