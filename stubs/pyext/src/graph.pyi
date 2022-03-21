@@ -1,0 +1,19 @@
+from typing import Any
+
+class Node:
+    nnodes: int
+    dgr: Any
+    adj: Any
+    pseq: Any
+    plymr: Any
+    pep: Any
+    strc: Any
+    out: Any
+    def __init__(self, structure: Any | None = ..., degree: Any | None = ..., adjacent: Any | None = ..., out=..., pseq: Any | None = ..., polymer: Any | None = ..., peptides: Any | None = ...) -> None: ...
+
+class Model: ...
+class Data: ...
+class Information: ...
+
+def compute_score(m: Model, d: Data) -> float: ...
+def add_nodes(model, n): ...
