@@ -274,7 +274,7 @@ def log_neal_interpolating_score_sequence__g(
 
 
 def nsteps_mh__g(
-        key : PRNGKey = None, 
+        key : PRNGKeyArray = None, 
         x : float = None, 
         log_intermediate__j : lPDF = None, 
         intermediate_rv__j : Callable = None,
