@@ -17,6 +17,7 @@ from typing import (
 import typing
 import inspect
 import types
+import jax._src.prng as prng
 
 T = TypeVar('T')
 T_co = TypeVar('T_co', covariant=True) 
@@ -88,7 +89,7 @@ Array1d = NewType('Array1d', Array)
 DTypeLikeInt = Any
 DTypeLikeFloat = Any
 DeviceArray = NewType('DeviceArray', Array)
-PRNGKeyArray = Any  # Change this to prng.PRNGKeyArray
+PRNGKeyArray = prng.PRNGKeyArray  # Change this to prng.PRNGKeyArray
 KeyArray = Any
 Index = NewType('Index', int)
 
