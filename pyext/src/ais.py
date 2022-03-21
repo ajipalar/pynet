@@ -59,7 +59,7 @@ def specialize_model_to_sampling(
     get_invariants, Source, T, get_log_intermediate_score = packed
 
     kwargs_sample = {'get_invariants': get_invariants,
-            'source': Source,
+            'testdefs': Source,
             'T': T,
             'get_log_intermediate_score': get_log_intermediate_score}
 
@@ -141,7 +141,7 @@ def sample(
   
          x: DeviceArray. shape, dtype t[s]
   
-         source:
+         testdefs:
            .rv : (key) -> (t[s])
          T:
            (PRNGKey, DeviceArray, Index, Index, GenericInvariants) -> (DeviceArray)
@@ -166,7 +166,7 @@ def sample(
         #x = p_n.rvs() #random variates
 
         key, s1, s2 = jax.random.split(key, 3)
-        x = source.rv(s1) #jax.random.normal(key)
+        x = testdefs.rv(s1) #jax.random.normal(key)
         logw = 0.0
         
         # loop signature
@@ -258,7 +258,7 @@ def log_neal_interpolating_score_sequence__g(
 
     """As equation (3) from Neal 1998 Annealed Importance Sampling
        Log interpolating distribution
-       use partial application of source and target"""
+       use partial application of testdefs and target"""
 
     return beta * log_target__j(x) + (1-beta) * log_source__j(x)
 

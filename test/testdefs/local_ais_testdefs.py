@@ -1,11 +1,29 @@
 from __future__ import print_function
 import IMP.test
 import IMP.algebra
+try:
+    import IMP.pynet
+    import IMP.pynet.ais as ais
+    import IMP.pynet.functional_gibbslib as fg
+    import IMP.pynet.PlotBioGridStatsLib as bsl
+    import IMP.pynet.distributions as dist
+    from IMP.pynet.typedefs import (
+        Index,
+        PRNGKey
+    )
+    import IMP.pynet.distributions as dist
 
-from ._typedefs import(
-    PRNGKeyArray,
-    Index
-)
+except ModuleNotFoundError:
+    import pyext.src.ais as ais
+    import pyext.src.functional_gibbslib as fg
+    import pyext.src.PlotBioGridStatsLib as nblib
+    import pyext.src.distributions as dist
+    from pyext.src.typedefs import (
+        Index,
+        PRNGKey
+    )
+    import pyext.src.distributions as dist
+
 import io
 import jax
 import jax.numpy as jnp
@@ -22,7 +40,7 @@ def testdef_get_trivial_model(n_samples, n_inter):
 
     source = dist.norm
 
-    def T(key: PRNGKeyArray, x, t, n, sample_state=None):
+    def T(key: PRNGKey, x, t, n, sample_state=None):
         return jax.random.uniform(key)
 
     def get_log_intermediate_score(x, n, sample_state=None):
@@ -38,7 +56,7 @@ def testdef_get_beta_dependant_trivial_model(n_samples, n_inter):
 
     source = dist.norm
 
-    def T(key: PRNGKeyArray, x, t, n, sample_state=None):
+    def T(key: PRNGKey, x, t, n, sample_state=None):
         return jax.random.uniform(key)
 
     def get_log_intermediate_score(x, n, sample_state=None):
@@ -47,23 +65,23 @@ def testdef_get_beta_dependant_trivial_model(n_samples, n_inter):
     return get_invariants, source, T, get_log_intermediate_score 
 
 
-def trivial_is_get_invariants_jittable(n_samples, n_inter):
+def trvial_is_get_invariants_jittable(n_samples, n_inter):
     g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
     jax.jit(g)(n_samples, n_inter)
 
 def trivial_is_s_rv_jittable(n_samples, n_inter):
     g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
-    key = jax.random.PRNGKeyArray(111)
+    key = jax.random.PRNGKey(111)
     jax.jit(s.rv)(key)
 
 def trivial_is_T_jittable(n_samples, n_inter):
     g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
-    key = jax.random.PRNGKeyArray(111)
+    key = jax.random.PRNGKey(111)
     jax.jit(T)(key, 1., 1, 1)
 
 def trivial_is_get_log_score_jittable(n_samples, n_inter):
     g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
-    key = jax.random.PRNGKeyArray(111)
+    key = jax.random.PRNGKey(111)
     jax.jit(gl)(0.7, 2)
 
 def not_ones_trivial(n_samples, n_inter):
@@ -73,7 +91,7 @@ def not_ones_trivial(n_samples, n_inter):
         n_samples=n_samples,
         n_inter=n_inter)
 
-    key = jax.random.PRNGKeyArray(12382)
+    key = jax.random.PRNGKey(12382)
     samples, logw = jax.jit(sample__j)(key)
     # print(f'samples {samples}\nlog_w {logw}')
 
@@ -92,10 +110,10 @@ def specialize_model_to_sampling_trivial(
         n_samples=n_samples,
         n_inter=n_inter)
 
-    key = jax.random.PRNGKeyArray(111)
+    key = jax.random.PRNGKey(111)
     jsample=jax.jit(sample__j)
     #jit compile
-    jsample(jax.random.PRNGKeyArray(3))
+    jsample(jax.random.PRNGKey(3))
     np.testing.assert_almost_equal(jsample(key), sample__j(key), decimals)
 
     packed = testdef_get_trivial_model(n_samples, n_inter)
@@ -106,7 +124,7 @@ def specialize_model_to_sampling_trivial(
         'n_samples': n_samples,
         'n_inter': n_inter,
         'get_log_intermediate_score': get_log_intermediate_score,
-        'source': Source,
+        'testdefs': Source,
         'T': T,
         'get_invariants': get_invariants
     }
@@ -124,17 +142,17 @@ def sample_trivial(n_samples: int, n_inter: int, decimal_tolerance: int):
     get_invariants, Source, T, get_log_intermediate_score = packed
 
     kwargs_partial = {'get_log_intermediate_score': get_log_intermediate_score,
-            'source': Source,
+            'testdefs': Source,
             'T': T,
             'get_invariants': get_invariants,
             'n_samples': n_samples,
             'n_inter': n_inter}
 
     samplep = partial(ais.sample, **kwargs_partial) 
-    key = jax.random.PRNGKeyArray(111)
+    key = jax.random.PRNGKey(111)
 
     jsample = jax.jit(samplep)
-    jsample(jax.random.PRNGKeyArray(3))
+    jsample(jax.random.PRNGKey(3))
 
     np.testing.assert_almost_equal(samplep(key=key), jsample(key=key), decimal_tolerance) 
 
@@ -154,7 +172,7 @@ def negative_sample_trivial(
         'n_samples': n_samples,
         'n_inter': n_inter,
         'get_log_intermediate_score': get_log_intermediate_score,
-        'source': Source,
+        'testdefs': Source,
         'T': T,
         'get_invariants': get_invariants
     }
@@ -162,8 +180,8 @@ def negative_sample_trivial(
     s__p = partial(ais.sample, **kwargs_sample)
     s = jax.jit(s__p)
 
-    k1 = jax.random.PRNGKeyArray(rseed1)
-    k2 = jax.random.PRNGKeyArray(rseed2)
+    k1 = jax.random.PRNGKey(rseed1)
+    k2 = jax.random.PRNGKey(rseed2)
 
     s1, logw1 = s(k1)
     s2, logw2 = s(k2)
@@ -192,7 +210,7 @@ def nsteps_mh__g(mu : float, sigma: float, rseed : Union[float, int]):
     log_intermediate__j = partial(dist.norm.lpdf, loc=mu, scale=sigma)
     n_steps = 100
 
-    key = jax.random.PRNGKeyArray(rseed)
+    key = jax.random.PRNGKey(rseed)
     x = 0.0
 
     kwargs_nsteps_mh = {
@@ -224,7 +242,7 @@ def nsteps_mh__g_accuracy(mu, cv):
 
     log_intermediate__j = partial(dist.norm.lpdf, loc=mu, scale=sigma)
 
-    key = jax.random.PRNGKeyArray(7)
+    key = jax.random.PRNGKey(7)
     n_steps = 50000
 
     kwargs_nsteps_mh = {
@@ -251,7 +269,7 @@ def apply_normal_context_to_sample(mu : float, sigma : float,
     f = ais.apply_normal_context_to_sample__s
     sample__j = f(mu, sigma, n_mh_steps, n_samples, n_inter)
     #sample = jax.jit(sample__j)
-    key = jax.random.PRNGKeyArray(rseed)
+    key = jax.random.PRNGKey(rseed)
 
     weights, samples, = sample__j(key)
 
@@ -322,7 +340,7 @@ def T_nsteps__unorm2unorm__p(mu, sig):
 
     maximum = 0.0
 
-    key = jax.random.PRNGKeyArray(1)
+    key = jax.random.PRNGKey(1)
 
     for i, xi in enumerate(x):
         for j, bij in enumerate(betas):
@@ -331,7 +349,7 @@ def T_nsteps__unorm2unorm__p(mu, sig):
 
 
 def test_T_nsteps_mh__g(rseed, x):
-    key = jax.random.PRNGKeyArray(rseed)
+    key = jax.random.PRNGKey(rseed)
     ij = ais.fj_pdf__g
     ij__j = partial(ij, source__j = ais.fn_pdf__j,
             target__j = ais.f0_pdf__j)
@@ -354,7 +372,7 @@ def do_ais(mu, sigma):
     n_samples = 100
     n_inter = 50
     betas = np.linspace(0, 1, n_inter)
-    key = jax.random.PRNGKeyArray(10)
+    key = jax.random.PRNGKey(10)
     T = ais.T_nsteps_mh__g
 
     fj_pdf__j = partial(ais.fj_pdf__g, source__j = jax.scipy.stats.norm.pdf,

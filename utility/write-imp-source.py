@@ -1,5 +1,5 @@
 """
-Dev tool to save you some typing when writing imp source code
+Dev tool to save you some typing when writing imp testdefs code
 
 inputs foo.h or foo.cpp
 oputputs

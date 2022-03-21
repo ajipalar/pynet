@@ -64,7 +64,7 @@ def priority_decrement(key, queue):
 
 def adj(s, A):
     """
-    s: source vertex
+    s: testdefs vertex
     A: Adjacency matrix
     return: adjacent vertices
     """
@@ -86,7 +86,7 @@ def dijkstra(s, t, A):
     
 def distance(s,t, A)-> Dist:
     """
-    s: source vertex
+    s: testdefs vertex
     t: target vertex
     A: Adjacency matrix
     return: d (distance)
@@ -123,7 +123,7 @@ def revert_sum(n):
 def get_immutable_edge_id(s, t, vmax):
     """
     Note s < t
-    s: source
+    s: testdefs
     t: target
     vmax: max vertices
     return edge_id
@@ -184,7 +184,7 @@ def edge_from_eid(eid, v):
     """
     v: the number of vertices in the graph
     eid: the immutable edge id
-    return s, t : source target
+    return s, t : testdefs target
     """
     #Area of the lower triangle not including self loops
     s = src_from_eid(eid, v)

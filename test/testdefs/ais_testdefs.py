@@ -1,4 +1,4 @@
-from ._ais_testdefs import(
+from .ais import(
     testdef_get_trivial_model,
     testdef_get_beta_dependant_trivial_model,
     trivial_is_get_invariants_jittable,

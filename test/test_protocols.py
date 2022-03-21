@@ -9,7 +9,7 @@ import io
 import os
 import math
 
-from .source import protocols_testdefs as td
+from .testdefs import protocols_testdefs as td
 
 class Tests(IMP.test.TestCase):
 

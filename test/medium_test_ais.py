@@ -20,7 +20,7 @@ import math
 import numpy as np
 from functools import partial 
 from hypothesis import given, settings, strategies as st
-from .source import ais_testdefs as td
+from .testdefs import ais_testdefs as td
 
 
 deadline_ms = 2000

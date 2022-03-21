@@ -1,20 +1,15 @@
 from __future__ import print_function
-import IMP.test
-import IMP.algebra
 
-import IMP.pynet
-import IMP.pynet.ais as ais
-import IMP.pynet.functional_gibbslib as fg
-import IMP.pynet.PlotBioGridStatsLib as bsl
-import IMP.pynet.distributions as dist
-
-#import the tests
-from ._test_ais import (
+from .casedefs.test_ais import(
     DevPropertyTrivial,
     DevTrivialAIS,
     DevTrivialBetaDependantAIS,
     DevTestAIS
 )
+
+import IMP.pynet
+
+#import the tests
 
 #run tests
 if __name__ == '__main__':
