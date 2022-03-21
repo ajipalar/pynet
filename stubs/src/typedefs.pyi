@@ -20,19 +20,13 @@ PreyUID: Any
 ProteinName: Any
 GeneID: Any
 R = TypeVar('R')
-
-class Array:
-    def __getitem__(self, idx): ...
-
-f__: Any
-i__: Any
-RealArray = Array
-IntegerArray = Array
-Array1d: Any
+Array = Any
+RealArray = Any
+IntegerArray = Any
+Array1d = Any
 DTypeLikeInt = Any
 DTypeLikeFloat = Any
-DeviceArray: Any
-PRNGKeyArray = Any
+PRNGKeyArray: Any
 KeyArray = Any
 Index: Any
 Dimension: Any
