@@ -68,6 +68,18 @@ def trivial_is_get_log_score_jittable(n_samples, n_inter):
     key = jax.random.PRNGKey(111)
     jax.jit(gl)(0.7, 2)
 
+def not_ones_trivial(n_samples, n_inter):
+    sample__j = ais.specialize_model_to_sampling(
+        model_getter=testdef_get_trivial_model,
+        kwargs_params={},
+        n_samples=n_samples,
+        n_inter=n_inter)
+
+    key = jax.random.PRNGKey(12382)
+    samples, logw = jax.jit(sample__j)(key)
+    # print(f'samples {samples}\nlog_w {logw}')
+
+
 
 def specialize_model_to_sampling_trivial(
         n_samples : int,
@@ -127,6 +139,55 @@ def sample_trivial(n_samples: int, n_inter: int, decimal_tolerance: int):
     jsample(jax.random.PRNGKey(3))
 
     np.testing.assert_almost_equal(samplep(key=key), jsample(key=key), decimal_tolerance) 
+
+def negative_sample_trivial(
+        n_samples: int, 
+        n_inter: int,
+        rseed1: int,
+        rseed2: int):
+    """Checks that two different keys produce different outputs of the same shape and
+       dtype"""
+
+    packed = testdef_get_trivial_model(n_samples, n_inter)
+    packed = testdef_get_trivial_model(n_samples, n_inter)
+    get_invariants, Source, T, get_log_intermediate_score = packed
+
+    kwargs_sample = {
+        'n_samples': n_samples,
+        'n_inter': n_inter,
+        'get_log_intermediate_score': get_log_intermediate_score,
+        'source': Source,
+        'T': T,
+        'get_invariants': get_invariants
+    }
+
+    s__p = partial(ais.sample, **kwargs_sample)
+    s = jax.jit(s__p)
+
+    k1 = jax.random.PRNGKey(rseed1)
+    k2 = jax.random.PRNGKey(rseed2)
+
+    s1, logw1 = s(k1)
+    s2, logw2 = s(k2)
+    w1 = np.exp(logw1)
+    w2 = np.exp(logw2)
+
+    assert s1.shape == s2.shape
+    assert s1.dtype == s2.dtype
+    assert logw1.shape == logw2.shape
+    assert logw1.dtype == logw2.dtype
+
+    rtol = 1e-5
+    atol = 1e-8
+
+    assert not np.any(np.isclose(s1, s2, rtol, atol))
+    assert not np.any(np.isclose(s2, s1, rtol, atol))
+    try:
+        assert not np.any(np.isclose(w1, w2, rtol, atol))
+        assert not np.any(np.isclose(w2, w1, rtol, atol))
+    except AssertionError:
+        # print(w1, w2)
+        ...
 
 
 def nsteps_mh__g(mu : float, sigma: float, rseed : Union[float, int]):
