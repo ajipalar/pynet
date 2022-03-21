@@ -53,6 +53,9 @@ class DevTrivialAIS(IMP.test.TestCase):
     n4k=4096
     n32k=32768
 
+    seed1=111
+    seed2=1234
+
     def test_model_getter1(self):
         td.trvial_is_get_invariants_jittable(self.n1, self.n1)
 
@@ -125,6 +128,21 @@ class DevTrivialAIS(IMP.test.TestCase):
     def test_log_score32k(self):
         td.trivial_is_get_log_score_jittable(self.n32k, self.n32k)
 
+    def test_specialized_model_to_sampling_trivial(self):
+        td.specialize_model_to_sampling_trivial(
+            n_samples=8, n_inter=8, decimals=5)
+
+    
+    def test_negative_sample_trivial(self):
+        td.negative_sample_trivial(
+            n_samples=self.n512,
+            n_inter=self.n1,
+            rseed1=self.seed1,
+            rseed2=self.seed2)
+
+class DevTrivialBetaDependantAIS(IMP.test.TestCase):
+    ...
+
 
 
 
@@ -141,13 +159,7 @@ class DevTestAIS(IMP.test.TestCase):
     n_inter64=64
 
 
-    def test_sample_trivial(self):
-        td.sample_trivial(n_samples=8, n_inter=8, decimal_tolerance=5)
 
-    @IMP.test.skip 
-    def test_specialized_model_to_sampling_trivial(self):
-        td.specialize_model_to_sampling_trivial(
-            n_samples=8, n_inter=8, decimals=5)
 
     @IMP.test.skip
     def test_sample(self):
