@@ -1,9 +1,6 @@
 import matplotlib.pyplot as plt
 from typing import Any
-try:
-    from IMP.pynet.typedefs import Array1d
-except ModuleNotFoundError:
-    from pyext.src.typedefs import Array1d
+from .typedefs import Array1d
 
 
 def marginal(x: Array1d, 

@@ -1,10 +1,7 @@
 from pathlib import Path
 import pyext.src.data_in
 import numpy as np
-try:
-    from IMP.pynet.typedefs import Array
-except ModuleNotFoundError:
-    from pyext.src.typedefs import Array
+from .typedefs import Array
 
 def write_example_benchmark():
     """Write an an example benchmark file

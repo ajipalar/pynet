@@ -1,42 +1,23 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-try:
-    from IMP.pynet.typedefs import (
-        Array, 
-        ColName, 
-        DataFrame, 
-        DeviceArray,
-        Dimension,
-        GeneID,
-        Index,
-        Matrix,
-        PRNGKey,
-        ProteinName,
-        Series,
-        State,
-        Vector
-    )
+from .typedefs import (
+    Array, 
+    ColName, 
+    DataFrame, 
+    DeviceArray,
+    Dimension,
+    GeneID,
+    Index,
+    Matrix,
+    PRNGKey,
+    ProteinName,
+    Series,
+    State,
+    Vector
+)
 
-    from IMP.pynet.jittools import is_jittable
-except ModuleNotFoundError:
-    from pyext.src.typedefs import (
-        Array, 
-        ColName, 
-        DataFrame, 
-        DeviceArray,
-        Dimension,
-        GeneID,
-        Index,
-        Matrix,
-        ProteinName,
-        PRNGKey,
-        Series,
-        State,
-        Vector
-    )
-    from pyext.src.jittools import is_jittable
-
+from .jittools import is_jittable
 import Bio.PDB
 from functools import partial
 import graphviz

@@ -3,6 +3,9 @@ Author Aji Palar
 Input Information
 Module for handling data I/O and preprocessing
 """
+import .config as config
+import .utils as utils
+
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,13 +16,6 @@ import sys
 #from statsmodels.stats.multitest import fdrcorrection
 
 #Local imports
-try:
-    import IMP.pynet.config
-    import IMP.pynet.utils as utils
-except ModuleNotFoundError:
-    import pyext.src.config as config
-    import pyext.src.utils as utils
-
 src = pathlib.Path("~/Projects/pynet")
 
 if config.PRINT_MODULE_INFO:

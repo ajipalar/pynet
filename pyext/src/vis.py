@@ -5,10 +5,7 @@ import matplotlib
 
 #pynet modules
 
-try:
-    from IMP.pynet.score import mode, normal_pdf, parabola, ull_normal
-except ModuleNotFoundError:
-    from pyext.src.score import mode, normal_pdf, parabola, ull_normal
+from .score import mode, normal_pdf, parabola, ull_normal
 
 def plot_density(length, mu, sig):
 

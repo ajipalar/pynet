@@ -1,10 +1,7 @@
 import pandas as pd
 from pathlib import Path
 
-try:
-    from IMP.typedefs import AnyPath, DirPath, FilePath 
-except ModuleNotFoundError:
-    from pyext.src.typedefs import AnyPath, DirPath, FilePath 
+from .typedefs import AnyPath, DirPath, FilePath 
 
 def write_excel_files(working_dir : DirPath) -> list[FilePath]:
     for file in working_dir.iterdir():

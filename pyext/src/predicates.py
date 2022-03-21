@@ -6,11 +6,7 @@ e.g., filter(predicate, iterator)
 """
 
 from pathlib import Path
-try:
-    from IMP.pynet.typedefs import AnyPath, FilePath, DirPath
-except ModuleNotFoundError:
-    from pyext.src.typedefs import AnyPath, FilePath, DirPath
-
+from .typedefs import AnyPath, FilePath, DirPath
 
 def isfile(p: AnyPath) -> bool:
     return p.is_file()

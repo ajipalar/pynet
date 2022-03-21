@@ -1,12 +1,12 @@
 from __future__ import print_function
 import IMP.test
-import IMP.algebra
 
-import IMP.pynet
-import IMP.pynet.ais as ais
-import IMP.pynet.functional_gibbslib as fg
-import IMP.pynet.PlotBioGridStatsLib as bsl
-import IMP.pynet.distributions as dist
+
+#Define the import paths
+import pyext.src.ais as ais
+import pyext.src.functional_gibbslib as fg
+import pyext.src.PlotBioGridStatsLib as bsl
+import pyext.src.distributions as dist
 
 #import the tests
 from ._test_ais import (
@@ -16,6 +16,6 @@ from ._test_ais import (
     DevTestAIS
 )
 
-#run tests
+#run the tests
 if __name__ == '__main__':
     IMP.test.main()

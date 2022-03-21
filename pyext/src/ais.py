@@ -1,22 +1,12 @@
 from __future__ import print_function
-try:
-    from IMP.pynet.typedefs import (
-        Array, DeviceArray, Dimension, Index, JitFunc, Matrix, Number, PartialF, 
-        PDF, lPDF, PMF, lPMF, PRNGKey, PureFunc, Samples, Vector, Weights,
-        RV, fParam, iParam, Prob, lProb, GenericInvariants
-    )
-    import IMP.pynet.functional_gibbslib as fg
-    import IMP.pynet.PlotBioGridStatsLib as nblib
-    import IMP.pynet.distributions as dist
-except ModuleNotFoundError:
-    from pyext.src.typedefs import (
-        Array, DeviceArray, Dimension, Index, JitFunc, Matrix, Number, PartialF, 
-        PDF, lPDF, PMF, lPMF, PRNGKey, PureFunc, Samples, Vector, Weights,
-        RV, fParam, iParam, Prob, lProb, GenericInvariants
-    )
-    import pyext.src.functional_gibbslib as fg
-    import pyext.src.PlotBioGridStatsLib as nblib
-    import pyext.src.distributions as dist
+from .typedefs import (
+    Array, DeviceArray, Dimension, Index, JitFunc, Matrix, Number, PartialF, 
+    PDF, lPDF, PMF, lPMF, PRNGKeyArray, PureFunc, Samples, Vector, Weights,
+    RV, fParam, iParam, Prob, lProb, GenericInvariants
+)
+from . import functional_gibbslib as fg
+from . import PlotBioGridStatsLib as nblib
+from . import distributions as dist
 
 from abc import ABC, abstractmethod
 from functools import partial
@@ -77,7 +67,7 @@ def specialize_model_to_sampling(
 
     kwargs_sample = kwargs_sample | kwargs_dimension
     
-    sample__j : Callable[[PRNGKey], tuple[Samples, LogWeights]]
+    sample__j : Callable[[PRNGKeyArray], tuple[Samples, LogWeights]]
     sample__j = partial(sample, **kwargs_sample)
     return sample__j
 
@@ -98,12 +88,12 @@ def get_normal_model(
         return betas
 
     class Source:
-        def rv(key: PRNGKey):
+        def rv(key: PRNGKeyArray):
             return jax.random.normal(key)
 
     source = dist.norm # pass in a module
 
-    def T(key: PRNGKey, x, t, n, sample_state=None):
+    def T(key: PRNGKeyArray, x, t, n, sample_state=None):
         return jax.random.uniform(key)
 
     def get_log_intermediate_score(x, n, sample_state=None):
@@ -118,7 +108,7 @@ class ContractSample(ABC):
         ...
 
     @abstractmethod
-    def T(key: PRNGKey, x: DeviceArray, t: Index, n: Index, invariants: GenericInvariants) -> DeviceArray:
+    def T(key: PRNGKeyArray, x: DeviceArray, t: Index, n: Index, invariants: GenericInvariants) -> DeviceArray:
         ...
 
     @abstractmethod
@@ -131,7 +121,7 @@ class DerivedTypeViolation(ContractSample):
 
 
 def sample(
-        key : PRNGKey = None, 
+        key : PRNGKeyArray = None, 
         n_samples : Dimension = None,
         n_inter : Dimension = None, 
         get_log_intermediate_score : JitFunc = None, 

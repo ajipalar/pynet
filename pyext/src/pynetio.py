@@ -1,3 +1,17 @@
+import .predicates as pred
+from .typedefs import (
+    AnyPath,
+    AnyCol,
+    Bait,
+    DataFrame,
+    DirPath,
+    FilePath,
+    Organism,
+    PGGroupCol,
+    PreyUID,
+    UID
+)
+
 import argparse
 import json
 import numpy as np
@@ -6,39 +20,6 @@ import pandas as pd
 import sys
 import typing
 from typing import Dict, Iterable, Iterator, List, Set, Tuple
-
-#Custom modules
-###############################################################################
-try:
-    import IMP.pynet.predicates as pred
-    from IMP.pynet.typedefs import (
-        AnyPath,
-        AnyCol,
-        Bait,
-        DataFrame,
-        DirPath,
-        FilePath,
-        Organism,
-        PGGroupCol,
-        PreyUID,
-        UID
-    )
-
-except ModuleNotFoundError:
-    import pyext.src.predicates as pred
-    from pyext.src.typedefs import (
-        AnyPath,
-        AnyCol,
-        Bait,
-        DataFrame,
-        DirPath,
-        FilePath,
-        Organism,
-        PGGroupCol,
-        PreyUID,
-        UID
-    )
-
 
 """
 Reading and parsing excel files

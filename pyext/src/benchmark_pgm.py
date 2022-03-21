@@ -1,9 +1,7 @@
-import IMP
 import jax
 import jax.numpy as jnp
-import numpy as np
 import math
-from typedefs import (
+from .typedefs import (
     CartesianTable,
     Container,
     FilePath,

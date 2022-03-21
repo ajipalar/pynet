@@ -1,12 +1,7 @@
 from inspect import signature
 from typing import Any, Callable
-import typing
 
-try:
-    from IMP.pynet.typdefs import Function, Parameters
-except ModuleNotFoundError:
-    from typedefs import Function, Parameters
-
+from .typedefs import Function, Parameters
 
 def parameters(f: Function):
     return signature(f).parameters

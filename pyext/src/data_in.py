@@ -8,10 +8,7 @@ to be placed into model objects
 import itertools
 from typing import Iterator
 
-try:
-    from IMP.pynet.typedefs import TsvPath
-except ModuleNotFoundError:
-    from pyext.src.typedefs import TsvPath
+from .typedefs import TsvPath
 
 def read_column_n(filepath: TsvPath, col_num: int) -> Iterator[str]:
     with open(filepath, 'r') as f:

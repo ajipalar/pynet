@@ -4,11 +4,7 @@
 import numpy as np
 import jax.numpy as jnp
 from typing import NewType
-try:
-    from IMP.pynet.typedefs import KeyArray
-except ModuleNotFoundError:
-    from pyext.src.typedefs import KeyArray
-
+from .typedefs import PRNGKeyArray
 Dist = NewType('Dist', float)
 EdgeID = NewType('EID', int)
 VertexID = NewType('VID', int)
@@ -265,7 +261,7 @@ def MH_MCMC(steps, target, seed, y, mustart, sigstart,
 
     return chain
 
-def n_steps_mh(key: KeyArray, target_prob,
+def n_steps_mh(key: PRNGKeyArray, target_prob,
                target_params, mcmc_params):
     """The n steps Metropolis Hastings Algorithm MCMC"""
     n_steps = mcmc_params['n_steps']
@@ -282,5 +278,5 @@ def n_steps_mh(key: KeyArray, target_prob,
     return x
 
 
-def l_mh(key: KeyArray, target_lprob, params):
+def l_mh(key: PRNGKeyArray, target_lprob, params):
     pass
