@@ -174,6 +174,4 @@ class DevTestAIS(IMP.test.TestCase):
     @IMP.test.skip
     def test_nsteps_mh__g(self):
         td.nsteps_mh__g(mu=100, sigma=2, rseed=3)
-        
-if __name__ == '__main__':
-    IMP.test.main()
+
