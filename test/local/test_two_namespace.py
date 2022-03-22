@@ -1,6 +1,5 @@
-import IMP
 import IMP.test
-from ..casedefs.test_two_namespace_example import(
+from test.testdefs.casedef_two_namespace_example import(
     BaseExample
 )
 

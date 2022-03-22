@@ -1,7 +1,5 @@
-from ..testdefs import two_namespace_example as td
-from . import NullModule
+from test.testdefs import two_namespace_example as td, NullModule
 from typing import Any
-import IMP
 import IMP.test
 
 Module = Any

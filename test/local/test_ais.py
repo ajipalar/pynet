@@ -4,7 +4,7 @@ import IMP.test
 import pyext.src.ais as ais
 import pyext.src.distributions as dist
 
-from ..casedefs import(
+from test.casedefs import(
     DevPropertyTrivial,
     DevTrivialAIS,
     DevTrivialBetaDependantAIS,

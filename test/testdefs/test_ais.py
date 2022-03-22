@@ -9,7 +9,7 @@ import math
 import numpy as np
 from functools import partial 
 from hypothesis import given, settings, strategies as st
-from ..testdefs import ais as td
+from test.testdefs import ais as td
 
 import pyext.src.distributions as dist
 
