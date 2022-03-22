@@ -11,7 +11,6 @@ from functools import partial
 from hypothesis import given, settings, strategies as st
 from test.src import ais as td
 
-import pyext.src.distributions as dist
 
 deadline_ms = 2000
 
