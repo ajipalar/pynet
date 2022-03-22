@@ -9,7 +9,7 @@ import io
 import os
 import math
 
-from .testdefs import example
+from .src import example
 
 class DevTests(IMP.test.TestCase):
     def test_a_lt_b(self):

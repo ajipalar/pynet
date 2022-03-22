@@ -1,5 +1,5 @@
 import IMP.test
-from test.testdefs.casedef_two_namespace_example import(
+from test.src.casedef_two_namespace_example import(
     BaseExample
 )
 

@@ -210,7 +210,7 @@ def py_compile_inner_body(f : PyFname ,
     #c = inspect.getsource(inner_body_fun)
     #pattern = 'key, samples, params, rho, thin'
     #repl = '{comma_seperated_values}'
-    #c = re.sub(pattern, repl, testdefs)
+    #c = re.sub(pattern, repl, src)
     
     return c
 

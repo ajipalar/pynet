@@ -1,11 +1,29 @@
 from __future__ import print_function
 import IMP.test
 import IMP.algebra
+try:
+    import IMP.pynet
+    import IMP.pynet.ais as ais
+    import IMP.pynet.functional_gibbslib as fg
+    import IMP.pynet.PlotBioGridStatsLib as bsl
+    import IMP.pynet.distributions as dist
+    from IMP.pynet.typedefs import (
+        Index,
+        PRNGKey
+    )
+    import IMP.pynet.distributions as dist
 
-from ._typedefs import(
-    PRNGKeyArray,
-    Index
-)
+except ModuleNotFoundError:
+    import pyext.src.ais as ais
+    import pyext.src.functional_gibbslib as fg
+    import pyext.src.PlotBioGridStatsLib as nblib
+    import pyext.src.distributions as dist
+    from pyext.src.typedefs import (
+        Index,
+        PRNGKey
+    )
+    import pyext.src.distributions as dist
+
 import io
 import jax
 import jax.numpy as jnp
@@ -14,16 +32,15 @@ import numpy as np
 from functools import partial 
 from typing import Union, Any, Callable
 
-PynetModule = Any
 
-def testdef_get_trivial_model(n_samples, n_inter, dist: PynetModule):
-    """Helper function to use in various testdefs"""
+def testdef_get_trivial_model(n_samples, n_inter):
+    """Helper function to use in various src"""
     def get_invariants(n_samples: Index, n_inter: Index) -> tuple:
         return ()
 
     source = dist.norm
 
-    def T(key: PRNGKeyArray, x, t, n, sample_state=None):
+    def T(key: PRNGKey, x, t, n, sample_state=None):
         return jax.random.uniform(key)
 
     def get_log_intermediate_score(x, n, sample_state=None):
@@ -31,15 +48,15 @@ def testdef_get_trivial_model(n_samples, n_inter, dist: PynetModule):
     
     return get_invariants, source, T, get_log_intermediate_score 
 
-def testdef_get_beta_dependant_trivial_model(n_samples, n_inter, dist: PynetModule):
-    """Helper function to use in various testdefs"""
+def testdef_get_beta_dependant_trivial_model(n_samples, n_inter):
+    """Helper function to use in various src"""
     def get_invariants(n_samples: Index, n_inter: Index) -> tuple:
         beta = jnp.arange(n_inter)
         return betas
 
     source = dist.norm
 
-    def T(key: PRNGKeyArray, x, t, n, sample_state=None):
+    def T(key: PRNGKey, x, t, n, sample_state=None):
         return jax.random.uniform(key)
 
     def get_log_intermediate_score(x, n, sample_state=None):
@@ -48,31 +65,28 @@ def testdef_get_beta_dependant_trivial_model(n_samples, n_inter, dist: PynetModu
     return get_invariants, source, T, get_log_intermediate_score 
 
 
-def trivial_is_get_invariants_jittable(n_samples, n_inter, dist: PynetModule):
-    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter, dist)
+def trvial_is_get_invariants_jittable(n_samples, n_inter):
+    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
     jax.jit(g)(n_samples, n_inter)
 
-def trivial_is_s_rv_jittable(n_samples, n_inter, dist: PynetModule):
-    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter, dist)
+def trivial_is_s_rv_jittable(n_samples, n_inter):
+    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
     key = jax.random.PRNGKey(111)
     jax.jit(s.rv)(key)
 
-def trivial_is_T_jittable(n_samples, n_inter, dist: PynetModule):
-    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter, dist)
+def trivial_is_T_jittable(n_samples, n_inter):
+    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
     key = jax.random.PRNGKey(111)
     jax.jit(T)(key, 1., 1, 1)
 
-def trivial_is_get_log_score_jittable(n_samples, n_inter, dist: PynetModule):
-    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter, dist)
+def trivial_is_get_log_score_jittable(n_samples, n_inter):
+    g, s, T, gl = testdef_get_trivial_model(n_samples, n_inter)
     key = jax.random.PRNGKey(111)
     jax.jit(gl)(0.7, 2)
 
-def not_ones_trivial(n_samples, n_inter, ais: PynetModule,
-        dist):
-
-    model_getter = partial(testdef_get_trivial_model, dist=dist)
+def not_ones_trivial(n_samples, n_inter):
     sample__j = ais.specialize_model_to_sampling(
-        model_getter=model_getter,
+        model_getter=testdef_get_trivial_model,
         kwargs_params={},
         n_samples=n_samples,
         n_inter=n_inter)
@@ -86,17 +100,12 @@ def not_ones_trivial(n_samples, n_inter, ais: PynetModule,
 def specialize_model_to_sampling_trivial(
         n_samples : int,
         n_inter : int,
-        decimals,
-        ais: PynetModule,
-        dist: PynetModule):
+        decimals):
     """Tests that the func is callable and that 
        the return is jittable"""
 
-    model_getter = partial(testdef_get_trivial_model,
-            dist = dist)
-
     sample__j = ais.specialize_model_to_sampling(
-        model_getter=model_getter,
+        model_getter=testdef_get_trivial_model,
         kwargs_params={},
         n_samples=n_samples,
         n_inter=n_inter)
@@ -107,7 +116,7 @@ def specialize_model_to_sampling_trivial(
     jsample(jax.random.PRNGKey(3))
     np.testing.assert_almost_equal(jsample(key), sample__j(key), decimals)
 
-    packed = testdef_get_trivial_model(n_samples, n_inter, dist)
+    packed = testdef_get_trivial_model(n_samples, n_inter)
     get_invariants, Source, T, get_log_intermediate_score = packed
 
     sampling2 = ais.sample
@@ -115,7 +124,7 @@ def specialize_model_to_sampling_trivial(
         'n_samples': n_samples,
         'n_inter': n_inter,
         'get_log_intermediate_score': get_log_intermediate_score,
-        'testdefs': Source,
+        'src': Source,
         'T': T,
         'get_invariants': get_invariants
     }
@@ -123,18 +132,17 @@ def specialize_model_to_sampling_trivial(
     np.testing.assert_almost_equal(jsample(key), sampling2(key=key, **kwargs_sample2), decimals)
 
             
-def sample_trivial(n_samples: int, n_inter: int, decimal_tolerance: int, ais: PynetModule, dist: PynetModule):
+def sample_trivial(n_samples: int, n_inter: int, decimal_tolerance: int):
     """Test definition for sample is callable and jittable"""
 
     packed = testdef_get_trivial_model(
         n_samples=n_samples,
-        n_inter=n_inter,
-        dist=None)
+        n_inter=n_inter)
 
     get_invariants, Source, T, get_log_intermediate_score = packed
 
     kwargs_partial = {'get_log_intermediate_score': get_log_intermediate_score,
-            'testdefs': Source,
+            'src': Source,
             'T': T,
             'get_invariants': get_invariants,
             'n_samples': n_samples,
@@ -152,21 +160,19 @@ def negative_sample_trivial(
         n_samples: int, 
         n_inter: int,
         rseed1: int,
-        rseed2: int,
-        ais: PynetModule,
-        dist: PynetModule):
+        rseed2: int):
     """Checks that two different keys produce different outputs of the same shape and
        dtype"""
 
-    packed = testdef_get_trivial_model(n_samples, n_inter, dist)
-    packed = testdef_get_trivial_model(n_samples, n_inter, dist)
+    packed = testdef_get_trivial_model(n_samples, n_inter)
+    packed = testdef_get_trivial_model(n_samples, n_inter)
     get_invariants, Source, T, get_log_intermediate_score = packed
 
     kwargs_sample = {
         'n_samples': n_samples,
         'n_inter': n_inter,
         'get_log_intermediate_score': get_log_intermediate_score,
-        'testdefs': Source,
+        'src': Source,
         'T': T,
         'get_invariants': get_invariants
     }
@@ -200,7 +206,7 @@ def negative_sample_trivial(
         ...
 
 
-def nsteps_mh__g(mu : float, sigma: float, rseed : Union[float, int], ais: PynetModule ):
+def nsteps_mh__g(mu : float, sigma: float, rseed : Union[float, int]):
     log_intermediate__j = partial(dist.norm.lpdf, loc=mu, scale=sigma)
     n_steps = 100
 
@@ -258,7 +264,7 @@ def nsteps_mh__g_accuracy(mu, cv):
 
      
 def apply_normal_context_to_sample(mu : float, sigma : float, 
-        n_mh_steps  : int, n_samples : int, n_inter : int, rseed, ais: PynetModule):
+        n_mh_steps  : int, n_samples : int, n_inter : int, rseed):
 
     f = ais.apply_normal_context_to_sample__s
     sample__j = f(mu, sigma, n_mh_steps, n_samples, n_inter)
@@ -268,7 +274,7 @@ def apply_normal_context_to_sample(mu : float, sigma : float,
     weights, samples, = sample__j(key)
 
 
-def f0_pdf__j(mu, sig, ais: PynetModule):
+def f0_pdf__j(mu, sig):
 
     cases1 = [mu -1, mu, mu + 1]
     cases2 = [mu - 10, mu, mu + 10]
@@ -286,7 +292,7 @@ def f0_pdf__j(mu, sig, ais: PynetModule):
         assert 0 <= f0(n) <= 1
         np.testing.assert_almost_equal(jf0(n), f0(n), decimal = 5)
 
-def fn_pdf__j(mu, sig, ais: PynetModule):
+def fn_pdf__j(mu, sig):
     
     cases1 = [mu -1, mu, mu + 1]
     cases2 = [mu - 10, mu, mu + 10]
@@ -305,7 +311,7 @@ def fn_pdf__j(mu, sig, ais: PynetModule):
         assert 0 <= f0(n) <= 1
         np.testing.assert_almost_equal(jf0(n), f0(n), decimal = 5)
 
-def fj_pdf__g(mu, sig, ais: PynetModule):
+def fj_pdf__g(mu, sig):
 
     target__j = ais.f0_pdf__j
     target__j = partial(target__j, mu = mu, sig = sig)
@@ -323,7 +329,7 @@ def fj_pdf__g(mu, sig, ais: PynetModule):
 
 
 
-def T_nsteps__unorm2unorm__p(mu, sig, ais: PynetModule):
+def T_nsteps__unorm2unorm__p(mu, sig):
 
     T_j = ais.T_nsteps_mh__unorm2unorm__p(mu, sig)
     T_j = ais.T.unorm2unorm__p(mu, sig)
@@ -342,7 +348,7 @@ def T_nsteps__unorm2unorm__p(mu, sig, ais: PynetModule):
             xij = T_j(key, xi, kwargs_intermediate__j = {'beta': bij})
 
 
-def test_T_nsteps_mh__g(rseed, x, ais: PynetModule):
+def test_T_nsteps_mh__g(rseed, x):
     key = jax.random.PRNGKey(rseed)
     ij = ais.fj_pdf__g
     ij__j = partial(ij, source__j = ais.fn_pdf__j,
@@ -361,7 +367,7 @@ def test_T_nsteps_mh__g(rseed, x, ais: PynetModule):
     assert jresults == test_func(**kwargs_test_func)
 
 
-def do_ais(mu, sigma, ais: PynetModule):
+def do_ais(mu, sigma):
     fn_pdf = jax.scipy.stats.norm.pdf
     n_samples = 100
     n_inter = 50

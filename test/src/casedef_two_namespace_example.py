@@ -1,4 +1,4 @@
-from test.testdefs import two_namespace_example as td, NullModule
+from test.src import two_namespace_example as td, NullModule
 from typing import Any
 import IMP.test
 

@@ -9,7 +9,7 @@ import io
 import os
 import math
 
-from .testdefs import example
+from .src import example
 from hypothesis import given, settings, strategies as st
 import unittest
 

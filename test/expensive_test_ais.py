@@ -21,7 +21,7 @@ from math import isnan
 import numpy as np
 from functools import partial 
 from hypothesis import assume, given, settings, strategies as st
-from .testdefs import ais_testdefs as td
+from .src import ais_testdefs as td
 
 
 deadline_ms = 10000 # 10s

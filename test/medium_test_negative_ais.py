@@ -11,7 +11,7 @@ import os
 import math
 from math import isnan
 from hypothesis import assume, given, settings, strategies as st
-from .testdefs import ais_testdefs as td
+from .src import ais_testdefs as td
 
 class NegativeTestAIS(IMP.test.TestCase):
     @given(st.integers(), st.integers())
