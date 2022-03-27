@@ -3,9 +3,8 @@ Author Aji Palar
 Input Information
 Module for handling data I/O and preprocessing
 """
-import .config as config
-import .utils as utils
-
+from . import config
+from . import utils
 
 import matplotlib.pyplot as plt
 import numpy as np

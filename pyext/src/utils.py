@@ -5,7 +5,7 @@ import sys
 pynet_home = Path('.').absolute().parent
 sys.path.append(str(pynet_home))
 
-import .config as config
+from . import config
 
 def modparse(local_dict):
     modname = local_dict['__name__']

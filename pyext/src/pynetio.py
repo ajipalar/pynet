@@ -1,4 +1,4 @@
-import .predicates as pred
+from . import predicates as pred
 from .typedefs import (
     AnyPath,
     AnyCol,
