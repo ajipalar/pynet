@@ -4,29 +4,35 @@ import IMP.test
 import pyext.src.ais as ais
 import pyext.src.distributions as dist
 
-from ..src.casedef_ais import(
+from ..src import casedef_ais as test_case
+
+class T1(test_case.UnitTest1):
+    dist = dist
+    ais = ais
+
+
+"""
+import(
     DevPropertyTrivial,
     DevTrivialAIS,
     DevTrivialBetaDependantAIS,
     DevTestAIS
 )
-
-class l1(DevPropertyTrivial):
+class l1(test_case.DevPropertyTrivial):
     dist = dist
     ais = ais
 
-class l2(DevTrivialAIS):
+class l2(test_case.DevTrivialAIS):
+    dist = dist
+    ais = ais
+"""
+class l3(test_case.DevTrivialBetaDependantAIS):
     dist = dist
     ais = ais
 
-class l3(DevTrivialBetaDependantAIS):
+class l4(test_case.DevTestAIS):
     dist = dist
     ais = ais
-
-class l4(DevTestAIS):
-    dist = dist
-    ais = ais
-
 
 
 #Define the import paths
