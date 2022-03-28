@@ -9,10 +9,17 @@ import math
 import numpy as np
 from functools import partial 
 from hypothesis import given, settings, strategies as st
-from test.src import ais as td
+from . import ais as td
 
 
 deadline_ms = 2000
+
+class UnitTest1(IMP.test.TestCase):
+    dist = None
+    ais = None
+
+    def test_testdef_get_trivial_model(self):
+        td.testdef_get_trivial_model(12, 12, self.dist)
 
 class DevPropertyTrivial(IMP.test.TestCase):
     dist = None # the base class should override this attribute
