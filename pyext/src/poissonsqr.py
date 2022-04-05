@@ -5,7 +5,7 @@ import numpy as np
 from functools import partial
 from typing import Callable as f
 from typing import Protocol
-from .typedefs import Dimension, JitFunc
+from .typedefs import Dimension, Index, JitFunc, Matrix
 import collections
                     # variable value -> Array index
 n_samples: int      # [1, n_samples] -> [0, n_samples)
@@ -33,42 +33,99 @@ Get = collections.namedtuple(
     "Get", ['eta1', 'eta2'])
 
 
-
-
 get = Get(
     lambda phi, i: phi[i, i], 
     lambda theta, phi, x, i: theta[i] + 2)
 
 
-def remove_ith_entry__s(arr_l: Dimension) -> JitFunc:
-    i_eq_0__j = i_eq_0__s(arr_l)
-    i_eq_arr_l__j = i_eq_arr_l__s(arr_l)
-    zero_lt_i_lt_arr_l__j = zero_lt_i_lt_arr_l__s(arr_l)
-    branch2__j = branch2__s(arr_l)
+def remove_ith_entry__s(a) -> JitFunc:
+    """Specialize the function 'remove_ith_entry' to a vector of length arr_l
+       such that it may be jit compiled"""
+
+    # array values
+    # array shape
+    # array ndim
+
+    ndim = a.ndim
+    assert (ndim == 1) or (ndim == 2)
+    if ndim == 2:
+        assert a.shape[0] == a.shape[1]
+
+    n = len(a)
+    nrows = n
+    ncols = n
+
+
+    outshape = n-1 if ndim == 1 else (nrows, ncols-1)
+
+    # case 1 i==0 -> remove 0th entry
+    start_indices = [1] if ndim == 1 else [0, 1]
+    limit_indices = [n] if ndim == 1 else [nrows, ncols]
+    # copy entries from [1, n) to [0, n-1)
+    f0__j = lambda x: jax.lax.slice(x, start_indices, limit_indices)
+
+    # case 2 0<i<n
+    if ndim == 1:
+        def fi__j(x, i):
+            o = jnp.zeros(outshape)
+            # copy entries from [0, i) to [0, i)
+            o, x = jax.lax.fori_loop(0, i, lambda j, t: (t[0].at[j].set(t[1][j]), x), (o, x))
+            # copy entries from [i+1, n) to [i, n-1) 
+            o, x = jax.lax.fori_loop(i+1, n, lambda j, t: (t[0].at[j-1].set(t[1][j]) , x), (o, x))
+            return o
+    else:
+        def fi__j(x, i):
+            o = jnp.zeros(outshape)
+            o, x = jax.lax.fori_loop(0, i, lambda j, t: (t[0].at[:, j].set(t[1][:, j]), (o, x)))
+            o, x = jax.lax.fori_loop(i+1, n, lambda j, t: (t[0].at[:, j-1].set(t[1][:, j]), (o, x)))
+            return o
+            
+    # case 3 i==n
+    start_indices = [0] if ndim == 1 else [0, 0]
+    limit_indices = [n] if ndim == 1 else [nrows, ncols-1]
+    fn__j = lambda x: jax.lax.slice(x, start_indices, limit_indices)
+
+
+    # branch2__j = branch2__s(arr_l, zf__s=zf__s, i_eq_arr_l__j=ieqarr__j)
+
+    def branch2__j(a, i):
+        o = jax.lax.cond(
+            i==n, 
+            lambda m, b: fn__j(m),
+            lambda m, b: fi__j(m, b),
+            *(a, i))
+
+        return o
     
     def remove_ith_entry__j(arr, i):
         out_arr = jax.lax.cond(
             i==0,
-            lambda a, b: i_eq_0__j(arr=a),
-            lambda a, b: branch2__j(arr=a, i=b),
+            lambda a, b: f0__j(a),
+            lambda a, b: branch2__j(a=a, i=b),
             *(arr, i))
         return out_arr
 
     return remove_ith_entry__j
 
 
-
-def remove_ith_entry(arr, arr_l: Dimension, i: int):
-    """Array has at least two elements"""
-    out_arr = jax.lax.cond(i==0, lambda a, b, c: i_eq_0(a, b), branch2, *(arr, arr_l, i))
-    return out_arr
-    
 #def i_eq_0(arr, arr_l: Dimension, i: int):
-def i_eq_0(arr, arr_l): 
+def i_eq_0(arr, out_shape, s): 
     """ i=0 -> [1, arr_l)"""
-    out_arr = jnp.zeros(arr_l -1, dtype=pynet_jax_fdtype)
-    out_arr = arr[1:arr_l]
+    out_arr = jnp.zeros(out_shape, dtype=pynet_jax_fdtype)
+    #         arr[1:arr_l]
+    out_arr = arr[s]
     return out_arr
+
+
+def i_eq_0_matrix(arr, arr_l):
+    """params:
+        arr is an (arr_l x arr_l) matrix
+       return:
+        out_m is an (arr_l x arr_l -1)_ matrix"""
+    out_m = jnp.zeros((arr_l, arr_l-1), dtype=pynet_jax_fdtype)
+    out_m = arr_l[:, 1:n]
+    return out_m
+
 
 def i_eq_0__s(arr_l: Dimension):
     i_eq_0__j = partial(i_eq_0, arr_l=arr_l)
@@ -81,10 +138,15 @@ def i_eq_arr_l(arr, arr_l):
     out_arr = arr[0:arr_l - 1]
     return out_arr
 
+def i_eq_arr_l_matrix(arr, arr_l):
+    """ arr is an (arr_l x arr_l) matrix"""
+    out_m = jnp.zeros((arr_l, arr_l-1), dtype=pynet_jax_fdtype)
+    out_m = arr[:, 0:arr_l-1]
+    return out_m
+
 def i_eq_arr_l__s(arr_l: Dimension):
     i_eq_arr_l__j = partial(i_eq_arr_l, arr_l=arr_l)
     return i_eq_arr_l__j
-
 
 
 #def zero_lt_i_lt_arr_l(arr, arr_l: Dimension, i: int):
@@ -105,6 +167,28 @@ def zero_lt_i_lt_arr_l(arr, arr_l, i):
         
     return out_arr
 
+def zero_lt_i_lt_arr_l_matrix(m: Matrix, n: Dimension, i: Index) -> Matrix:
+    """for the (n x n) matrix m return the (n x (n-1)) matrix of m with the ith column
+       removed"""
+
+    out_mat = jnp.zeros((arr_l, arr_l -1))
+
+
+    # copy columns [0, i) into out_mat
+    out_mat, tmp  = jax.lax.fori_loop(
+        0, i,
+        lambda j, t: (t[0].at[:, j].set(t[1][:, j]), t[1]),  
+        (out_mat, m)) 
+
+
+    # copy columns [i+1, n) into out_mat
+    out_mat, tmp  = jax.lax.fori_loop(
+        i+1, n,
+        lambda j, t: (t[0].at[:, j-1].set(t[1][:, j]), t[1]),  (out_mat, m)) 
+
+    return out_mat
+
+
 def zero_lt_i_lt_arr_l__s(arr_l):
     return partial(zero_lt_i_lt_arr_l, arr_l=arr_l)
 
@@ -114,18 +198,27 @@ def branch2(arr, arr_l, i):
     out_arr = jax.lax.cond(i==arr_l-1, lambda a, b, c: i_eq_arr_l(a, b), zero_lt_i_lt_arr_l, *(arr, arr_l, i))
     return out_arr
 
-def branch2__s(arr_l: Dimension):
-    i_eq_arr_l__j = i_eq_arr_l__s(arr_l)
-    zero_lt_i_lt_arr_l__j = zero_lt_i_lt_arr_l__s(arr_l)
+def branch2__s(arr_l: Dimension, 
+        zf__s=None, 
+        i_eq_arr_l__j=None):
+    # i_eq_arr_l__j = i_eq_arr_l__s(arr_l)
+    zf__j = zf__s(arr_l)
+
     def branch2__j(arr, i):
         return jax.lax.cond(
             i==arr_l-1,
             lambda a, b : i_eq_arr_l__j(arr=a),
-            lambda a, b : zero_lt_i_lt_arr_l__j(arr=a, i=b),
+            lambda a, b : zf__j(arr=a, i=b),
             *(arr, i))
 
     return branch2__j
     
+
+def remove_ith_column(symm_matrix, size, i) -> Matrix:
+    """Given an (n x n) matrix 'm', return an (n x (n-1)) matrix,
+       where the entries of the new matrix are the same as the old except
+       the ith column of 'm' is removed."""
+    ...
 
 
 
