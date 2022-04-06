@@ -71,18 +71,18 @@ def remove_ith_entry__s(a) -> JitFunc:
             # copy entries from [0, i) to [0, i)
             o, x = jax.lax.fori_loop(0, i, lambda j, t: (t[0].at[j].set(t[1][j]), x), (o, x))
             # copy entries from [i+1, n) to [i, n-1) 
-            o, x = jax.lax.fori_loop(i+1, n, lambda j, t: (t[0].at[j-1].set(t[1][j]) , x), (o, x))
+            o, x = jax.lax.fori_loop(i+1, n, lambda j, t: (t[0].at[j-1].set(t[1][j]), x), (o, x))
             return o
     else:
         def fi__j(x, i):
             o = jnp.zeros(outshape)
-            o, x = jax.lax.fori_loop(0, i, lambda j, t: (t[0].at[:, j].set(t[1][:, j]), (o, x)))
-            o, x = jax.lax.fori_loop(i+1, n, lambda j, t: (t[0].at[:, j-1].set(t[1][:, j]), (o, x)))
+            o, x = jax.lax.fori_loop(0, i, lambda j, t: (t[0].at[:, j].set(t[1][:, j]), x), (o, x))
+            o, x = jax.lax.fori_loop(i+1, n, lambda j, t: (t[0].at[:, j-1].set(t[1][:, j]), x), (o, x))
             return o
             
     # case 3 i==n
     start_indices = [0] if ndim == 1 else [0, 0]
-    limit_indices = [n] if ndim == 1 else [nrows, ncols-1]
+    limit_indices = [n-1] if ndim == 1 else [nrows, ncols-1]
     fn__j = lambda x: jax.lax.slice(x, start_indices, limit_indices)
 
 
@@ -90,7 +90,7 @@ def remove_ith_entry__s(a) -> JitFunc:
 
     def branch2__j(a, i):
         o = jax.lax.cond(
-            i==n, 
+            i==n-1, 
             lambda m, b: fn__j(m),
             lambda m, b: fi__j(m, b),
             *(a, i))
