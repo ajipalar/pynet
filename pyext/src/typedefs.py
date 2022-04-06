@@ -102,14 +102,14 @@ Number: TypeAlias = int | float | complex
 
 # Number = NewType('Number', Union[int, float, complex])
 PRNGKey = NewType("PRNGKey", Tuple[int, int])
-Vector = NewType('Vector', npt.NDArray)
-Matrix = NewType('Matrix', npt.NDArray)
+Vector = NewType("Vector", npt.NDArray)
+Matrix = NewType("Matrix", npt.NDArray)
 
-Score = NewType('Score', float)
-LogScore = NewType('LogScore', float)
-uScore = NewType('uScore', float)
-uLogScore = NewType('uLogScore', float)
-ProbScore = NewType('ProbScore', float)
+Score = NewType("Score", float)
+LogScore = NewType("LogScore", float)
+uScore = NewType("uScore", float)
+uLogScore = NewType("uLogScore", float)
+ProbScore = NewType("ProbScore", float)
 
 # Generic types
 State = NewType("State", object)
