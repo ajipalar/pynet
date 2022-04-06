@@ -16,7 +16,8 @@ from typing import (
 
 import jax._src.prng as prng
 from jax._src.device_array import DeviceArray as DeviceArray
-from numpy.typing import ArrayLike
+import numpy as np
+import numpy.typing as npt
 
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)
@@ -101,9 +102,9 @@ Number: TypeAlias = int | float | complex
 
 # Number = NewType('Number', Union[int, float, complex])
 PRNGKey = NewType("PRNGKey", Tuple[int, int])
-Vector = NewType("Vector", Sequence[Number])
-Matrix = NewType("Matrix", Sequence[Sequence[Number]])
-CartesianTable = NewType("CartesianTable", Matrix)
+Vector = NewType('Vector', npt.NDArray)
+Matrix = NewType('Matrix', npt.NDArray)
+
 
 # Generic types
 State = NewType("State", object)
