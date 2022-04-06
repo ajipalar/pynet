@@ -5,7 +5,7 @@ import numpy as np
 from functools import partial
 from typing import Callable as f
 from typing import Protocol, Union
-from .typedefs import Dimension, Index, JitFunc, Matrix, Vector
+from .typedefs import Dimension, Index, JitFunc, Matrix, Vector, uLogScore, Number
 import collections
 
 # variable value -> Array index
@@ -28,8 +28,6 @@ Source = collections.namedtuple("Source", ["rv"])
 
 Get = collections.namedtuple("Get", ["eta1", "eta2"])
 
-
-get = Get(lambda phi, i: phi[i, i], lambda theta, phi, x, i: theta[i] + 2)
 
 
 def remove_ith_entry__s(a: Union[Vector, Matrix]) -> JitFunc:
@@ -105,3 +103,36 @@ def remove_ith_entry__s(a: Union[Vector, Matrix]) -> JitFunc:
         return out_arr
 
     return remove_ith_entry__j
+
+def logfactorial(n: Union[int, float]):
+    logfac = 0
+    for i in range(1, int(n)+1):
+        logfac += np.log(i)
+    return logfac
+
+def get_logfacx_lookuptable(x: Vector):
+    lookup = np.zeros(len(x))
+    for i, xi in enumerate(x):
+        lookup[i] = logfactorial(xi)
+    return lookup
+
+
+def get_eta2__s(theta: Vector, phi: Matrix, x: Vector):
+
+    rm_i__j = remove_ith_entry__s(theta)
+
+    def get_eta2__j(theta: Vector, phi: Matrix, x: Vector, i: Index):
+        return theta[i] + 2 * rm_i__j(phi[:, i], i) * jnp.sqrt(rm_i__j(x, i))
+
+    return get_eta2__j
+
+def get_ulog_score__s(theta: Vector, phi: Matrix, x: Vector) -> JitFunc:
+    """Generate the unormalized log score jittable kernal for the poisson sqr model"""
+    eta2__j = get_eta2__s(theta, phi, x)
+    logfacx = get_logfacx_lookuptable(x)
+    def get_ulog_score__j(theta: Vector, phi: Matrix, x: Vector, i: Index) -> uLogScore:
+        return phi[i, i] * x[i] + eta2__j(theta, phi, x, i) * jnp.sqrt(x[i]) - logfacx[i]
+
+    return get_ulog_score__j
+
+
