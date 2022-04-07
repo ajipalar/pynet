@@ -73,10 +73,12 @@ GeneID = NewType("GeneID", str)  # NCBI Entrez Gene identifier
 R = TypeVar("R")
 
 # jax related
-Array = Any
-RealArray = Any
-IntegerArray = Any
-Array1d = Any
+Array: TypeAlias = npt.NDArray
+#RealArray: TypeAlias = npt.NDArray[float]
+#IntegerArray: TypeAlias = npt.NDArray[int]
+Array1d = NewType('Array1d', Array)
+Array2d = NewType('Array2d', Array)
+ArraySquare = NewType('ArraySquare', Array2d)
 DTypeLikeInt = Any
 DTypeLikeFloat = Any
 PRNGKeyArray = prng.PRNGKeyArray  # Change this to prng.PRNGKeyArray

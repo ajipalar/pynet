@@ -5,7 +5,8 @@ import numpy as np
 from functools import partial
 from typing import Callable as f
 from typing import Protocol, Union
-from .typedefs import Dimension, Index, JitFunc, Matrix, Vector, uLogScore, Number
+from .typedefs import Dimension, Index, JitFunc, ArraySquare, Array1d, uLogScore, Number, Callable
+from . import predicates as pred
 import collections
 
 # variable value -> Array index
@@ -29,7 +30,7 @@ Source = collections.namedtuple("Source", ["rv"])
 Get = collections.namedtuple("Get", ["eta1", "eta2"])
 
 
-def remove_ith_entry__s(a: Union[Vector, Matrix]) -> JitFunc:
+def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
     """Specialize the function 'remove_ith_entry' to a vector of length arr_l
     such that it may be jit compiled"""
 
@@ -40,7 +41,7 @@ def remove_ith_entry__s(a: Union[Vector, Matrix]) -> JitFunc:
     ndim = a.ndim
     assert (ndim == 1) or (ndim == 2)
     if ndim == 2:
-        assert a.shape[0] == a.shape[1]
+        assert pred.is_array_square(a) 
 
     n = len(a)
     nrows = n
@@ -56,9 +57,9 @@ def remove_ith_entry__s(a: Union[Vector, Matrix]) -> JitFunc:
 
     # case 2 0<i<n
     if ndim == 1:
-
+        assert pred.is_array1d(a)
         def fi__j(x, i):
-            o = jnp.zeros(outshape)
+            o = jnp.zeros(outshape, dtype=x.dtype)
             # copy entries from [0, i) to [0, i)
             o, x = jax.lax.fori_loop(
                 0, i, lambda j, t: (t[0].at[j].set(t[1][j]), x), (o, x)
@@ -70,9 +71,8 @@ def remove_ith_entry__s(a: Union[Vector, Matrix]) -> JitFunc:
             return o
 
     else:
-
         def fi__j(x, i):
-            o = jnp.zeros(outshape)
+            o = jnp.zeros(outshape, dtype=x.dtype)
             o, x = jax.lax.fori_loop(
                 0, i, lambda j, t: (t[0].at[:, j].set(t[1][:, j]), x), (o, x)
             )
@@ -111,31 +111,33 @@ def logfactorial(n: Union[int, float]):
     return logfac
 
 
-def get_logfacx_lookuptable(x: Vector):
-    lookup = np.zeros(len(x))
+def get_logfacx_lookuptable(x: Array1d):
+    lookup = jnp.zeros(len(x))
     for i, xi in enumerate(x):
-        lookup[i] = logfactorial(xi)
+        lookup = lookup.at[i].set(logfactorial(xi))
     return lookup
 
 
-def get_eta2__s(theta: Vector, phi: Matrix, x: Vector):
+def get_eta2__s(theta: Array1d, phi: ArraySquare, x: Array1d):
 
     rm_i__j = remove_ith_entry__s(theta)
 
-    def get_eta2__j(theta: Vector, phi: Matrix, x: Vector, i: Index):
+    def get_eta2__j(theta: Array1d, phi: ArraySquare, x: Array1d, i: Index):
         return theta[i] + 2 * rm_i__j(phi[:, i], i) * jnp.sqrt(rm_i__j(x, i))
 
     return get_eta2__j
 
 
-def get_ulog_score__s(theta: Vector, phi: Matrix, x: Vector) -> JitFunc:
+def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
     """Generate the unormalized log score jittable kernal for the poisson sqr model"""
     eta2__j = get_eta2__s(theta, phi, x)
     logfacx = get_logfacx_lookuptable(x)
 
-    def get_ulog_score__j(theta: Vector, phi: Matrix, x: Vector, i: Index) -> uLogScore:
+    def get_ulog_score__j(theta: Array1d, phi: ArraySquare, x: Array1d, i: Index, logfacx: Callable) -> uLogScore:
         return (
             phi[i, i] * x[i] + eta2__j(theta, phi, x, i) * jnp.sqrt(x[i]) - logfacx[i]
         )
+
+    get_ulog_score__j = partial(get_ulog_score__j, logfacx=logfacx)
 
     return get_ulog_score__j
