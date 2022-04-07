@@ -5,7 +5,16 @@ import numpy as np
 from functools import partial
 from typing import Callable as f
 from typing import Protocol, Union
-from .typedefs import Dimension, Index, JitFunc, ArraySquare, Array1d, uLogScore, Number, Callable
+from .typedefs import (
+    Dimension,
+    Index,
+    JitFunc,
+    ArraySquare,
+    Array1d,
+    uLogScore,
+    Number,
+    Callable,
+)
 from . import predicates as pred
 import collections
 
@@ -41,7 +50,7 @@ def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
     ndim = a.ndim
     assert (ndim == 1) or (ndim == 2)
     if ndim == 2:
-        assert pred.is_array_square(a) 
+        assert pred.is_array_square(a)
 
     n = len(a)
     nrows = n
@@ -58,6 +67,7 @@ def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
     # case 2 0<i<n
     if ndim == 1:
         assert pred.is_array1d(a)
+
         def fi__j(x, i):
             o = jnp.zeros(outshape, dtype=x.dtype)
             # copy entries from [0, i) to [0, i)
@@ -71,6 +81,7 @@ def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
             return o
 
     else:
+
         def fi__j(x, i):
             o = jnp.zeros(outshape, dtype=x.dtype)
             o, x = jax.lax.fori_loop(
@@ -123,7 +134,8 @@ def get_eta2__s(theta: Array1d, phi: ArraySquare, x: Array1d):
     rm_i__j = remove_ith_entry__s(theta)
 
     def get_eta2__j(theta: Array1d, phi: ArraySquare, x: Array1d, i: Index):
-        return theta[i] + 2 * rm_i__j(phi[:, i], i) * jnp.sqrt(rm_i__j(x, i))
+               #         sa em                      mm           
+        return theta[i] + 2 * rm_i__j(phi[:, i], i) @ jnp.sqrt(rm_i__j(x, i))
 
     return get_eta2__j
 
@@ -133,7 +145,9 @@ def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
     eta2__j = get_eta2__s(theta, phi, x)
     logfacx = get_logfacx_lookuptable(x)
 
-    def get_ulog_score__j(theta: Array1d, phi: ArraySquare, x: Array1d, i: Index, logfacx: Callable) -> uLogScore:
+    def get_ulog_score__j(
+        theta: Array1d, phi: ArraySquare, x: Array1d, i: Index, logfacx: Callable
+    ) -> uLogScore:
         return (
             phi[i, i] * x[i] + eta2__j(theta, phi, x, i) * jnp.sqrt(x[i]) - logfacx[i]
         )

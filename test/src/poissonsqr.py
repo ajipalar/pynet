@@ -77,6 +77,7 @@ class PoissUnitTests(IMP.test.TestCase):
     atol = None
     decimal = None
     kwds = None
+    key = jax.random.PRNGKey(10)
 
     def test_dev_remove_ith_entry(self):
         def run(key, shape):
@@ -95,12 +96,10 @@ class PoissUnitTests(IMP.test.TestCase):
         key = run(key, (4, 4))
         # key = run(key, (111, 111))
 
-    def test_f_is_jittable(self):
-        seed = 10
-        key = jax.random.PRNGKey(seed)
+    def test_get_ulog_score_is_jittable(self):
         d=3
         n=1
-        X, theta, phi = helper_init_state(key, n, d)
+        X, theta, phi = helper_init_state(self.key, n, d)
         assert theta.shape == (d,)
         assert phi.shape == (d, d)
         assert X.shape == (d,n)
@@ -111,6 +110,31 @@ class PoissUnitTests(IMP.test.TestCase):
        # assert x.dtype == np.float32
         get_ulog_score__j_is_jittable(theta, phi, x, self.src)
         
+    def test_logfactorial(self):
+
+        factorial = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800]
+        lfactorial = np.log(factorial)
+        for i, lf in enumerate(lfactorial):
+            logfaci = self.src.logfactorial(i)
+            np.testing.assert_almost_equal(lf, logfaci, decimal=self.decimal)
+
+    def test_get_eta2__j(self):
+        precision = 5
+        n=4
+        d=4
+        X, theta, phi = helper_init_state(self.key, n, d)
+
+        x = X[:,1]
+        get_eta2__j = self.src.get_eta2__s(theta, phi, x)
+        jf = jax.jit(get_eta2__j)
+        jf(theta, phi, x, 0).block_until_ready()
+
+        for i in range(len(theta)):
+            a = get_eta2__j(theta, phi, x, i)
+            np.testing.assert_almost_equal(a, b, decimal=precision)
+
+
+
 
 
 class IsMatrixCompatible(IMP.test.TestCase):
