@@ -146,6 +146,22 @@ def helper_init_state(key, n, d):
     phi = jax.random.normal(k3, shape=[d, d])
     return X, theta, phi
 
+def get_eta2__j_values(src: Module, d=3):
+    xscale = 4.0
+    thetascale = 1.0
+    phiscale = 1.0
+    x = jnp.ones(d, dtype=jnp.int32) * xscale
+    theta = jnp.ones(d) * thetascale
+    phi = jnp.ones((d, d)) * phiscale
+
+    get_eta2__j = src.get_eta2__s(theta, phi, x)
+
+    a = get_eta2__j(theta, phi, x, 0)
+    t1 = thetascale
+    t2 = 2 * (6.0)
+    eta2 = t1 + t2
+    np.testing.assert_almost_equal(eta2, a)
+
 
 class PoissUnitTests(IMP.test.TestCase):
     """Base class for Poisson SQR unit tests"""
@@ -267,21 +283,10 @@ class PoissUnitTests(IMP.test.TestCase):
 
 
     def test_get_eta2__j_values(self):
-        d = 3
-        xscale = 4.0
-        thetascale = 1.0
-        phiscale = 1.0
-        x = jnp.ones(d, dtype=jnp.int32) * xscale
-        theta = jnp.ones(d) * thetascale
-        phi = jnp.ones((d, d)) * phiscale
+        get_eta2__j_values(src=self.src)
 
-        get_eta2__j = self.src.get_eta2__s(theta, phi, x)
-
-        a = get_eta2__j(theta, phi, x, 0)
-        t1 = thetascale
-        t2 = 2 * (6.0)
-        eta2 = t1 + t2
-        np.testing.assert_almost_equal(eta2, a)
+    def test_get_eta2__j_valuesd4(self):
+        get_eta2__j_values(d=4, src=self.src)
 
     def test_get_ulog_score__j_values(self):
         d = 3
