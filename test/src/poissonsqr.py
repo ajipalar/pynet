@@ -59,7 +59,7 @@ def dev_remove_ith_entry__s(a, src: Module):
 def remove_ith_entry__s_vs_value(src: Module, d1=100, d2=10):
     """Tests the removal of the ith entry from a vector and a matrix
     where answers are known"""
-    test_dtype=jnp.float32
+    test_dtype = jnp.float32
 
     a1d = jnp.arange(d1, dtype=test_dtype)
     a2d = jnp.arange(d2 * d2, dtype=test_dtype).reshape((d2, d2))
@@ -83,7 +83,7 @@ def remove_ith_entry__s_vs_value(src: Module, d1=100, d2=10):
         if i == 0:
             assert a1d[0] == 0
             assert a1d_min_i[0] == 1
-            
+
             ref = a1d[1:d1]
             pred = a1d_min_i
             np.testing.assert_almost_equal(ref, pred)
@@ -112,7 +112,7 @@ def remove_ith_entry__s_vs_value(src: Module, d1=100, d2=10):
 
     for i in range(d2):
         a2d_min_i = np.array(j2d(a2d, i))
-        assert a2d_min_i.shape == (d2 - 1, d2 - 1)
+        assert a2d_min_i.shape == (d2, d2 - 1), f"{a2d_min_i.shape}"
         if i == 0:
             ref = a2d[:, 1:d2]
             pred = a2d_min_i
@@ -127,8 +127,8 @@ def remove_ith_entry__s_vs_value(src: Module, d1=100, d2=10):
             np.testing.assert_array_almost_equal(ref2, pred2)
         # i==d2
         else:
-            ref1 = a2d[0 : d2 - 1]
-            pred1 = a1d_min_i
+            ref1 = a2d[:, 0 : d2 - 1]
+            pred1 = a2d_min_i
             np.testing.assert_almost_equal(ref1, pred1)
 
 
@@ -176,6 +176,7 @@ class PoissUnitTests(IMP.test.TestCase):
 
     def test_dev_remove_ith_entry_vs_value(self):
         remove_ith_entry__s_vs_value(src=self.src)
+
     def test_get_ulog_score_is_jittable(self):
         d = 3
         n = 1
@@ -190,6 +191,7 @@ class PoissUnitTests(IMP.test.TestCase):
         # assert x.dtype == np.float32
         get_ulog_score__j_is_jittable(theta, phi, x, self.src)
 
+    @IMP.test.skip
     def test_logfactorial(self):
 
         factorial = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800]
@@ -198,6 +200,7 @@ class PoissUnitTests(IMP.test.TestCase):
             logfaci = self.src.logfactorial(i)
             np.testing.assert_almost_equal(lf, logfaci, decimal=self.decimal)
 
+    @IMP.test.skip
     def test_get_eta2__j(self):
         precision = 5
         n = 4
@@ -230,6 +233,7 @@ class PoissUnitTests(IMP.test.TestCase):
         eta2 = t1 + t2
         np.testing.assert_almost_equal(eta2, a)
 
+    @IMP.test.skip
     def test_get_ulog_score__j_values(self):
         d = 3
         xscale = 4.0

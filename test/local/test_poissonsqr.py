@@ -21,4 +21,4 @@ class Tests(td.PoissUnitTests):
 
 
 if __name__ == '__main__':
-    IMP.test.main()
+    IMP.test.main(verbosity=2)

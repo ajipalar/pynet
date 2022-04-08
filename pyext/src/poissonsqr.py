@@ -4,11 +4,12 @@ import jax.scipy as jsp
 import numpy as np
 from functools import partial
 from typing import Callable as f
-from typing import Protocol, Union
+from typing import Protocol, Sequence, Union
 from .typedefs import (
     Dimension,
     Index,
     JitFunc,
+    Array,
     ArraySquare,
     Array1d,
     uLogScore,
@@ -59,10 +60,16 @@ def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
     outshape = n - 1 if ndim == 1 else (nrows, ncols - 1)
 
     # case 1 i==0 -> remove 0th entry
-    start_indices = [1] if ndim == 1 else [0, 1]
-    limit_indices = [n] if ndim == 1 else [nrows, ncols]
+    start_indices0 = [1] if ndim == 1 else [0, 1]
+    limit_indices0 = [n] if ndim == 1 else [nrows, ncols]
     # copy entries from [1, n) to [0, n-1)
-    f0__j = lambda x: jax.lax.slice(x, start_indices, limit_indices)
+
+    def f0__s(x: Array, s: Sequence[int], l: Sequence[int]):
+        return jax.lax.slice(x, s, l)
+    f0__j = partial(f0__s, s=start_indices0, l=limit_indices0)
+    del f0__s
+    del start_indices0
+    del limit_indices0
 
     # case 2 0<i<n
     if ndim == 1:
@@ -93,9 +100,15 @@ def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
             return o
 
     # case 3 i==n
-    start_indices = [0] if ndim == 1 else [0, 0]
-    limit_indices = [n - 1] if ndim == 1 else [nrows, ncols - 1]
-    fn__j = lambda x: jax.lax.slice(x, start_indices, limit_indices)
+    start_indicesn = [0] if ndim == 1 else [0, 0]
+    limit_indicesn = [n - 1] if ndim == 1 else [nrows, ncols - 1]
+    def fn__s(x, s: Sequence[int], l: Sequence[int]):
+        return jax.lax.slice(x, s, l)
+    fn__j = partial(fn__s, s=start_indicesn, l=limit_indicesn)
+
+    del fn__s
+    del start_indicesn
+    del limit_indicesn
 
     # branch2__j = branch2__s(arr_l, zf__s=zf__s, i_eq_arr_l__j=ieqarr__j)
 
@@ -135,7 +148,7 @@ def get_eta2__s(theta: Array1d, phi: ArraySquare, x: Array1d):
 
     def get_eta2__j(theta: Array1d, phi: ArraySquare, x: Array1d, i: Index):
                #         sa em                      mm           
-        return theta[i] + 2 * rm_i__j(phi[:, i], i) @ jnp.sqrt(rm_i__j(x, i))
+        return theta[i] + 2 * (rm_i__j(phi[:, i], i) @ jnp.sqrt(rm_i__j(x, i)))
 
     return get_eta2__j
 
