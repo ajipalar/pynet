@@ -191,7 +191,6 @@ class PoissUnitTests(IMP.test.TestCase):
         # assert x.dtype == np.float32
         get_ulog_score__j_is_jittable(theta, phi, x, self.src)
 
-    @IMP.test.skip
     def test_logfactorial(self):
 
         factorial = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800]
@@ -200,21 +199,72 @@ class PoissUnitTests(IMP.test.TestCase):
             logfaci = self.src.logfactorial(i)
             np.testing.assert_almost_equal(lf, logfaci, decimal=self.decimal)
 
-    @IMP.test.skip
     def test_get_eta2__j(self):
         precision = 5
         n = 4
         d = 4
         X, theta, phi = helper_init_state(self.key, n, d)
 
+        del n
+
+        assert len(theta) == len(phi) == d
+
         x = X[:, 1]
         get_eta2__j = self.src.get_eta2__s(theta, phi, x)
         jf = jax.jit(get_eta2__j)
         jf(theta, phi, x, 0).block_until_ready()
 
-        for i in range(len(theta)):
-            a = get_eta2__j(theta, phi, x, i)
+        del X
+        
+        # i == 0
+        a = np.array(get_eta2__j(theta, phi, x, 0))
+        b = theta[0] + 2 * (phi[:, 0][1:d] @ jnp.sqrt(x[1:d]))
+        b = np.array(b)
+        np.testing.assert_almost_equal(a, b, decimal=precision)
+
+        
+        del a
+        del b
+
+        for i in range(1, d-1):
+            tmp = np.zeros(d-1)
+            tmp[0:i] = phi[0:i, i]
+            tmp[i:d-1] = phi[i+1:d, i]
+            b = tmp
+
+            tmp = np.zeros(d-1)
+            tmp[0:i] = x[0:i]
+            tmp[i:d-1] = x[i+1:d]
+            tmp = np.sqrt(tmp)
+
+            a = np.array(get_eta2__j(theta, phi, x, i))
+            b = np.array(theta[i]) + 2 * (b @ tmp)
             np.testing.assert_almost_equal(a, b, decimal=precision)
+
+            del tmp
+            del a 
+            del b
+            del i
+
+        # i == d-1
+        a = np.array(get_eta2__j(theta, phi, x, d-1))
+        tmp = phi[0:d-1, d-1]
+        b = tmp
+        tmp = jnp.sqrt(x[0:d-1])
+        b = theta[d-1] + 2 * (b @ tmp)
+        b = np.array(b)
+        np.testing.assert_almost_equal(a, b, decimal=precision)
+
+        del a
+        del b
+        del tmp
+        del precision
+        del d
+        del theta
+        del phi
+        del jf
+        del get_eta2__j
+
 
     def test_get_eta2__j_values(self):
         d = 3
@@ -233,7 +283,6 @@ class PoissUnitTests(IMP.test.TestCase):
         eta2 = t1 + t2
         np.testing.assert_almost_equal(eta2, a)
 
-    @IMP.test.skip
     def test_get_ulog_score__j_values(self):
         d = 3
         xscale = 4.0
