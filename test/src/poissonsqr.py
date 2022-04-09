@@ -146,21 +146,59 @@ def helper_init_state(key, n, d):
     phi = jax.random.normal(k3, shape=[d, d])
     return X, theta, phi
 
-def get_eta2__j_values(src: Module, d=3):
-    xscale = 4.0
-    thetascale = 1.0
-    phiscale = 1.0
+def get_eta2__j_values(
+        src: Module, 
+        d=3,
+        xscale=4.,
+        thetascale=1.,
+        phiscale=1.):
+
+    result = (np.ones(d-1) * phiscale) @ (np.sqrt(np.ones(d-1) * xscale))
+
+    x = np.ones(d, dtype=jnp.int32) * xscale
+    theta = np.ones(d) * thetascale
+    phi = np.ones((d, d)) * phiscale
+
+    get_eta2__j = src.get_eta2__s(theta, phi, x)
+
+    a = np.array(get_eta2__j(theta, phi, x, 0))
+    t1: float  = thetascale
+    t2: float  = 2 * (result)
+    eta2 = t1 + t2
+    eta2 = np.array(eta2)
+    np.testing.assert_almost_equal(eta2, a)
+
+def get_ulog_score__j_values(
+        src: Module,
+        decimal: int,
+        d = 3,
+        xscale = 4.0,
+        thetascale = 1.0,
+        phiscale = 1.0,
+        test_dtype=jnp.int32):
+
     x = jnp.ones(d, dtype=jnp.int32) * xscale
     theta = jnp.ones(d) * thetascale
     phi = jnp.ones((d, d)) * phiscale
 
-    get_eta2__j = src.get_eta2__s(theta, phi, x)
+    # i = 0
+    # phi[i, i] * x[i]
+    t1 = phiscale * xscale
+    # theta[i] + 2 * rm_i(phi[:, i], i) @ jnp.sqrt(rm_i(x, i))
+    t2 = (thetascale + 2 * ((np.ones(d-1) * phiscale) @ (np.sqrt(np.ones(d-1) * xscale)))) * np.sqrt(xscale)
+    t3 = np.log(4 * 3 * 2 * 1)
 
-    a = get_eta2__j(theta, phi, x, 0)
-    t1 = thetascale
-    t2 = 2 * (6.0)
-    eta2 = t1 + t2
-    np.testing.assert_almost_equal(eta2, a)
+    a = t1 + t2 - t3
+
+    assert theta.shape == (d,)
+    assert phi.shape == (d, d)
+    assert x.shape == (d,)
+
+    get_ulog_score__j = src.get_ulog_score__s(theta, phi, x)
+    b = get_ulog_score__j(theta, phi, x, 0)
+    a = np.array(a)
+    b = np.array(b)
+    np.testing.assert_almost_equal(a, b, decimal=decimal)
 
 
 class PoissUnitTests(IMP.test.TestCase):
@@ -289,25 +327,8 @@ class PoissUnitTests(IMP.test.TestCase):
         get_eta2__j_values(d=4, src=self.src)
 
     def test_get_ulog_score__j_values(self):
-        d = 3
-        xscale = 4.0
-        thetascale = 1.0
-        phiscale = 1.0
-        x = jnp.ones(d, dtype=jnp.int32) * xscale
-        theta = jnp.ones(d) * thetascale
-        phi = jnp.ones((d, d)) * phiscale
-
-        # i = 0
-        # phi[i, i] * x[i]
-        t1 = phiscale * xscale
-        # theta[i] + 2 * rm_i(phi[:, i], i) @ jnp.sqrt(rm_i(x, i))
-        t2 = (thetascale + 2 * 6.0) * jnp.sqrt(xscale)
-        t3 = jnp.log(4 * 3 * 2 * 1)
-
-        a = t1 + t2 - t3
-        get_ulog_score__j = self.src.get_ulog_score__s(theta, phi, x)
-        b = get_ulog_score__j(theta, phi, x, 0)
-        np.testing.assert_almost_equal(a, b)
+        DECIMALS=5
+        get_ulog_score__j_values(src=self.src, decimal=DECIMALS)
 
 
 class IsMatrixCompatible(IMP.test.TestCase):
