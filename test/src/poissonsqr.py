@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import jax.random
 from jax import jit
 import numpy as np
-from hypothesis import given, strategies as st
+from hypothesis import given, settings, strategies as st
 from typing import Any
 from functools import partial
 import collections
@@ -99,16 +99,6 @@ def remove_ith_entry__s_vs_value(src: Module, d1=100, d2=10):
             ref1 = a1d[0 : d1 - 1]
             pred1 = a1d_min_i
             np.testing.assert_almost_equal(ref1, pred1)
-
-    del d1
-    del j1d
-    del a1d
-    del a1d_min_i
-    del ref1
-    del ref2
-    del pred
-    del pred1
-    del pred2
 
     for i in range(d2):
         a2d_min_i = np.array(j2d(a2d, i))
@@ -336,3 +326,9 @@ class IsMatrixCompatible(IMP.test.TestCase):
 
 class PoissPropTests(IMP.test.TestCase):
     """Base class for Poisson SQR Property tests"""
+    @given(st.integers(min_value=2, max_value=13), st.integers(min_value=2, max_value=13))
+    @settings(deadline=None)
+    def test_remove_ith_entry__s_vs_value(self, d1: int, d2: int):
+        remove_ith_entry__s_vs_value(src=self.src, d1=d1, d2=d2)
+
+

@@ -171,3 +171,40 @@ def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
     get_ulog_score__j = partial(get_ulog_score__j, logfacx=logfacx)
 
     return get_ulog_score__j
+
+# Functions for AIS sampling of the Poisson SQR Model
+
+
+# Base Exponentail Closed Form Solution
+
+def csqrt(z: complex) -> complex:
+    """Take the complex root of x"""
+    return jnp.sqrt(z)
+
+def ccubed(z: complex) -> complex:
+    return z**3
+
+def base_exp_z__s(d: Dimension) -> JitFunc:
+    phi_shape = (d, d)
+    theta_shape = (d,)
+    x_shape = (d,)
+
+    def get_z_base_exp(theta, phi, i, get_eta2__j):
+        # phi[i, i] != 0
+        a = (-) / (4 * phi[i, i])
+        b = (-eta2) / (2 * jnp.sqrt(-phi[i,i]))
+        return (
+          jnp.sqrt(jnp.pi) * jnp.exp(a) * (1 - erf(b))/(-2 * (jnp.sqrt((-phi[i, i])**3))) - 1/phi[i, i]
+        )
+
+
+
+def ais__s(d: Dimension) -> JitFunc:
+    ...
+
+    phi_shape = (d, d)
+    theta_shape = (d,)
+    x_shape = (d,)
+
+    
+
