@@ -66,6 +66,7 @@ def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
 
     def f0__s(x: Array, s: Sequence[int], l: Sequence[int]):
         return jax.lax.slice(x, s, l)
+
     f0__j = partial(f0__s, s=start_indices0, l=limit_indices0)
     del f0__s
     del start_indices0
@@ -102,8 +103,10 @@ def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
     # case 3 i==n
     start_indicesn = [0] if ndim == 1 else [0, 0]
     limit_indicesn = [n - 1] if ndim == 1 else [nrows, ncols - 1]
+
     def fn__s(x, s: Sequence[int], l: Sequence[int]):
         return jax.lax.slice(x, s, l)
+
     fn__j = partial(fn__s, s=start_indicesn, l=limit_indicesn)
 
     del fn__s
@@ -147,7 +150,7 @@ def get_eta2__s(theta: Array1d, phi: ArraySquare, x: Array1d):
     rm_i__j = remove_ith_entry__s(theta)
 
     def get_eta2__j(theta: Array1d, phi: ArraySquare, x: Array1d, i: Index):
-               #         sa em                      mm           
+        #         sa em                      mm
         return theta[i] + 2 * (rm_i__j(phi[:, i], i) @ jnp.sqrt(rm_i__j(x, i)))
 
     return get_eta2__j

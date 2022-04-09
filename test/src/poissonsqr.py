@@ -146,14 +146,10 @@ def helper_init_state(key, n, d):
     phi = jax.random.normal(k3, shape=[d, d])
     return X, theta, phi
 
-def get_eta2__j_values(
-        src: Module, 
-        d=3,
-        xscale=4.,
-        thetascale=1.,
-        phiscale=1.):
 
-    result = (np.ones(d-1) * phiscale) @ (np.sqrt(np.ones(d-1) * xscale))
+def get_eta2__j_values(src: Module, d=3, xscale=4.0, thetascale=1.0, phiscale=1.0):
+
+    result = (np.ones(d - 1) * phiscale) @ (np.sqrt(np.ones(d - 1) * xscale))
 
     x = np.ones(d, dtype=jnp.int32) * xscale
     theta = np.ones(d) * thetascale
@@ -162,20 +158,22 @@ def get_eta2__j_values(
     get_eta2__j = src.get_eta2__s(theta, phi, x)
 
     a = np.array(get_eta2__j(theta, phi, x, 0))
-    t1: float  = thetascale
-    t2: float  = 2 * (result)
+    t1: float = thetascale
+    t2: float = 2 * (result)
     eta2 = t1 + t2
     eta2 = np.array(eta2)
     np.testing.assert_almost_equal(eta2, a)
 
+
 def get_ulog_score__j_values(
-        src: Module,
-        decimal: int,
-        d = 3,
-        xscale = 4.0,
-        thetascale = 1.0,
-        phiscale = 1.0,
-        test_dtype=jnp.int32):
+    src: Module,
+    decimal: int,
+    d=3,
+    xscale=4.0,
+    thetascale=1.0,
+    phiscale=1.0,
+    test_dtype=jnp.int32,
+):
 
     x = jnp.ones(d, dtype=jnp.int32) * xscale
     theta = jnp.ones(d) * thetascale
@@ -185,7 +183,10 @@ def get_ulog_score__j_values(
     # phi[i, i] * x[i]
     t1 = phiscale * xscale
     # theta[i] + 2 * rm_i(phi[:, i], i) @ jnp.sqrt(rm_i(x, i))
-    t2 = (thetascale + 2 * ((np.ones(d-1) * phiscale) @ (np.sqrt(np.ones(d-1) * xscale)))) * np.sqrt(xscale)
+    t2 = (
+        thetascale
+        + 2 * ((np.ones(d - 1) * phiscale) @ (np.sqrt(np.ones(d - 1) * xscale)))
+    ) * np.sqrt(xscale)
     t3 = np.log(4 * 3 * 2 * 1)
 
     a = t1 + t2 - t3
@@ -269,26 +270,25 @@ class PoissUnitTests(IMP.test.TestCase):
         jf(theta, phi, x, 0).block_until_ready()
 
         del X
-        
+
         # i == 0
         a = np.array(get_eta2__j(theta, phi, x, 0))
         b = theta[0] + 2 * (phi[:, 0][1:d] @ jnp.sqrt(x[1:d]))
         b = np.array(b)
         np.testing.assert_almost_equal(a, b, decimal=precision)
 
-        
         del a
         del b
 
-        for i in range(1, d-1):
-            tmp = np.zeros(d-1)
+        for i in range(1, d - 1):
+            tmp = np.zeros(d - 1)
             tmp[0:i] = phi[0:i, i]
-            tmp[i:d-1] = phi[i+1:d, i]
+            tmp[i : d - 1] = phi[i + 1 : d, i]
             b = tmp
 
-            tmp = np.zeros(d-1)
+            tmp = np.zeros(d - 1)
             tmp[0:i] = x[0:i]
-            tmp[i:d-1] = x[i+1:d]
+            tmp[i : d - 1] = x[i + 1 : d]
             tmp = np.sqrt(tmp)
 
             a = np.array(get_eta2__j(theta, phi, x, i))
@@ -296,16 +296,16 @@ class PoissUnitTests(IMP.test.TestCase):
             np.testing.assert_almost_equal(a, b, decimal=precision)
 
             del tmp
-            del a 
+            del a
             del b
             del i
 
         # i == d-1
-        a = np.array(get_eta2__j(theta, phi, x, d-1))
-        tmp = phi[0:d-1, d-1]
+        a = np.array(get_eta2__j(theta, phi, x, d - 1))
+        tmp = phi[0 : d - 1, d - 1]
         b = tmp
-        tmp = jnp.sqrt(x[0:d-1])
-        b = theta[d-1] + 2 * (b @ tmp)
+        tmp = jnp.sqrt(x[0 : d - 1])
+        b = theta[d - 1] + 2 * (b @ tmp)
         b = np.array(b)
         np.testing.assert_almost_equal(a, b, decimal=precision)
 
@@ -319,7 +319,6 @@ class PoissUnitTests(IMP.test.TestCase):
         del jf
         del get_eta2__j
 
-
     def test_get_eta2__j_values(self):
         get_eta2__j_values(src=self.src)
 
@@ -327,7 +326,7 @@ class PoissUnitTests(IMP.test.TestCase):
         get_eta2__j_values(d=4, src=self.src)
 
     def test_get_ulog_score__j_values(self):
-        DECIMALS=5
+        DECIMALS = 5
         get_ulog_score__j_values(src=self.src, decimal=DECIMALS)
 
 

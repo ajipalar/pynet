@@ -8,17 +8,19 @@ import collections
 from ..src import poissonsqr as td
 import pyext.src.poissonsqr as src_module
 
+
 class Tests(td.PoissUnitTests):
     """Derived class for Poisson SQR Model unit tests"""
+
     src = src_module
-    rtol=1e-5
-    atol=1e-5
+    rtol = 1e-5
+    atol = 1e-5
     decimal = 7
 
-    kwds = collections.namedtuple(
-            'KWDS', ['rtol', 'atol', 'decimal'])(rtol, atol, decimal)
+    kwds = collections.namedtuple("KWDS", ["rtol", "atol", "decimal"])(
+        rtol, atol, decimal
+    )
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     IMP.test.main(verbosity=2)
