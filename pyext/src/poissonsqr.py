@@ -191,7 +191,7 @@ def base_exp_z__s(d: Dimension) -> JitFunc:
 
     def get_z_base_exp(theta, phi, i, get_eta2__j):
         # phi[i, i] != 0
-        a = (-) / (4 * phi[i, i])
+        a = (-1) / (4 * phi[i, i])
         b = (-eta2) / (2 * jnp.sqrt(-phi[i,i]))
         return (
           jnp.sqrt(jnp.pi) * jnp.exp(a) * (1 - erf(b))/(-2 * (jnp.sqrt((-phi[i, i])**3))) - 1/phi[i, i]
