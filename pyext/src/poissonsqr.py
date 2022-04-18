@@ -172,22 +172,94 @@ def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
 
     return get_ulog_score__j
 
+
 # Functions for AIS sampling of the Poisson SQR Model
 
 
-# Base Exponentail Closed Form Solution
+# Base Exponential Closed Form Solution
+# Not jittable, implemented in scipy
+# Solution -> precompute and feed in as array
 
-def csqrt(z: complex) -> complex:
-    """Take the complex root of x"""
-    return jnp.sqrt(z)
 
-def ccubed(z: complex) -> complex:
-    return z**3
+def erf_taylor_approx__s(nmax: int):
+    """A jax implementation of the error function erf using the Maclaurin seriess
+    see https://wikipedia.org/wiki/Error_function
 
-def base_exp_z__s(d: Dimension) -> JitFunc:
-    phi_shape = (d, d)
-    theta_shape = (d,)
-    x_shape = (d,)
+    the imaginary error function erfi = -i * erf (i * z)
+    """
+
+    def erf_taylor_approx__j(z, nmax, facn):
+        a = 2.0 / (jnp.sqrt(jnp.pi))
+        b = 0.0
+        for n in range(0, n):
+            b += ((-1) ** n) * (z ** (2 * n + 1)) / (facn[n] * (2 * n + 1))
+
+        return a * b
+
+    logfactable = get_logfacx_lookuptable(nmax)
+    facn = jnp.exp(logfactable)
+    return erf_taylor_approx__j
+
+
+def erf_maclaurin_approximation__s(nmax):
+    def inner_logsum__s(z, n):
+        logb = 0
+        for k in range(1, n):
+            logb += (2 * jnp.log(-z)) - jnp.log(k)
+        return logb
+
+    def mac__s(z, n):
+        a = z / (2 * n + 1)
+        b = inner_logsum__s(z, n)
+        b = jnp.exp(b)
+        return a * b
+
+    partial_funcs = []
+    for n in range(0, nmax):
+        f = partial(mac__s, n=n)
+        partial_funcs.append(f)
+
+    def erf_mac_approx__s(z, nmax, partial_funcs):
+        a = 2 / jnp.sqrt(jnp.pi)
+        b = z
+
+        for n in range(0, nmax):
+            b += partial_funcs[n](z)
+
+        return a * b
+
+    erf_mac_approx__j = partial(
+        erf_mac_approx__s, nmax=nmax, partial_funcs=partial_funcs
+    )
+    return erf_mac_approx__j
+
+
+def erf(z: complex):
+    """A jax implementation of the error function based on the 1993 Sun Microsystems
+    erf approximation used in s_erf.c. Original Copyright (C)
+
+     @(#)s_erf.c 1.3 95/01/18 */
+
+     ====================================================
+     Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+
+     Developed at SunSoft, a Sun Microsystems, Inc. business.
+     Permission to use, copy, modify, and distribute this
+     software is freely granted, provided that this notice
+     is preserved.
+     ====================================================
+
+    """
+
+
+"""
+def base_exp_z(eta1: complex, eta2: complex) -> float: 
+
+    a = jnp.sqrt(jnp.pi) * eta1
+    b = jnp.exp( -eta2**2 / (4 * eta1))
+    arg = -eta2 / (2 * jnp.sqrt(-eta1)) # Must be complex! no check
+    c = sp.special.erfc(arg) # not jittable
+    
 
     def get_z_base_exp(theta, phi, i, get_eta2__j):
         # phi[i, i] != 0
@@ -196,15 +268,70 @@ def base_exp_z__s(d: Dimension) -> JitFunc:
         return (
           jnp.sqrt(jnp.pi) * jnp.exp(a) * (1 - erf(b))/(-2 * (jnp.sqrt((-phi[i, i])**3))) - 1/phi[i, i]
         )
+"""
 
 
+def T1_nsteps_mh__s(f: Callable, nsteps: int, d: Dimension):
+    def T1_nsteps_mh__j(
+        key: PRNGKey,
+        theta: Array1d,
+        phi: ArraySquare,
+        f: Callable,
+        nsteps: int,
+        d: Dimension,
+    ):
+        for t in range(nsteps):
 
-def ais__s(d: Dimension) -> JitFunc:
-    ...
+            theta_prime = theta + jax.random.normal(keys[1], (d,))
+            phi_prime = phi + jax.random.normal(keys[2], (d, d))
 
-    phi_shape = (d, d)
-    theta_shape = (d,)
-    x_shape = (d,)
+            a = f(theta_prime, phi_prime) / f(theta, phi)
 
-    
+            rn = jax.random.uniform(keys[3])
 
+            theta, phi = jax.lax.cond(
+                rn < a, (lambda: theta_prime, phi_prime), (lambda: theta, phi)
+            )
+        return theta, phi
+
+
+def ais__s(
+    d: Dimension, nsamples: int, ninterpol: int, T: Callable, scoref: Callable
+) -> JitFunc:
+    def ais__j(
+        key: PRNGKey, d: Dimension, nsamples: int, ninterpol: int, T: Callable
+    ) -> tuple[Array]:
+
+        phi_shape = (d, d)
+        theta_shape = (d,)
+        x_shape = (d,)
+
+        samples = jnp.zeros(nsamples)
+        weights = jnp.zeros(nsamples)
+
+        gammas = jnp.arange(ninterpol)
+
+        keys = jnp.zeros((ninterpol + 1, 2), dtype=jnp.uint32)
+        keys = keys.at[0].set(key)
+
+        for i in range(0, nsamples):
+
+            keys = jax.random.split(keys[0], num=ninterpol + 1)
+
+            # Generate an array from a random exponential distribution
+
+            x = jax.random.exponential(
+                keys[1], shape=[d]
+            )  # Generate a sample from pn, random exp
+
+            for j in range(1, ninterpol):
+                # Sample from the transition distribution
+
+                theta, phi = T(keys[j + 1], x)
+
+            samples = samples.at[i].set(x)
+
+        return samples, weights
+
+    ais__j = partial(ais__j, d=d, nsamples=nsamples, ninterpol=ninterpol, T=T)
+    return ais__j
