@@ -1,3 +1,7 @@
+"""
+Tests for the poisson sqr module in pyext/src/poissonsqr
+"""
+
 from __future__ import print_function
 import IMP
 import IMP.test
@@ -13,6 +17,7 @@ import collections
 import scipy as sp
 
 Module = Any
+
 
 
 def dev_remove_ith_entry__s(a, src: Module):
