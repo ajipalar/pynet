@@ -3,10 +3,11 @@ from typing import Any
 import IMP.test
 
 Module = Any
+
+
 class BaseExample(IMP.test.TestCase):
     m: Module = NullModule
-    def test_example_testdef(self): 
-        x = 2.
+
+    def test_example_testdef(self):
+        x = 2.0
         td.example_testdef(x, self.m)
-
-

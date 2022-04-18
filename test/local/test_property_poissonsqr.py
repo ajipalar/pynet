@@ -3,12 +3,13 @@ import IMP.test
 import IMP.algebra
 import os
 import math
+import collections
 
-from .src import poissonsqr as td
-import IMP.pynet.poissonsqr as src_module
+from ..src import poissonsqr as td
+import pyext.src.poissonsqr as src_module
 
 
-class Tests(td.PoissUnitTests):
+class Tests(td.PoissPropTests):
     """Derived class for Poisson SQR Model unit tests"""
 
     src = src_module
@@ -22,4 +23,4 @@ class Tests(td.PoissUnitTests):
 
 
 if __name__ == "__main__":
-    IMP.test.main()
+    IMP.test.main(verbosity=2)

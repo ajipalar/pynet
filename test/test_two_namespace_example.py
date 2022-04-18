@@ -1,5 +1,6 @@
+import IMP
 import IMP.test
-from test.src.casedef_two_namespace_example import BaseExample
+from ..casedefs.test_two_namespace_example import BaseExample
 
 import pyext.src.distributions as dist
 

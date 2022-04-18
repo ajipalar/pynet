@@ -1,4 +1,5 @@
 import IMP
+
 model = IMP.Model()
 particle_0 = model.add_particle("my first particle")
 string_key = IMP.StringKey("my first data")

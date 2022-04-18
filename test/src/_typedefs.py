@@ -1,4 +1,4 @@
-#import graph_tool as gt
+# import graph_tool as gt
 from pathlib import Path
 from typing import (
     Any,
@@ -11,45 +11,44 @@ from typing import (
     Tuple,
     TypeAlias,
     TypeVar,
-    Union
+    Union,
 )
 
 import jax._src.prng as prng
 from jax._src.device_array import DeviceArray as DeviceArray
 
-T = TypeVar('T')
-T_co = TypeVar('T_co', covariant=True) 
-T_contra = TypeVar('T_contra', contravariant=True)
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
 
 
 # Paths
-AnyPath = NewType('AnyPath', Path)
-DirPath = NewType('DirPath', Path)
-FilePath = NewType('FilePath', Path)
-PlainTextDataPath = NewType('PlainTextDataPath', FilePath)
-TsvPath = NewType('TsvPath', PlainTextDataPath)
+AnyPath = NewType("AnyPath", Path)
+DirPath = NewType("DirPath", Path)
+FilePath = NewType("FilePath", Path)
+PlainTextDataPath = NewType("PlainTextDataPath", FilePath)
+TsvPath = NewType("TsvPath", PlainTextDataPath)
 
-# Pandas 
+# Pandas
 Series = Any
-AnyCol = NewType('AnyCol', str)
-PGGroupCol = NewType('PGGroupCol', AnyCol)
-ColName = NewType('ColName', str)
-
+AnyCol = NewType("AnyCol", str)
+PGGroupCol = NewType("PGGroupCol", AnyCol)
+ColName = NewType("ColName", str)
 
 
 # str Data Types (entries in the excel sheets)
-Bait = NewType('Bait', str)
-ExcelEntry = NewType('ExcelEntry', str)
-Organism = NewType('Organism', str)
-UID = NewType('UID', str)  # UniProtID
-PreyUID = NewType('PreyUID', UID)
-ProteinName = NewType('ProteinName', str)
-GeneID = NewType('GeneID', str)  # NCBI Entrez Gene identifier
+Bait = NewType("Bait", str)
+ExcelEntry = NewType("ExcelEntry", str)
+Organism = NewType("Organism", str)
+UID = NewType("UID", str)  # UniProtID
+PreyUID = NewType("PreyUID", UID)
+ProteinName = NewType("ProteinName", str)
+GeneID = NewType("GeneID", str)  # NCBI Entrez Gene identifier
 
-#Other Types
+# Other Types
 
 # Graph types
-#G = NewType('G', gt.Graph)
+# G = NewType('G', gt.Graph)
 
 # Functions
 
@@ -67,9 +66,9 @@ GeneID = NewType('GeneID', str)  # NCBI Entrez Gene identifier
 # lpi:  log posterior
 # -ll   negative log likelihood
 # -lp   negative log prior
-# 
+#
 
-R = TypeVar('R')
+R = TypeVar("R")
 
 # jax related
 Array = Any
@@ -80,17 +79,17 @@ DTypeLikeInt = Any
 DTypeLikeFloat = Any
 PRNGKeyArray = prng.PRNGKeyArray  # Change this to prng.PRNGKeyArray
 KeyArray = Any
-Index = NewType('Index', int)
+Index = NewType("Index", int)
 
-Dimension = NewType('Dimension', int)
+Dimension = NewType("Dimension", int)
 
 # More number types to increase readibility
 
-RV = float # random variate
+RV = float  # random variate
 fParam = float
 iParam = int
 Prob = float  # if x : Prob 0 <= x <= 1
-lProb = float # if x : lProb -inf < x <=0
+lProb = float  # if x : lProb -inf < x <=0
 
 
 UINT_DTYPES = Any  # TODO prng.UINT_DTYPES
@@ -99,20 +98,20 @@ UINT_DTYPES = Any  # TODO prng.UINT_DTYPES
 # Math related
 Number: TypeAlias = int | float | complex
 
-#Number = NewType('Number', Union[int, float, complex])
-PRNGKey = NewType('PRNGKey', Tuple[int, int])
-Vector = NewType('Vector', Sequence[Number])
-Matrix = NewType('Matrix', Sequence[Sequence[Number]])
-CartesianTable = NewType('CartesianTable', Matrix)
+# Number = NewType('Number', Union[int, float, complex])
+PRNGKey = NewType("PRNGKey", Tuple[int, int])
+Vector = NewType("Vector", Sequence[Number])
+Matrix = NewType("Matrix", Sequence[Sequence[Number]])
+CartesianTable = NewType("CartesianTable", Matrix)
 
 # Generic types
-State = NewType('State', object)
-Output = NewType('Output', object)
+State = NewType("State", object)
+Output = NewType("Output", object)
 
 # MCMC related
-Samples = NewType('Samples', DeviceArray)
-Weights = NewType('Weights', DeviceArray)  # AIS weights
-LogWeights = NewType('LogWeights', DeviceArray)  # AIS natural log w
+Samples = NewType("Samples", DeviceArray)
+Weights = NewType("Weights", DeviceArray)  # AIS weights
+LogWeights = NewType("LogWeights", DeviceArray)  # AIS natural log w
 
 JitFunc = Any
 PartialF = Any

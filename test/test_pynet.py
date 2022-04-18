@@ -1,6 +1,7 @@
 from __future__ import print_function
 import IMP.test
 import IMP.algebra
+
 try:
     import IMP.pynet
 except ModuleNotFoundError:
@@ -8,6 +9,7 @@ except ModuleNotFoundError:
 import io
 import os
 import math
+
 
 class Tests(IMP.test.TestCase):
     module = IMP.pynet
@@ -26,8 +28,6 @@ class Tests(IMP.test.TestCase):
         words = []
         self.assertClassNames(self.module, exceptions, words)
 
-    
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     IMP.test.main()

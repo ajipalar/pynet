@@ -7,7 +7,7 @@ import jax.random
 from jax import jit
 import numpy as np
 from hypothesis import given, settings, strategies as st
-from typing import Any
+from typing import Any, Callable
 from functools import partial
 import collections
 import scipy as sp
@@ -202,13 +202,29 @@ def erf_taylor_approx__j(z: complex, src: Module):
     b = np.array(erf_taylor_approx__j)
 
 
-def T1_nsteps_mh__s_normal(key, mu: float, sigma: float, nsteps: int, src: Module):
+def T1_nsteps_mh__s_normal(key, nsteps: int, d: int, src: Module, theta, phi):
+    """Test the n-steps Metropolis Hastings algorithm using the univariate normal distribution"""
 
-    f = jsp.stats.norm.pdf(loc=mu, scale=sigma)
-    T__j = src.T1_nsteps_mh__s(f=f, nsteps=nsteps)
+    def scoref(theta, phi):
+        return theta @ phi[:, 0]
+
+    T__j = src.T1_nsteps_mh__s(f=scoref, nsteps=nsteps, d=d)
     jT = jax.jit(T__j)
 
-    
+    theta, phi = jT(key=key, theta=theta, phi=phi)
+
+    assert theta.shape == (d,)
+    assert phi.shape == (d, d)
+
+
+def ais__s(
+    key, d, nsamples: int, ninterpol: int, T: Callable, scoref: Callable, src: Module
+):
+    f = src.ais__s
+
+    ais__j = f(d, nsamples, ninterpol, T, scoref)
+    ais = jax.jit(ais__j)
+    ais(key)
 
 
 class PoissUnitTests(IMP.test.TestCase):
@@ -337,6 +353,28 @@ class PoissUnitTests(IMP.test.TestCase):
     def test_get_ulog_score__j_values(self):
         DECIMALS = 5
         get_ulog_score__j_values(src=self.src, decimal=DECIMALS)
+
+    def test_T1_nsteps_mh__s_normal(self):
+        d = 2
+        nsteps = 4
+        theta = jnp.zeros(d).block_until_ready()
+        phi = jnp.zeros((d, d)).block_until_ready()
+        T1_nsteps_mh__s_normal(self.key, nsteps, d, self.src, theta, phi)
+        d = 3
+        theta = jnp.zeros(d).block_until_ready()
+        phi = jnp.zeros((d, d)).block_until_ready()
+        T1_nsteps_mh__s_normal(self.key, nsteps, d, self.src, theta, phi)
+
+    @IMP.test.skip
+    def test_ais__j_jittable(self):
+        d = 4
+        nsamples = 10
+        ninterpol = 5
+        T = lambda a, b: (a, b)
+        scoref = lambda x: x + 1
+        key = jax.random.PRNGKey(10)
+
+        ais__s(key, d, nsamples, ninterpol, T, scoref, self.src)
 
 
 class IsMatrixCompatible(IMP.test.TestCase):

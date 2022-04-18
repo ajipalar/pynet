@@ -4,6 +4,7 @@ import IMP.algebra
 import os
 import math
 import collections
+import jax
 
 from ..src import poissonsqr as td
 import pyext.src.poissonsqr as src_module
@@ -16,6 +17,8 @@ class Tests(td.PoissUnitTests):
     rtol = 1e-5
     atol = 1e-5
     decimal = 7
+    rseed = 13
+    key = jax.random.PRNGKey(rseed)
 
     kwds = collections.namedtuple("KWDS", ["rtol", "atol", "decimal"])(
         rtol, atol, decimal

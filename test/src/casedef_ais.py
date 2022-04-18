@@ -7,12 +7,13 @@ import jax
 import jax.numpy as jnp
 import math
 import numpy as np
-from functools import partial 
+from functools import partial
 from hypothesis import given, settings, strategies as st
 from . import ais as td
 
 
 deadline_ms = 2000
+
 
 class UnitTest1(IMP.test.TestCase):
     dist = None
@@ -21,10 +22,10 @@ class UnitTest1(IMP.test.TestCase):
     def test_testdef_get_trivial_model(self):
         td.testdef_get_trivial_model(12, 12, self.dist)
 
+
 class DevPropertyTrivial(IMP.test.TestCase):
-    dist = None # the base class should override this attribute
+    dist = None  # the base class should override this attribute
     ais = None
-    
 
     # Run functions once to jit compile
     def test_run_once(self):
@@ -32,16 +33,18 @@ class DevPropertyTrivial(IMP.test.TestCase):
         td.trivial_is_s_rv_jittable(1, 2, self.dist)
         td.trivial_is_T_jittable(1, 2, self.dist)
         td.trivial_is_get_log_score_jittable(1, 2, self.dist)
-        
 
-    @given(st.integers(min_value=1, max_value=2147483647), st.integers(min_value=1, max_value=2147483647))
+    @given(
+        st.integers(min_value=1, max_value=2147483647),
+        st.integers(min_value=1, max_value=2147483647),
+    )
     def test_trivial(self, n1, n2):
         td.trivial_is_get_invariants_jittable(n1, n2, self.dist)
-    
+
         td.trivial_is_s_rv_jittable(n1, n2, self.dist)
-    
+
         td.trivial_is_T_jittable(n1, n2, dist)
-    
+
         td.trivial_is_get_log_score_jittable(n1, n2, self.dist)
 
 
@@ -49,16 +52,15 @@ class DevTrivialAIS(IMP.test.TestCase):
     dist = None
     ais = None
 
-    n1=1
+    n1 = 1
     n8 = 8
     n64 = 64
-    n512 =512
-    n4k=4096
-    n32k=32768
+    n512 = 512
+    n4k = 4096
+    n32k = 32768
 
-    seed1=111
-    seed2=1234
-
+    seed1 = 111
+    seed2 = 1234
 
     def test_model_getter1(self):
         td.trivial_is_get_invariants_jittable(self.n1, self.n1, self.dist)
@@ -134,9 +136,9 @@ class DevTrivialAIS(IMP.test.TestCase):
 
     def test_specialized_model_to_sampling_trivial(self):
         td.specialize_model_to_sampling_trivial(
-            n_samples=8, n_inter=8, decimals=5, ais=self.ais, dist = self.dist)
+            n_samples=8, n_inter=8, decimals=5, ais=self.ais, dist=self.dist
+        )
 
-    
     def test_negative_sample_trivial(self):
         td.negative_sample_trivial(
             n_samples=self.n512,
@@ -144,7 +146,9 @@ class DevTrivialAIS(IMP.test.TestCase):
             rseed1=self.seed1,
             rseed2=self.seed2,
             ais=self.ais,
-            dist=self.dist)
+            dist=self.dist,
+        )
+
 
 class DevTrivialBetaDependantAIS(IMP.test.TestCase):
     dist = None
@@ -152,27 +156,22 @@ class DevTrivialBetaDependantAIS(IMP.test.TestCase):
     ...
 
 
-
-
 class DevTestAIS(IMP.test.TestCase):
-    """Test the various functions in the AIS module""" 
+    """Test the various functions in the AIS module"""
+
     dist = None
     ais = None
-    
 
     rtol = 1e-05
     atol = 1e-05
 
-    n_samples8=8
-    n_inter8=8
+    n_samples8 = 8
+    n_inter8 = 8
 
-    n_samples64=64
-    n_inter64=64
+    n_samples64 = 64
+    n_inter64 = 64
 
     dist = None
-
-
-
 
     @IMP.test.skip
     def test_sample(self):
@@ -181,4 +180,3 @@ class DevTestAIS(IMP.test.TestCase):
     @IMP.test.skip
     def test_nsteps_mh__g(self):
         td.nsteps_mh__g(mu=100, sigma=2, rseed=3)
-

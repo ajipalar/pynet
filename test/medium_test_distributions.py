@@ -1,4 +1,5 @@
 from __future__ import print_function
+
 try:
     pass
 except ModuleNotFoundError:
@@ -18,8 +19,8 @@ import io
 import os
 import math
 
-class TestPoisson(IMP.test.TestCase):
 
+class TestPoisson(IMP.test.TestCase):
     def test_p100(self):
         lam = 100
         p100 = dist.Poisson(lam)
@@ -45,12 +46,10 @@ class TestPoisson(IMP.test.TestCase):
         epsilon = 5
         av = jnp.mean(a_list)
         var = jnp.var(a_list)
-        print(f'mean {av}\nvar{var}')
+        print(f"mean {av}\nvar{var}")
 
         self.assertAlmostEqual(av, var, delta=5)
-        
-        
-        
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     IMP.test.main()
