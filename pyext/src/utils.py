@@ -2,22 +2,23 @@ import inspect
 from pathlib import Path
 import sys
 
-pynet_home = Path('.').absolute().parent
+pynet_home = Path(".").absolute().parent
 sys.path.append(str(pynet_home))
 
 from . import config
 
+
 def modparse(local_dict):
-    modname = local_dict['__name__']
+    modname = local_dict["__name__"]
     if "." in modname:
         modname = modname.split(".")[1]
-    packname = local_dict['__package__']
+    packname = local_dict["__package__"]
     return modname, packname
 
 
 def moduleinfo(local_dict):
     modname, packname = modparse(local_dict)
-    print(f'[Package, Module]: {packname} {modname}')
+    print(f"[Package, Module]: {packname} {modname}")
 
 
 def doc(x):
@@ -31,7 +32,7 @@ def psrc(x):
     print(inspect.getsource(x))
 
 
-def ls(p:Path):
+def ls(p: Path):
     for f in p.iterdir():
         print(str(f))
 

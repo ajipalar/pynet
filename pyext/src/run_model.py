@@ -1,14 +1,14 @@
-#Import modules
+# Import modules
 from __future__ import print_function
 import numpy as np
 import jax
 import jax.numpy as jnp
 
-#Load synthetic datasynthetic data
+# Load synthetic datasynthetic data
 synthetic_spec_counts_data = np.random.randint(0, 200, (300, 3))
 
 print(synthetic_spec_counts_data)
-#Set up model
+# Set up model
 def represent_network(n):
     """represent a network of n nodes."""
     return network
@@ -25,6 +25,8 @@ Restraint n applies to vertex set n
 
 None of the restraints need to know about any of the other restraints
 """
+
+
 def register_restraints():
     """
     Score Table:

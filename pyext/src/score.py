@@ -4,32 +4,37 @@
 # An Abstract interface for molecular networks
 
 from abc import ABC, abstractmethod
-#import graph_tool as gt #graph tool not supported in 3.10.1 env
 
-#from graph_tool.all import graph_draw
+# import graph_tool as gt #graph tool not supported in 3.10.1 env
+
+# from graph_tool.all import graph_draw
 import math
 import scipy
-#import inspect
-from itertools import combinations
-#import jax
-import jax.numpy as jnp
-#import json
-#import matplotlib
-#import matplotlib.pyplot as plt
-import numpy as np
-#from pathlib import Path, PosixPath
 
-#import pandas as pd
+# import inspect
+from itertools import combinations
+
+# import jax
+import jax.numpy as jnp
+
+# import json
+# import matplotlib
+# import matplotlib.pyplot as plt
+import numpy as np
+
+# from pathlib import Path, PosixPath
+
+# import pandas as pd
 # User
-#import pynetio as mio
-#from myitertools import exhaust, forp
-#import predicates as pred
+# import pynetio as mio
+# from myitertools import exhaust, forp
+# import predicates as pred
 from typing import List, Tuple
-#from utils import doc, ls, psrc
+
+# from utils import doc, ls, psrc
 
 
 class Network(ABC):
-
     @abstractmethod
     def deg(i):
         """Return the degree of vertex i"""
@@ -41,7 +46,6 @@ class Network(ABC):
 
 
 class AdjNetwork(Network):
-
     def __init__(self, n):
         self.n = n
         self.M = np.ndarray((n, n), dtype=int)
@@ -129,14 +133,14 @@ def get_graph_ordering(g) -> int:
 
     # The ordering algorithm
 
-    #Get the number of combinations for a given |E|
+    # Get the number of combinations for a given |E|
 
-    #m = mbase + order
+    # m = mbase + order
 
-    #Compute mbase
+    # Compute mbase
     mbase = 0
 
-    #Compute order
+    # Compute order
     order = 0
 
     return mbase + order
@@ -144,7 +148,7 @@ def get_graph_ordering(g) -> int:
 
 def get_graph_from_order(m, n):
     """For an m in [0, 2^(0.5n(n + 1)))
-       return the graph g_m
+    return the graph g_m
     """
     pass
 
@@ -168,7 +172,7 @@ def edge_combs(emax):
     Returns an edge combination generator
     The value is the number of combinations
     The index is the number of edges
-    
+
     e.g., index 0 1 2 3
           value 1 3 3 1
     """
@@ -180,17 +184,18 @@ def ne(gid, vmax):
     Returns the number of edges for a given gid & vmax
     """
     emax = femax(vmax)
-    
-    #The index of combs is the edge number
+
+    # The index of combs is the edge number
     combs = list(edge_combs(emax))
-    assert sum(combs) == 2**emax
-    
+    assert sum(combs) == 2 ** emax
+
     solutions = 0
     edges = 0
     while gid >= solutions:
         solutions += combs[edges]
-        edges +=1
+        edges += 1
     return edges - 1
+
 
 def base(nedges, vmax):
     """
@@ -201,6 +206,7 @@ def base(nedges, vmax):
     combs = list(edge_combs(emax))
     return sum(combs[0:nedges])
 
+
 def mantissa(gid, vmax):
     """
     returns the mantissa for gid, vmax
@@ -209,11 +215,13 @@ def mantissa(gid, vmax):
     b = base(ne(gid, vmax), vmax)
     return gid - b
 
+
 def next_vertex(i):
     """
     Count the next vertex, undefined over vmax
     """
     return i + 1
+
 
 def prev_vertex(i):
     """
@@ -221,29 +229,37 @@ def prev_vertex(i):
     """
     return i - 1
 
+
 def next_edge(e, vertex_n_max):
     """
     Return the next edge in the sequence
     """
-    if e[1] < vertex_n_max - 1: return (e[0], e[1] + 1)
-    else: return (e[0] + 1, e[0] + 2)
-    
+    if e[1] < vertex_n_max - 1:
+        return (e[0], e[1] + 1)
+    else:
+        return (e[0] + 1, e[0] + 2)
+
+
 def prev_edge(e, vmax):
     """
     Count the previous edge in the sequence
     """
-    #if e > first_e:
+    # if e > first_e:
     # (0, 2) -> (0, 1)
-    if e[1] > e[0] + 1: return (e[0], e[1] - 1)
+    if e[1] > e[0] + 1:
+        return (e[0], e[1] - 1)
     # (1, 2) -> (0, 3)
-    else: return (e[0] - 1, vmax - 1)
+    else:
+        return (e[0] - 1, vmax - 1)
+
 
 def generate_eseq(estart, vertex_n_max):
     yield estart
     while estart != (vertex_n_max - 2, vertex_n_max - 1):
         next_e = next_edge(estart, vertex_n_max)
         estart = next_e
-        yield estart   
+        yield estart
+
 
 def permutations(nitems):
     perms = []
@@ -252,6 +268,7 @@ def permutations(nitems):
             perms.append((i, j))
     return perms
 
+
 def generate_graph(gid, vmax):
     """
     Return an ordered elist from a graph id and n vertices
@@ -259,55 +276,58 @@ def generate_graph(gid, vmax):
     nedges = ne(gid, vmax)
     b = base(nedges, vmax)
     m = mantissa(gid, vmax)
-    
+
     if gid == 0:
         return []
     else:
         all_edges = list(generate_eseq((0, 1), vmax))
         combinations_iter = combinations(range(len(all_edges)), nedges)
-        
+
         for i, combo in enumerate(combinations_iter):
-            #print(i, combo)
+            # print(i, combo)
             if i == m:
                 eseq = []
-                #print(combo)
+                # print(combo)
                 for idx in combo:
                     eseq.append(all_edges[idx])
                 return eseq
 
+
 def ugraph_from_elist(elist: List[Tuple[int]]):
     """
-    elist: 
+    elist:
     """
     g = gt.Graph(directed=False)
     for edge in elist:
-        s=edge[0]
-        t=edge[1]
+        s = edge[0]
+        t = edge[1]
         g.add_edge(s, t)
     return g
 
 
 def test_next_prev(vmax):
     print("fEdges for vmax = {vmax}")
-    print(' e      next   prev   pne    npe   b')
+    print(" e      next   prev   pne    npe   b")
     for e in generate_eseq((0, 1), vmax):
         ne = next_edge(e, vmax)
         pe = prev_edge(e, vmax)
         pne = prev_edge(ne, vmax)
         npe = next_edge(pe, vmax)
         b = e == npe
-        
+
         print(e, ne, pe, pne, npe, b)
 
 
 class PoissonSQRGM:
-    """ An implementation of the Poisson Square root graphical model from David
-    Inoyue """
-    def __init__(self, 
-                 x,
-                 theta=None,
-                 phi=None,
-                 ):
+    """An implementation of the Poisson Square root graphical model from David
+    Inoyue"""
+
+    def __init__(
+        self,
+        x,
+        theta=None,
+        phi=None,
+    ):
         self.x = x
         self.sqrx = np.sqr(x)
         self.d = self.sqrx.shape[0]
@@ -324,20 +344,21 @@ class PoissonSQRGM:
 
     def node_term(self):
         pass
-        #return self.sqrx @ 
+        # return self.sqrx @
 
     def log_likelihood(self):
         pass
 
     def rPhi(d, key):
         """
-        Generate a random R^(d x d) where 
+        Generate a random R^(d x d) where
         the values are between -2, 2
         """
         a = jnp.random.uniform(key, shape=(d, d), minval=-2, maxval=2)
         a = (a + a.T) + 2
         return a
-    
+
+
 def stable_div(a, b):
     return np.exp(np.log(a) - np.log(b))
 
@@ -345,20 +366,20 @@ def stable_div(a, b):
 def normal_pdf(y, mu, sigma):
     base = np.sqrt(2 * np.pi) + sigma
     base = stable_div(1, base)
-    num = -(y - mu)** 2
-    den = 2 * sigma**2
+    num = -((y - mu) ** 2)
+    den = 2 * sigma ** 2
     exp = stable_div(num, den)
     return base * np.exp(exp)
 
 
 def parabola(x, mu, sigma):
-    return -(x - mu)**2 - 10    
+    return -((x - mu) ** 2) - 10
 
 
 def ull_normal(y, mu, sigma):
     n = len(y)
-    tau =  1 / sigma**2
-    return n / 2 * np.log(tau) - tau * (1 / 2) * np.sum((y - mu)**2)
+    tau = 1 / sigma ** 2
+    return n / 2 * np.log(tau) - tau * (1 / 2) * np.sum((y - mu) ** 2)
 
 
 def mode(x, y):

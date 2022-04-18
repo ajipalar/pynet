@@ -3,6 +3,7 @@ from typing import Any, Callable
 
 from .typedefs import Function, Parameters
 
+
 def parameters(f: Function):
     return signature(f).parameters
 

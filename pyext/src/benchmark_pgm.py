@@ -8,7 +8,7 @@ from .typedefs import (
     Matrix,
     PPINetwork,
     PRNGKey,
-    Vector
+    Vector,
 )
 
 
@@ -29,19 +29,18 @@ def get_ppi_network_from_complex(protein_complex) -> PPINetwork:
     return ppi_network
 
 
-def get_synth_apms_data(bait_prey: PPINetwork,
-                        prng_key: PRNGKey) -> Matrix:
+def get_synth_apms_data(bait_prey: PPINetwork, prng_key: PRNGKey) -> Matrix:
     """Use the prng_key to generate random APMS
-       spectral counts data
-       return a bait prey matrix
-        r1 r2 r3
-       0
-       1
-       2
+    spectral counts data
+    return a bait prey matrix
+     r1 r2 r3
+    0
+    1
+    2
 
-       The index is the bait index
-       The prey is bait is unknwon
-       The calling function is responsible for that
+    The index is the bait index
+    The prey is bait is unknwon
+    The calling function is responsible for that
 
     """
     return y_synth
@@ -52,8 +51,7 @@ def poisson_sqr(y, theta, phi) -> float:
     return score
 
 
-def move_poisson_sqr(key: PRNGKey, theta:
-                     Vector, phi: Matrix) -> tuple[Vector, Matrix]:
+def move_poisson_sqr(key: PRNGKey, theta: Vector, phi: Matrix) -> tuple[Vector, Matrix]:
     theta = jax.random.uniform(key)
     return theta, phi
 
@@ -89,7 +87,7 @@ def A(theta, phi):
 
     def B(x):
         fac = math.factorial(x)
-        return - jnp.log(fac)
+        return -jnp.log(fac)
 
     def exponant(theta: Vector, phi: Matrix, x: Vector) -> float:
         sqrtx = jnp.sqrt(x)

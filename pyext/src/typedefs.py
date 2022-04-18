@@ -74,11 +74,11 @@ R = TypeVar("R")
 
 # jax related
 Array: TypeAlias = npt.NDArray
-#RealArray: TypeAlias = npt.NDArray[float]
-#IntegerArray: TypeAlias = npt.NDArray[int]
-Array1d = NewType('Array1d', Array)
-Array2d = NewType('Array2d', Array)
-ArraySquare = NewType('ArraySquare', Array2d)
+# RealArray: TypeAlias = npt.NDArray[float]
+# IntegerArray: TypeAlias = npt.NDArray[int]
+Array1d = NewType("Array1d", Array)
+Array2d = NewType("Array2d", Array)
+ArraySquare = NewType("ArraySquare", Array2d)
 DTypeLikeInt = Any
 DTypeLikeFloat = Any
 PRNGKeyArray = prng.PRNGKeyArray  # Change this to prng.PRNGKeyArray

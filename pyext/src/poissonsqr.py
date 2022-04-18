@@ -15,6 +15,7 @@ from .typedefs import (
     uLogScore,
     Number,
     Callable,
+    PRNGKeyArray,
 )
 from . import predicates as pred
 import collections
@@ -272,16 +273,25 @@ def base_exp_z(eta1: complex, eta2: complex) -> float:
 
 
 def T1_nsteps_mh__s(f: Callable, nsteps: int, d: Dimension):
-    def T1_nsteps_mh__j(
-        key: PRNGKey,
+    def T1__j(
+        key: PRNGKeyArray,
         theta: Array1d,
         phi: ArraySquare,
         f: Callable,
         nsteps: int,
         d: Dimension,
     ):
-        for t in range(nsteps):
 
+        """The n-steps Metropolis Hastings algorithm
+
+        Args:
+          key:
+            A jax splittable PRNGKeyArray
+
+        """
+
+        keys = jax.random.split(key, 4)
+        for t in range(nsteps):
             theta_prime = theta + jax.random.normal(keys[1], (d,))
             phi_prime = phi + jax.random.normal(keys[2], (d, d))
 
@@ -290,16 +300,22 @@ def T1_nsteps_mh__s(f: Callable, nsteps: int, d: Dimension):
             rn = jax.random.uniform(keys[3])
 
             theta, phi = jax.lax.cond(
-                rn < a, (lambda: theta_prime, phi_prime), (lambda: theta, phi)
+                rn < a, (lambda: (theta_prime, phi_prime)), (lambda: (theta, phi))
             )
+            keys = jax.random.split(keys[0], 4)
+
         return theta, phi
+
+    T1_nsteps_mh__j = partial(T1__j, f=f, nsteps=nsteps, d=d)
+
+    return T1_nsteps_mh__j
 
 
 def ais__s(
     d: Dimension, nsamples: int, ninterpol: int, T: Callable, scoref: Callable
 ) -> JitFunc:
     def ais__j(
-        key: PRNGKey, d: Dimension, nsamples: int, ninterpol: int, T: Callable
+        key: PRNGKeyArray, d: Dimension, nsamples: int, ninterpol: int, T: Callable
     ) -> tuple[Array]:
 
         phi_shape = (d, d)

@@ -5,9 +5,10 @@ import numpy as np
 import jax.numpy as jnp
 from typing import NewType
 from .typedefs import PRNGKeyArray
-Dist = NewType('Dist', float)
-EdgeID = NewType('EID', int)
-VertexID = NewType('VID', int)
+
+Dist = NewType("Dist", float)
+EdgeID = NewType("EID", int)
+VertexID = NewType("VID", int)
 
 A = np.zeros((10, 10), dtype=np.int32)
 A[0, 1] = 1
@@ -23,15 +24,16 @@ G = np.ones((10, 10))
 
 M = np.zeros((10, 10))
 
+
 def score(i, j, A):
     return -np.log(distance(i, j, A))
 
 
 def rsum(v):
-    r=0
+    r = 0
     while v > 0:
-        v-=1
-        r+=v
+        v -= 1
+        r += v
     return r
 
 
@@ -39,14 +41,14 @@ def harmonic_restraint(d, mu, s=1.0):
     """
     Penalize distances away from mu
     """
-    return (np.abs(d - mu) / s)**2
+    return (np.abs(d - mu) / s) ** 2
 
 
 def degree_prior(degree, prior_degree, s=1.0):
     """
     Harmonic well over degrees centered at prior
     """
-    return ((np.abs(degree - prior_degree) / s)**2).sum()
+    return ((np.abs(degree - prior_degree) / s) ** 2).sum()
 
 
 def priority_insert(obj, key, queue):
@@ -101,7 +103,7 @@ def dijkstra(s, t, A):
     return distances  # An array of distances from s to every other node where distances[t] = d
 
 
-def distance(s, t, A)-> Dist:
+def distance(s, t, A) -> Dist:
     """
     s: src vertex
     t: target vertex
@@ -130,17 +132,17 @@ def vmax(A):
 
 
 def e_base(s, v):
-    r=0
+    r = 0
     vmax = v
-    while v > vmax -s:
-        v-=1
-        r+=v
+    while v > vmax - s:
+        v -= 1
+        r += v
     return r
 
 
 def revert_sum(n):
     steps = 0
-    i=1
+    i = 1
     while i < n:
         pass
     return steps
@@ -165,7 +167,7 @@ def get_edge_from_id(eid, vmax):
     while eid > vmax:
         # Reduce the eid by c
         eid = eid - s * c
-        c+=1
+        c += 1
     return s, eid
 
 
@@ -176,7 +178,7 @@ def src_from_eid(eid: EdgeID, v) -> VertexID:
     u = v - 2
     count = 0
     while eid > u:
-        count+=1
+        count += 1
         u = u + v - 1 - count
     return count
 
@@ -207,13 +209,13 @@ def transition_kernal(A, n=4):
     Emax = v * (v - 1) // 2
 
 
-def integral_lower_tri(x: int, v: int)-> int:
+def integral_lower_tri(x: int, v: int) -> int:
     """
     x: The base 1 index of the triangle
     note x = vertex id + 1
     Call integral_lower_tri(vid+1, v)
     """
-    return int((-x**2) / 2 + x * v - 0.5 * x)
+    return int((-(x ** 2)) / 2 + x * v - 0.5 * x)
 
 
 def edge_from_eid(eid, v):
@@ -229,10 +231,10 @@ def edge_from_eid(eid, v):
     return s, eid
 
 
-def MH_MCMC(steps, target, seed, y, mustart, sigstart,
-            mu_step_size=1,
-            sigma_step_size=1):
-    print('Error: implement jax prng')
+def MH_MCMC(
+    steps, target, seed, y, mustart, sigstart, mu_step_size=1, sigma_step_size=1
+):
+    print("Error: implement jax prng")
     exit
     np.random.seed(seed)
     chain = np.zeros((steps, 3))
@@ -243,8 +245,8 @@ def MH_MCMC(steps, target, seed, y, mustart, sigstart,
     av = np.mean(y)
     avstd = np.std(y)
     for i in range(1, steps):
-        mu = chain[i-1][0]
-        sigma = chain[i-1][1]
+        mu = chain[i - 1][0]
+        sigma = chain[i - 1][1]
         mu1 = mu + np.random.uniform(-mu_step_size, mu_step_size)
         sigma1 = sigma + np.random.uniform(-sigma_step_size, sigma_step_size)
 
@@ -261,12 +263,12 @@ def MH_MCMC(steps, target, seed, y, mustart, sigstart,
 
     return chain
 
-def n_steps_mh(key: PRNGKeyArray, target_prob,
-               target_params, mcmc_params):
+
+def n_steps_mh(key: PRNGKeyArray, target_prob, target_params, mcmc_params):
     """The n steps Metropolis Hastings Algorithm MCMC"""
-    n_steps = mcmc_params['n_steps']
-    x = mcmc_params['x']
-    n_dims = mcmc_params['n_dims']
+    n_steps = mcmc_params["n_steps"]
+    x = mcmc_params["x"]
+    n_dims = mcmc_params["n_dims"]
 
     for i in range(n_steps):
         key, subkey = jax.random.split(key)

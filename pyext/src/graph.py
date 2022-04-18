@@ -2,13 +2,22 @@
 ################################################################################
 import IMP
 
-class Node():
+
+class Node:
     # Belonging to all nodes / node class
     # Nodes are listed from 1 to nnodes
     nnodes = 0
 
-    def __init__(self, structure=None, degree=None, adjacent=None, out=[],
-                 pseq=None, polymer=None, peptides=None):
+    def __init__(
+        self,
+        structure=None,
+        degree=None,
+        adjacent=None,
+        out=[],
+        pseq=None,
+        polymer=None,
+        peptides=None,
+    ):
         Node.nnodes += 1
         self.dgr = degree
         self.adj = adjacent
@@ -18,21 +27,24 @@ class Node():
         self.strc = structure
         self.out = out
 
-class Model():
+
+class Model:
     """
     Holds the state of the graph
     """
+
     pass
 
 
-class Data():
+class Data:
     """
     Holds all the data used for inference
     """
+
     pass
 
 
-class Information():
+class Information:
     """
     Holds the prior information
     """

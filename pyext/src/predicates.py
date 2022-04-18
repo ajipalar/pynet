@@ -64,15 +64,19 @@ def is_lower_tri(a: npt.NDArray) -> bool:
 def is_upper_tri(a: npt.NDArray) -> bool:
     return True if (is_square_matrix(a) and np.all(a == np.triu(a))) else False
 
+
 def is_nonnegative(a: npt.NDArray) -> bool:
     return False if np.any(a < 0) else True
+
 
 # Array tests
 def is_array1d(a: npt.NDArray) -> bool:
     return a.ndim == 1
 
+
 def is_array2d(a: npt.NDArray) -> bool:
     return a.ndim == 2
+
 
 def is_array_square(a: npt.NDArray) -> bool:
     return True if ((a.ndim == 2) and (a.shape[0] == a.shape[1])) else False
