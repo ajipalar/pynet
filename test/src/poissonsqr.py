@@ -2,6 +2,7 @@ from __future__ import print_function
 import IMP
 import IMP.test
 import jax.numpy as jnp
+import jax.scipy as jsp
 import jax.random
 from jax import jit
 import numpy as np
@@ -9,6 +10,7 @@ from hypothesis import given, settings, strategies as st
 from typing import Any
 from functools import partial
 import collections
+import scipy as sp
 
 Module = Any
 
@@ -192,6 +194,23 @@ def get_ulog_score__j_values(
     np.testing.assert_almost_equal(a, b, decimal=decimal)
 
 
+def erf_taylor_approx__j(z: complex, src: Module):
+    erf = sp.special.erf
+    erf_taylor__j = src.erf_taylor_approx__j
+
+    a = np.array(erf(z))
+    b = np.array(erf_taylor_approx__j)
+
+
+def T1_nsteps_mh__s_normal(key, mu: float, sigma: float, nsteps: int, src: Module):
+
+    f = jsp.stats.norm.pdf(loc=mu, scale=sigma)
+    T__j = src.T1_nsteps_mh__s(f=f, nsteps=nsteps)
+    jT = jax.jit(T__j)
+
+    
+
+
 class PoissUnitTests(IMP.test.TestCase):
     """Base class for Poisson SQR unit tests"""
 
@@ -326,9 +345,10 @@ class IsMatrixCompatible(IMP.test.TestCase):
 
 class PoissPropTests(IMP.test.TestCase):
     """Base class for Poisson SQR Property tests"""
-    @given(st.integers(min_value=2, max_value=13), st.integers(min_value=2, max_value=13))
+
+    @given(
+        st.integers(min_value=2, max_value=13), st.integers(min_value=2, max_value=13)
+    )
     @settings(deadline=None)
     def test_remove_ith_entry__s_vs_value(self, d1: int, d2: int):
         remove_ith_entry__s_vs_value(src=self.src, d1=d1, d2=d2)
-
-
