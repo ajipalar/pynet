@@ -377,7 +377,12 @@ def ais__j(
 
 
 def ais__s(
-    d: Dimension, nsamples: int, ninterpol: int, T: Callable, scoref: Callable, ais__j=ais__j
+    d: Dimension,
+    nsamples: int,
+    ninterpol: int,
+    T: Callable,
+    scoref: Callable,
+    ais__j=ais__j,
 ) -> JitFunc:
 
     """The partial specializer for the ais__j function"""

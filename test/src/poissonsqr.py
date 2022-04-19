@@ -19,7 +19,6 @@ import scipy as sp
 Module = Any
 
 
-
 def dev_remove_ith_entry__s(a, src: Module):
     f__j = src.remove_ith_entry__s(a)
     n = len(a)
@@ -221,26 +220,26 @@ def T1_nsteps_mh__s_normal(key, nsteps: int, d: int, src: Module, theta, phi):
     assert theta.shape == (d,)
     assert phi.shape == (d, d)
 
+
 def T1_nsteps_mh__univariate_probabilstic_test(key, mu1, mu2, sig1, sig2, nsteps, src):
     """Test the nsteps MH algorithm against two univariate normal distributions
-       the dimension = 2"""
+    the dimension = 2"""
 
-    d=2
+    d = 2
     k1, k2, k3 = jax.random.split(key, 3)
     theta = jax.random.normal(k1, [d])
     phi = jax.random.normal(k2, [d, d])
 
-    
     def scoref(theta, phi, mu1=mu1, sig1=sig1, mu2=mu2, sig2=sig2) -> float:
         """
         Args:
-          theta: 
+          theta:
             theta[0:2] is [mu1, mu2]
 
           phi:
             phi[0, 0:2] is [sigma1, sigma2]
         """
-        
+
         a = jnp.sqrt((theta[0] - mu1) ** 2)
         b = jnp.sqrt((theta[1] - mu2) ** 2)
         c = a + b
@@ -262,16 +261,17 @@ def T1_nsteps_mh__univariate_probabilstic_test(key, mu1, mu2, sig1, sig2, nsteps
     np.testing.assert_almost_equal(phi[0, 0], sig1)
     np.testing.assert_almost_equal(phi[0, 1], sig2)
 
+
 def T1_nsteps_mh__probabilistic_check(key, nsteps: int, src: Module, theta, phi):
     """Tests the n-steps MH algorithim against a bivariate normal distribution
 
-       Args:
-         theta:
-           An array of means
-         phi:
-           A (d, d) symmetric covariance matrix
+    Args:
+      theta:
+        An array of means
+      phi:
+        A (d, d) symmetric covariance matrix
     """
-    d=2
+    d = 2
 
     def bivariate_pdf():
         ...
@@ -442,7 +442,9 @@ class PoissUnitTests(IMP.test.TestCase):
         mu2 = -0.7
         sig2 = 0.1
 
-        T1_nsteps_mh__univariate_probabilstic_test(self.key, mu1, mu2, sig1, sig2, nsteps, self.src)
+        T1_nsteps_mh__univariate_probabilstic_test(
+            self.key, mu1, mu2, sig1, sig2, nsteps, self.src
+        )
 
 
 class IsMatrixCompatible(IMP.test.TestCase):
