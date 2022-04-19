@@ -221,12 +221,66 @@ def T1_nsteps_mh__s_normal(key, nsteps: int, d: int, src: Module, theta, phi):
     assert theta.shape == (d,)
     assert phi.shape == (d, d)
 
+def T1_nsteps_mh__univariate_probabilstic_test(key, mu1, mu2, sig1, sig2, nsteps, src):
+    """Test the nsteps MH algorithm against two univariate normal distributions
+       the dimension = 2"""
+
+    d=2
+    k1, k2, k3 = jax.random.split(key, 3)
+    theta = jax.random.normal(k1, [d])
+    phi = jax.random.normal(k2, [d, d])
+
+    
+    def scoref(theta, phi, mu1=mu1, sig1=sig1, mu2=mu2, sig2=sig2) -> float:
+        """
+        Args:
+          theta: 
+            theta[0:2] is [mu1, mu2]
+
+          phi:
+            phi[0, 0:2] is [sigma1, sigma2]
+        """
+        
+        a = jnp.sqrt((theta[0] - mu1) ** 2)
+        b = jnp.sqrt((theta[1] - mu2) ** 2)
+        c = a + b
+
+        a = jnp.sqrt((phi[0, 0] - sig1) ** 2)
+        b = jnp.sqrt((phi[0, 1] - sig2) ** 2)
+        c = c + a + b
+        return c
+
+    T = partial(src.T1_nsteps_mh__s(f=scoref, nsteps=nsteps, d=d))
+    jT = jax.jit(T)
+    theta, phi = T(key=k3, theta=theta, phi=phi)
+
+    theta = np.array(theta)
+    phi = np.array(phi)
+
+    np.testing.assert_almost_equal(theta[0], mu1)
+    np.testing.assert_almost_equal(theta[1], mu2)
+    np.testing.assert_almost_equal(phi[0, 0], sig1)
+    np.testing.assert_almost_equal(phi[0, 1], sig2)
+
+def T1_nsteps_mh__probabilistic_check(key, nsteps: int, src: Module, theta, phi):
+    """Tests the n-steps MH algorithim against a bivariate normal distribution
+
+       Args:
+         theta:
+           An array of means
+         phi:
+           A (d, d) symmetric covariance matrix
+    """
+    d=2
+
+    def bivariate_pdf():
+        ...
+
 
 def ais__s(
     key, d, nsamples: int, ninterpol: int, T: Callable, scoref: Callable, src: Module
 ):
     f = src.ais__s
-
     ais__j = f(d, nsamples, ninterpol, T, scoref)
     ais = jax.jit(ais__j)
     ais(key)
@@ -380,6 +434,15 @@ class PoissUnitTests(IMP.test.TestCase):
         key = jax.random.PRNGKey(10)
 
         ais__s(key, d, nsamples, ninterpol, T, scoref, self.src)
+
+    def test_T1_unormal_prob(self):
+        nsteps = 1000
+        mu1 = 0.3
+        sig1 = 0.2
+        mu2 = -0.7
+        sig2 = 0.1
+
+        T1_nsteps_mh__univariate_probabilstic_test(self.key, mu1, mu2, sig1, sig2, nsteps, self.src)
 
 
 class IsMatrixCompatible(IMP.test.TestCase):

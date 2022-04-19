@@ -158,7 +158,7 @@ def get_eta2__s(theta: Array1d, phi: ArraySquare, x: Array1d):
 
 
 def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
-    """Generate the unormalized log score jittable kernal for the poisson sqr model"""
+    """Generate the unormalized log score jit kernal for the poisson sqr model"""
     eta2__j = get_eta2__s(theta, phi, x)
     logfacx = get_logfacx_lookuptable(x)
 
@@ -178,7 +178,7 @@ def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
 
 
 # Base Exponential Closed Form Solution
-# Not jittable, implemented in scipy
+# Not jit, implemented in scipy
 # Solution -> precompute and feed in as array
 
 
@@ -259,7 +259,7 @@ def base_exp_z(eta1: complex, eta2: complex) -> float:
     a = jnp.sqrt(jnp.pi) * eta1
     b = jnp.exp( -eta2**2 / (4 * eta1))
     arg = -eta2 / (2 * jnp.sqrt(-eta1)) # Must be complex! no check
-    c = sp.special.erfc(arg) # not jittable
+    c = sp.special.erfc(arg) # not jit
     
 
     def get_z_base_exp(theta, phi, i, get_eta2__j):
@@ -272,82 +272,115 @@ def base_exp_z(eta1: complex, eta2: complex) -> float:
 """
 
 
-def T1_nsteps_mh__s(f: Callable, nsteps: int, d: Dimension):
-    def T1__j(
-        key: PRNGKeyArray,
-        theta: Array1d,
-        phi: ArraySquare,
-        f: Callable,
-        nsteps: int,
-        d: Dimension,
-    ):
+def T1__j(
+    key: PRNGKeyArray,
+    theta: Array1d,
+    phi: ArraySquare,
+    f: Callable,
+    nsteps: int,
+    d: Dimension,
+    rgen_theta=jax.random.normal,
+    rgen_phi=jax.random.normal,
+):
 
-        """The n-steps Metropolis Hastings algorithm
+    """The n-steps Metropolis Hastings algorithm
 
-        Args:
-          key:
-            A jax splittable PRNGKeyArray
+    Generic in the scoring function
+    TODO: Make the Alogrithm Generic to Arbitrary types
 
-        """
+    Args:
+      key:
+        A jax splittable PRNGKeyArray
+      theta:
+        A d-length DeviceArray
+      phi:
+        A (d, d) DeviceArray
+      f:
+        The probability density function or log probability density function
+      nsteps:
+        The number of steps the Metropolis Hastings algorithm should take
+      d:
+        The dimensionality of the problem
 
-        keys = jax.random.split(key, 4)
-        for t in range(nsteps):
-            theta_prime = theta + jax.random.normal(keys[1], (d,))
-            phi_prime = phi + jax.random.normal(keys[2], (d, d))
+    Returns:
+      theta:
+        A d-length paramter vector
+      phi:
+        A (d, d) size parameter matrix
 
-            a = f(theta_prime, phi_prime) / f(theta, phi)
 
-            rn = jax.random.uniform(keys[3])
+    """
 
-            theta, phi = jax.lax.cond(
-                rn < a, (lambda: (theta_prime, phi_prime)), (lambda: (theta, phi))
-            )
-            keys = jax.random.split(keys[0], 4)
+    keys = jax.random.split(key, 4)
+    for t in range(nsteps):
+        theta_prime = theta + rgen_theta(keys[1], (d,))
+        phi_prime = phi + rgen_phi(keys[2], (d, d))
 
-        return theta, phi
+        a = f(theta_prime, phi_prime) / f(theta, phi)
 
-    T1_nsteps_mh__j = partial(T1__j, f=f, nsteps=nsteps, d=d)
+        rn = jax.random.uniform(keys[3])
+
+        theta, phi = jax.lax.cond(
+            rn < a, (lambda: (theta_prime, phi_prime)), (lambda: (theta, phi))
+        )
+        keys = jax.random.split(keys[0], 4)
+
+    return theta, phi
+
+
+def T1_nsteps_mh__s(f: Callable, nsteps: int, d: Dimension, T1__j=T1__j) -> JitFunc:
+    # TODO Refactor f to be named scoref
+    """Specialize the Transition distribtuion by dimension and scoring function"""
+    scoref = f
+
+    T1_nsteps_mh__j = partial(T1__j, f=scoref, nsteps=nsteps, d=d)
 
     return T1_nsteps_mh__j
 
 
+def ais__j(
+    key: PRNGKeyArray, d: Dimension, nsamples: int, ninterpol: int, T: Callable
+) -> tuple[Array]:
+
+    """Annealed Importance Sampling"""
+
+    phi_shape = (d, d)
+    theta_shape = (d,)
+    x_shape = (d,)
+
+    samples = jnp.zeros(nsamples)
+    weights = jnp.zeros(nsamples)
+
+    gammas = jnp.arange(ninterpol)
+
+    keys = jnp.zeros((ninterpol + 1, 2), dtype=jnp.uint32)
+    keys = keys.at[0].set(key)
+
+    for i in range(0, nsamples):
+
+        keys = jax.random.split(keys[0], num=ninterpol + 1)
+
+        # Generate an array from a random exponential distribution
+
+        x = jax.random.exponential(
+            keys[1], shape=[d]
+        )  # Generate a sample from pn, random exp
+
+        for j in range(1, ninterpol):
+            # Sample from the transition distribution
+
+            theta, phi = T(keys[j + 1], x)
+
+        samples = samples.at[i].set(x)
+
+    return samples, weights
+
+
 def ais__s(
-    d: Dimension, nsamples: int, ninterpol: int, T: Callable, scoref: Callable
+    d: Dimension, nsamples: int, ninterpol: int, T: Callable, scoref: Callable, ais__j=ais__j
 ) -> JitFunc:
-    def ais__j(
-        key: PRNGKeyArray, d: Dimension, nsamples: int, ninterpol: int, T: Callable
-    ) -> tuple[Array]:
 
-        phi_shape = (d, d)
-        theta_shape = (d,)
-        x_shape = (d,)
-
-        samples = jnp.zeros(nsamples)
-        weights = jnp.zeros(nsamples)
-
-        gammas = jnp.arange(ninterpol)
-
-        keys = jnp.zeros((ninterpol + 1, 2), dtype=jnp.uint32)
-        keys = keys.at[0].set(key)
-
-        for i in range(0, nsamples):
-
-            keys = jax.random.split(keys[0], num=ninterpol + 1)
-
-            # Generate an array from a random exponential distribution
-
-            x = jax.random.exponential(
-                keys[1], shape=[d]
-            )  # Generate a sample from pn, random exp
-
-            for j in range(1, ninterpol):
-                # Sample from the transition distribution
-
-                theta, phi = T(keys[j + 1], x)
-
-            samples = samples.at[i].set(x)
-
-        return samples, weights
+    """The partial specializer for the ais__j function"""
 
     ais__j = partial(ais__j, d=d, nsamples=nsamples, ninterpol=ninterpol, T=T)
     return ais__j
