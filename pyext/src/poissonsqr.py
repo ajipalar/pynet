@@ -311,7 +311,7 @@ def T1__j(
 
     """
 
-    keys = jax.random.split(key, 4)
+    """ 
     for t in range(nsteps):
         theta_prime = theta + rgen_theta(keys[1], (d,))
         phi_prime = phi + rgen_phi(keys[2], (d, d))
@@ -324,6 +324,29 @@ def T1__j(
             rn < a, (lambda: (theta_prime, phi_prime)), (lambda: (theta, phi))
         )
         keys = jax.random.split(keys[0], 4)
+    """
+
+    def fori_loop_body(loop_index, init_val):
+        theta, phi, keys = init_val
+
+        theta_prime = theta + rgen_theta(keys[1], (d,))
+        phi_prime = phi + rgen_phi(keys[2], (d, d))
+
+        a = f(theta_prime, phi_prime) / f(theta, phi)
+
+        rn = jax.random.uniform(keys[3])
+
+        theta, phi = jax.lax.cond(
+            rn < a, (lambda: (theta_prime, phi_prime)), (lambda: (theta, phi))
+        )
+        keys = jax.random.split(keys[0], 4)
+        return theta, phi, keys
+
+    keys = jax.random.split(key, 4)
+
+    init_val = theta, phi, keys
+
+    theta, phi, keys = jax.lax.fori_loop(0, nsteps, fori_loop_body, init_val)
 
     return theta, phi
 
