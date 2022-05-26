@@ -9,7 +9,8 @@ do
         suffend=$strlen-1
         suffbegin=$strlen-5
         source_file="${notebook:0:$suffbegin-1}.py"
-        jupytext --update --to notebook $source_file
+        # jupytext --update --to notebook $source_file
+        jupytext --sync $notebook
 
 
 done
