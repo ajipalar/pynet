@@ -265,3 +265,6 @@ def compare_normal_distributions(key, mus, nsamples):
         stat.append(s)
         pval.append(p)
     return stat, pval
+
+# +
+# Additional example cell
