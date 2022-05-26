@@ -360,12 +360,211 @@ def T1_nsteps_mh__s(f: Callable, nsteps: int, d: Dimension, T1__j=T1__j) -> JitF
 
     return T1_nsteps_mh__j
 
+def T_gibbs__s(theta, phi, x, n_gibbs_steps, get_eta2__j) -> float:
+
+    """A gibbs sampler for the transition distribtuion within the AIS sampling algorithm
+
+       params:
+         theta: 1dArray 
+           A paramter array implementing a vector
+         Phi: 2dArray
+           A 2d parameter array implementing a square symmetric matrix
+         x: 1dArray
+           A Spectral Counts data array implementing a vector
+
+
+        By equation 4) in Square Root Graphical Models:  Multivariate Generalizations of
+        Univariate Exponential Families that Permit Positive Dependencies by Inouye et al
+
+        4) A(theta, phi) = integral exp { thetaT * sqrt(x) + sqrt(x)T * Phi * sqrt(x) + sum(B(x)) }
+
+        Dev Notes on Gibbs sampling from Fixed-Length Poisson MRF:
+        Adding Dependencies to the Multinomia
+
+          p: number of words
+          n: number of documents
+          k: number of topics
+
+        Poisson Markov Random Field:
+          theta: node vector
+          phi:   edge matrix
+
+          Pr_PMRF(x|theta, phi) = exp {thetaT * x + xT * Phi * x - sum(s=1,p)(log(xs!)) - A(theta, phi) }
+
+          The conditional distribtuion of 1 word ("One Spectral counts") given all other spectral counts is a 1d Poisson distribution
+
+          Pr(xs | x_-s) with a natural parameter eta_s = theta_s + xT_(-s) * Phi_s
+
+          1d Poisson in natural form is
+            eta = log(lambda)
+            lambda = exp {eta}
+            lambda = exp {theta_s + xT_(-s) * Phi_s}
+            Poiss(x| eta) = exp {eta * x - log(x!) - exp(eta))
+
+
+    1. Generate Spectral Counts Data From Independant Base Exponential
+       Distribution
+
+    """
+
+    def gibbs_loop_body__s(key, y, theta, phi, get_eta2__j: Callable, d) -> Callable:
+
+        def body(s, params) -> tuple:
+            keys, y, theta, phi, spec_counts_array  = params
+            natural_rate = get_eta2__j(theta, phi, y, s)
+            lam = jnp.exp(nartual_rate)
+            xs = jax.random.poisson(keys[s], lam)
+            spec_counts_array = spec_counts_array.at[s].set(xs)
+
+            return key, y, theta, phi, spec_counts_array
+
+        def gibbs__j(key, y, theta, phi, get_eta2__j, d, body) -> Array1d:
+
+            keys = jax.random.split(key, num=d)
+            spec_counts_array = jnp.zeros(d)
+            params = keys, y, theta, phi, spec_counts_array
+            params = jax.lax.fori_loop(0, d, body, params)
+
+            return spec_counts_array
+
+        init_params = ...
+
+        gibbs_loop_body__j = partial(gibbs_loop_body__s, get_eta2__j=get_eta2__j, d=d, body=body)
+
+        T_gibss__j = jax.lax.fori_loop(0, n_gibbs_steps, gibbs_loop_body__j, init_params)
+
+        return gibbs_loop_body__j
+
+    gibbs_loop_body__j = gibbs_loop_body__s(key, y, theta, phi, get_eta2__j, d, body)
+
+
+#### Helper Functions for the Gibbs sampling Alagorithm of the Poisson SQR Model ###
+
+def get_poisson_sqr_node_conditional_rv__s(key, theta, phi, x, i, get_eta2__j):
+    """The node conditional distributions are proportional to
+       the univariate poisson distribution with respect to eta1 and eta2
+
+       Meaning that if we hold theta, phi, and all x_minus s not xs constant
+
+       then xs is distrbuted according to some exponential family distribution (poisson or base exponential) and can be sampled
+       Performing this sequentially should yield a gibbs sampler.
+
+       Specifically begin
+
+       (x0, x1, x2, x3, ..., xN) = x
+
+       x0' ~ p(x0 | theta, phi, x1...xN)
+       x1' ~ p(x1 | theta, phi, x0', x2,...xN)
+       ...
+       xN' ~ p(xN | theta, phi, x0',..., xN-1')
+
+       x = (x0', x1', x2', x3', ..., xN')
+       repeat for N gibbs steps
+
+       
+       params:
+         key:
+           A jax.PRNGKeyArray
+         theta:
+           Parameter vector of length d
+         phi:
+           Parameter matrix of size d x d
+         x:
+           A data vector of length d
+         i:
+          an index from [0, d)
+         get_eta2__j:
+           a jittable function whose signature is (theta, phi, x, i) -> float
+
+
+       Proof
+
+       Pr(x| lambda) = lambda^x exp{-lambda) / x!
+                     = exp{ log(lambda ^x) - log(x!) -lambda}
+                     = exp{ x*log(lambda) + (- log(x!)) -lambda}
+                     = exp{ eta*x + B(x) -lambda}
+
+       Pr(x|eta) = exp(eta * x -log(x!) -exp(eta))
+         eta = log(lambda)
+         B(x) = -log(x!)
+         A(eta) = exp(eta)
+
+       
+       The Node Conditional Distribution for the Poisson Square Root Graphical Model
+       is given by equation 5)
+       
+         xs: x at s e.g., x[s]
+         x_s: x minus s
+
+       5) Pr(xs| x_s, theta, phi) = exp(eta1*sqrt(xs) + eta2*sqrt(xs) + B(xs) - Anode(eta))
+
+       Or equivalently by equation 4)
+
+       If eta2 == 0 then the node conditionals are the base exponential family distribution
+
+    """
+
+    eta2 = get_eta2__j(theta, phi, x)
+
+    # Node Conditional Distribution
+
+    # p(xs|x_s, theta, phi) \propto exp{a -log(xs!)}
+    # a = phi_ii * xi + (theta_i + 2*phi_i,-i * sqrt(x_-i)
+
+
 
 def ais__j(
     key: PRNGKeyArray, d: Dimension, nsamples: int, ninterpol: int, T: Callable
 ) -> tuple[Array]:
+    
+    
 
-    """Annealed Importance Sampling"""
+    """Annealed Importance Sampling from Radford M Neal 1997
+       Indicies as defined in Neal 1997
+
+       x: theta, phi, y
+       points 1...N where N=nsamples
+       i ranges from 1...N
+       
+       w(i) an importance weight = f(x(i))/g(x(i))
+
+       0<j<n where pn = starting distribution
+       p0 = final distribtuion
+
+       pn is the Base independant exponential distribution
+       p0 is the Full Poisson SQR distribtuion
+
+       A0 = log Z0
+
+       A0 = log 1/N Sum(weights) * Zn
+
+       Zn -> Evaluate and implement using scipy (not jax yet)
+         for complex valued functions
+
+       
+       Fixing theta and phi
+
+         1. Generate a Spectral counts sample from Base Exp yn-1
+
+         2. Have yn-1, theta, phi 
+
+         3. Tn-1 - assign theta, phi, yn-1
+            
+            3a. Assign the sequence yn-2 according to n_gibbs_steps
+                
+
+
+
+            
+            
+
+
+
+
+       
+
+
+    """
 
     phi_shape = (d, d)
     theta_shape = (d,)
@@ -412,3 +611,31 @@ def ais__s(
 
     ais__j = partial(ais__j, d=d, nsamples=nsamples, ninterpol=ninterpol, T=T)
     return ais__j
+
+
+def plot_surface(x, y, z, import_dependencies=False):
+
+    if import_dependencies:
+        import matplotlib.pyplot as plt
+        from matplotlib import cm
+        from matplotlib.ticker import LinearLocator
+        import numpy as np
+
+    fig, ax = plt.subplots(subplot_kw={'projection': "3d"})
+
+    surf = ax.plot_surface(x, y, z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+
+    # ax.set_zlim(-1.01, 1.01)
+    ax.zaxis.set_major_locator(LinearLocator(10))
+
+    ax.zaxis.set_major_formatter('{x:.02f}')
+
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+
+    plt.show()
+
+
+
+
+
+            
