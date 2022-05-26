@@ -27,3 +27,4 @@ data
 *.zip
 *.log
 .hypothesis
+devel/*.ipynb
