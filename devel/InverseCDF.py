@@ -1,6 +1,7 @@
 # ---
 # jupyter:
 #   jupytext:
+#     formats: ipynb,py
 #     text_representation:
 #       extension: .py
 #       format_name: light
@@ -111,7 +112,7 @@ def compare_normal_distributions(key, mus, nsamples):
         stat.append(s)
         pval.append(p)
     return stat, pval
-    
+
 
 
 def plot_ks(mus, stat, pval, title='', xlog=True):
