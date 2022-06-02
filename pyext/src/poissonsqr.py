@@ -770,7 +770,96 @@ def slice_sweep__s(key, x: float, pstar: Callable, w: float) -> tuple:
         
     return val
 
-
-
+def gibbs__step__s(key, theta, phi, xarr, w):
+    
+    # Make PRNGKeys
+    
+    k0, k1 = jax.random.split(key)
+    
+    # Generate from node conditional 0
+    
+    pstar0 = partial(pstar, i=0, theta=theta, phi=phi, xarr=xarr)
+    val = slice_sweep__s(key=k0, x=xarr[0], pstar=pstar0, w=w)
+    old_key0, x0, x0_prime, xl, xr, u_prime, t, loop_break = val
+    
+    # Update the joint independant variable
+    xarr = xarr.at[0].set(x0_prime)
+    
+    # Generate from node conditional 1
+    pstar1 = partial(pstar, i=1, theta=theta, phi=phi, xarr=xarr)
+    val = slice_sweep__s(key=k2, x=xarr[1], pstar=pstar1, w=w)
+    
+    
+    val = slice_sweep__s(key=k1, x=x)
+    old_key1, x1, x1_prime, xl, xr, u_prime, t, loop_break = val
+    
+    return (x0_prime, x1_prime)
 
             
+def gibbs_step(key, xarr, 
+               rv_cond0=None, 
+               rv_cond1=None):
+    
+    """Defines a single gibbs step for a bi-variate distribution.
+       
+       params:
+         key:
+         xarr:
+           A (2, ) dimensional DeviceArray
+         rv_cond0:
+           (key, Number) -> (key, Number, Number, ... )
+           A function to generate random variates from the first conditional distribution
+         rv_cond1:
+           (key, Number) -> (key, Number, Number, ... )
+           A function to generate random variates from the second conditional distribution
+
+       return:   
+         xarr:
+       
+       """
+    
+    k1, k2 = jax.random.split(key)
+    
+    # Sample node conditional 0
+    #val = slice_sweep(k1, x=xarr[0], pstar=npstar0, w=w)
+    
+    val = rv_cond0(k1, x=xarr[0])
+    old_key0, x0, x0_prime, xl, xr, u_prime, t, loop_break = val
+    
+    # Update slice
+    xarr = xarr.at[0].set(x0_prime)
+    # Sample Node conditional 1
+    
+    #val = slice_sweep(k2, x=xarr[1], pstar=npstar1, w=w)
+    val = rv_cond1(k2, x=xarr[1])
+    old_key1, x1, x1_prime, xl, xr, u_prime, t, loop_break = val
+    xarr = xarr.at[1].set(x1_prime)
+    
+    return xarr
+
+def gibbs_sampler(key, n_steps, x_init):
+        
+    """
+    for step in range(n_steps):
+        print(f'Sampling step {step}')
+        x_init = gibbs_step(keys[step], x_init)
+        samples = samples.at[step].set(x_init)
+    """
+    
+    keys = jax.random.split(key, n_steps)
+    samples = jnp.zeros((n_steps, 2))
+
+    def gibbs_body_fun(i, val):
+        keys, x_init, samples = val
+        x_init = gibbs_step(keys[i], x_init)
+        samples = samples.at[i].set(x_init)
+        val = keys, x_init, samples
+        return val
+    
+    val = keys, x_init, samples
+    val = jax.lax.fori_loop(0, n_steps, gibbs_body_fun, val)
+    keys, x_init, samples = val
+
+    
+    return samples
+

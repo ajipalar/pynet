@@ -128,38 +128,15 @@ ulog_target__j = sqr.get_ulog_score__s(theta, phi, xarr)
 
 f_node0 = partial(ulog_target__j, i=0, theta=theta, phi=phi)
 f_node1 = partial(ulog_target__j, i=1, theta=theta, phi=phi)
+# -
+
+
+gibbs__step__s = sqr.gibbs__step__s
 
 
 def pstar(x, i, theta, phi,  xarr=jnp.ones(2)):
     xarr = xarr.at[i].set(x)
     return ulog_target__j(theta, phi, xarr, i)
-
-
-def gibbs__step__s(key, theta, phi, xarr, w):
-    
-    # Make PRNGKeys
-    
-    k0, k1 = jax.random.split(key)
-    
-    # Generate from node conditional 0
-    
-    pstar0 = partial(pstar, i=0, theta=theta, phi=phi, xarr=xarr)
-    val = slice_sweep__s(key=k0, x=xarr[0], pstar=pstar0, w=w)
-    old_key0, x0, x0_prime, xl, xr, u_prime, t, loop_break = val
-    
-    # Update the joint independant variable
-    xarr = xarr.at[0].set(x0_prime)
-    
-    # Generate from node conditional 1
-    pstar1 = partial(pstar, i=1, theta=theta, phi=phi, xarr=xarr)
-    val = slice_sweep__s(key=k2, x=xarr[1], pstar=pstar1, w=w)
-    
-    
-    val = slice_sweep__s(key=k1, x=x)
-    old_key1, x1, x1_prime, xl, xr, u_prime, t, loop_break = val
-    
-    return (x0_prime, x1_prime)
-    
 
 
 # +
@@ -251,28 +228,10 @@ ss2 = partial(slice_sweep, pstar=npstar1, w=w)
 
 jax.jit(ss1)(key, xarr[0])
 jax.jit(ss2)(key, xarr[1])
+# -
 
-
-def gibbs_step(key, xarr):
-    
-    k1, k2 = jax.random.split(key)
-    
-    # Sample node conditional 0
-    #val = slice_sweep(k1, x=xarr[0], pstar=npstar0, w=w)
-    
-    val = ss1(k1, x=xarr[0])
-    old_key0, x0, x0_prime, xl, xr, u_prime, t, loop_break = val
-    
-    # Update slice
-    xarr = xarr.at[0].set(x0_prime)
-    # Sample Node conditional 1
-    
-    #val = slice_sweep(k2, x=xarr[1], pstar=npstar1, w=w)
-    val = ss2(k2, x=xarr[1])
-    old_key1, x1, x1_prime, xl, xr, u_prime, t, loop_break = val
-    xarr = xarr.at[1].set(x1_prime)
-    
-    return xarr
+gibbs_step = sqr.gibbs_step
+gibbs_step = partial(gibbs_step, rv_cond0=ss1, rv_cond1=ss2)
 
 
 def gibbs_sampler(key, n_steps, x_init):
@@ -301,6 +260,9 @@ def gibbs_sampler(key, n_steps, x_init):
     
     return samples
 
+gibbs_sampler = sqr.gibbs_sampler
+
+# +
 #samples = gibbs_sampler(key, 100, jnp.array([11., 90.]))
 
 n_steps = 1000000
