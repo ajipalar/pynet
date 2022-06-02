@@ -22,6 +22,7 @@ from typing import Callable
 from functools import partial
 import matplotlib
 import pyext.src.poissonsqr as sqr
+from matplotlib import gridspec
 
 # +
 pmf = jsp.stats.poisson.pmf
@@ -51,144 +52,9 @@ title += f'\n n={n} med {med}  var {var}'
 title += f'\nmean {mean}'
 plt.title(title)
 plt.show()
-
-
 # -
 
-def slice_sweep__s(key, x: float, pstar: Callable, w: float) -> tuple:
-    """Univariate Slice Sampling
-    
-    (x, u) -> (x', u')
-    Maps a point x, u under the density function pstar to x' u'
-    
-    Folowing David MacKay Book
-
-    Advantages:
-
-    No need for tuning (opposed to Metropolis). src wikipedia
-    Automatically adjusts the step size to match the local shape
-    of the density function.
-    Easier to implement than gibbs.
-  
-    Random variates exhibit seriel statistical dependance.
-  
-    For P(x) = 1/Z * P*(x)
-    Thus P*(x) \propto P(x)
-  
-    MacKay Pseudocode
-  
-    1. evaluate P*(x)
-    2. draw a vertical coordinate u' ~ Uniform(0, P*(x))
-    3. create a horizontal interval (xl, xr) enclosing x
-    4. loop {
-    5.   draw x' ~ Uniform(xl, xr)
-    6.   evaluate P*(x')
-    7.   if P*(x') > u' break out of loop 4-9
-    8.   else modify the interval (xl, xr)
-    }
-    
-    Params:
-    
-      key: A jax.random.PRNGKeyArray
-      x: A starting coordinate for the sweep within the domain of pstar
-      pstar: A univariate (1-dimensional) probability mass or density function of one parameter.
-             p(x)=1/Z*pstar(x). Thus pstar does not have to be normalized
-      w: A weight parameter for the stepping our algorithm in step 3.
-      
-    Returns:
-      x_prime, u_prim
-    """
-    
-    k1, k2, k3, k4 = jax.random.split(key, 4)
-    # step 1 evaluate pstar(x)
-    u = pstar(x)
-    
-    # step 2 draw a vertical coordinate
-    u_prime = jax.random.uniform(k1, minval=0, maxval=u)
-    
-    # step 3 create a horizontal interval (xl, xr) enclosing x
-    r = jax.random.uniform(k2, minval=0, maxval=1)
-    
-    xl = x - r * w
-    xr = x + (1 - r) * w
-    
-    xl = jax.lax.while_loop(lambda xl: pstar(xl) > u_prime, lambda xl: xl - w, xl)
-    xr = jax.lax.while_loop(lambda xr: pstar(xr) > u_prime, lambda xr: xr + w, xr)
-    
-    # step 4 loop 1st iteration
-    
-    loop_break = False
-    
-    # step 5 draw x'
-    x_prime = jax.random.uniform(k3, minval=xl, maxval=xr)
-    
-    # step 6 evaluate pstar(x')
-    t = pstar(x_prime)
-    
-    
-    def step7_true_func(val):
-        """Do nothing break out of loop"""
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val
-        loop_break = True
-        return key, x, x_prime, xl, xr, u_prime, t, loop_break
-
-    def step8(val):
-        """Perform the shrinking method for step 8"""
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val       
-        
-        x_prime, x, xr, xl = jax.lax.cond(
-            x_prime > x, 
-            lambda x_prime, x, xr, xl: (x_prime, x, x_prime, xl),  # reduce the right side
-            lambda x_prime, x, xr, xl: (x_prime, x, xr, x_prime),  # reduce the left side
-            *(x_prime, x, xr, xl))
-        
-        return key, x, x_prime, xl, xr, u_prime, t, loop_break
-    
-    def step7_and_8(val):
-        val = jax.lax.cond(
-            val[6] > val[5], # p*(x')>u'
-            step7_true_func, # do nothing. Break out of loop
-            step8, # step 8 modify the interval (xl, xr)
-            val)
-        
-        return val
-
-    # step 7 if pstar(x') > u' break out of loop. else modify interval
-    
-    val = k4, x, x_prime, xl, xr, u_prime, t, loop_break
-    val = step7_and_8(val)
-
-    def step4_loop_body(val):
-        
-        # step 5 draw x'
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val 
-        key, subkey = jax.random.split(key)
-        x_prime = jax.random.uniform(subkey, minval=xl, maxval=xr)
-        
-        # step 6 evaluate pstar(x')
-        t = pstar(x_prime)
-        
-        # step 7
-        
-        val = key, x, x_prime, xl, xr, u_prime, t, loop_break
-        val = step7_and_8(val)
-        return val
-    
-    # End 1st loop iteration
-    # Continue the loop executing the while loop
-    
-    def while_cond_func(val):
-        """Check the loop break condition,
-           terminate the loop if True"""
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val
-        return loop_break == False
-    
-    val = jax.lax.while_loop(
-        while_cond_func, # check the loop break condition
-        step4_loop_body, 
-        val) # u_prime <= p*(x') i.e., t
-        
-    return val
+slice_sweep__s = sqr.slice_sweep__s
 
 # +
 w = 50
@@ -480,7 +346,7 @@ h = hist2dr[0]
 
 # %matplotlib inline
 plt.figure(figsize=(10, 8))
-plt.imshow(np.exp(-h), cmap='hot')
+plt.imshow(np.exp(h), cmap='hot')
 plt.colorbar()
 
 
@@ -573,11 +439,6 @@ plt.ylabel('x1')
 plt.show()
 
 # +
-scores = []
-
-scalars = np.arange(-scaler, scaler)
-
-# +
 # Case one
 
 scaler = 5.
@@ -641,9 +502,41 @@ def plot_score_array(sa, title=''):
     plt.title(title)
     plt.ylabel('ulog conditional prob score')
     plt.show()
+    
+def get_stats_from_sa(sa):
+    
+    m1 = np.median(sa[2, 0, :])
+    m2 = np.median(sa[2, 1, :])
+    m3 = np.median(sa[0, 0, :])
+    m4 = np.median(sa[0, 1, :])
+    m5 = np.median(sa[1, 0, :])
+    m6 = np.median(sa[1, 1, :])
+    
+    s1 = np.std(sa[2, 0, :])
+    s2 = np.std(sa[2,1,:])
+    s3 = np.std(sa[0,0,:])
+    s4 = np.std(sa[0,1,:])
+    s5 = np.std(sa[1,0,:])
+    s6 = np.std(sa[1,1,:])
+    
+    return (m1, s1), (m2, s2), (m3, s3), (m4, s4), (m5, s5), (m6, s6)
+
+def round_stats(stats):
+    sl = []
+    for stat in stats:
+        m = stat[0]
+        s = stat[1]
+        
+        m = np.round(m)
+        s = np.round(s)
+        sl.append((m, s))
+    return sl
 
 sa = get_score_array(samples)
 plot_score_array(sa, title='Independant Poisson Data')
+print('median +/- std')
+for i, t in enumerate(round_stats(get_stats_from_sa(sa))):
+    print(f'{i+1} {t}')
 
 # +
 # Case 2 Positive dependance (correlation)
@@ -668,6 +561,9 @@ plt.show()
 samples = jnp.array([x0, x1]).T
 sa2 = get_score_array(samples)
 plot_score_array(sa2, title='Positive Poisson')
+print('median +/- std')
+for i, t in enumerate(round_stats(get_stats_from_sa(sa2))):
+    print(f'{i+1} {t}')
 
 # +
 # Case 3 Negative dependance
@@ -694,9 +590,12 @@ plt.show()
 samples = jnp.array([x0, x1]).T
 sa3 = get_score_array(samples)
 plot_score_array(sa3, title='Negative dependance Poisson')
+print('median +/- std')
+for i, t in enumerate(round_stats(get_stats_from_sa(sa3))):
+    print(f'{i+1} {t}')
 
 # +
-from matplotlib import gridspec
+
 
 
 def dens_plot(a):
@@ -726,7 +625,7 @@ def dens_plot(a):
 dens_plot(antiplt[0])
 # -
 
-# ?np.linspace
+sa
 
 # +
 
