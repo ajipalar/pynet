@@ -1,4 +1,5 @@
 import jax
+import jax.random
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np
@@ -6,6 +7,7 @@ from functools import partial
 from typing import Callable as f
 from typing import Protocol, Sequence, Union
 from .typedefs import (
+    DeviceArray,
     Dimension,
     Index,
     JitFunc,
@@ -802,6 +804,8 @@ def gibbs_step(key, xarr,
     
     """Defines a single gibbs step for a bi-variate distribution.
        
+       (K, T, F, F) -> T
+       
        params:
          key:
          xarr:
@@ -837,9 +841,24 @@ def gibbs_step(key, xarr,
     
     return xarr
 
-def gibbs_sampler(key, n_steps, x_init):
+def gibbs_sampler(key, n_steps: int, x_init, gibbs_step, d=2) -> DeviceArray:
         
     """
+    The Gibbs sampling algorithm for a bivariate score
+
+    (K, int, T, F) -> [T] 
+
+    Params:
+      key: K
+        A jax.random.PRNGKey
+      n_steps: int
+        The number of Gibbs steps to take
+      x_init: T
+        The initial value of some type T      
+      gibbs_steps: Callable
+        (K, T) -> T
+
+
     for step in range(n_steps):
         print(f'Sampling step {step}')
         x_init = gibbs_step(keys[step], x_init)
@@ -847,7 +866,7 @@ def gibbs_sampler(key, n_steps, x_init):
     """
     
     keys = jax.random.split(key, n_steps)
-    samples = jnp.zeros((n_steps, 2))
+    samples = jnp.zeros((n_steps, d))
 
     def gibbs_body_fun(i, val):
         keys, x_init, samples = val
