@@ -297,8 +297,8 @@ def T1_nsteps_mh__probabilistic_check(key, nsteps: int, src: Module, theta, phi)
 def ais__s(
     key, d, nsamples: int, ninterpol: int, T: Callable, scoref: Callable, src: Module
 ):
-    f = src.ais__s
-    ais__j = f(d, nsamples, ninterpol, T, scoref)
+    test_function = src.ais__s
+    ais__j = test_function(d, nsamples, ninterpol, T, scoref)
     ais = jax.jit(ais__j)
     ais(key)
 
@@ -312,6 +312,13 @@ class PoissUnitTests(IMP.test.TestCase):
     decimal = None
     kwds = None
     key = jax.random.PRNGKey(10)
+
+    def test_ais__j(self):
+        d = 2
+        nsamples = 10
+        ninterpol = 10
+
+        ...
 
     def test_dev_remove_ith_entry(self):
         def run(key, shape):
@@ -441,16 +448,15 @@ class PoissUnitTests(IMP.test.TestCase):
         phi = jnp.zeros((d, d)).block_until_ready()
         T1_nsteps_mh__s_normal(self.key, nsteps, d, self.src, theta, phi)
 
-    @IMP.test.skip
+    #@IMP.test.skip
     def test_ais__j_jittable(self):
-        d = 4
+        d=2
         nsamples = 10
         ninterpol = 5
         T = lambda a, b: (a, b)
         scoref = lambda x: x + 1
-        key = jax.random.PRNGKey(10)
 
-        ais__s(key, d, nsamples, ninterpol, T, scoref, self.src)
+        ais__s(self.key, self.d, nsamples, ninterpol, T, scoref, self.src)
 
     @IMP.test.skip
     def test_T1_unormal_prob(self):

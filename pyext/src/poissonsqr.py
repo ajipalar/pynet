@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np
 from functools import partial
-from typing import Callable as f
+from typing import Any, Callable as f
 from typing import Protocol, Sequence, Union
 from .typedefs import (
     DeviceArray,
@@ -362,7 +362,7 @@ def T1_nsteps_mh__s(f: Callable, nsteps: int, d: Dimension, T1__j=T1__j) -> JitF
 
     return T1_nsteps_mh__j
 
-def T_gibbs__s(theta, phi, x, n_gibbs_steps, get_eta2__j) -> float:
+def T_gibbs__s(theta, phi, x, n_gibbs_steps, get_eta2__j) -> Callable[Any, float]:
 
     """A gibbs sampler for the transition distribtuion within the AIS sampling algorithm
 
@@ -437,7 +437,27 @@ def T_gibbs__s(theta, phi, x, n_gibbs_steps, get_eta2__j) -> float:
 
         return gibbs_loop_body__j
 
+
     gibbs_loop_body__j = gibbs_loop_body__s(key, y, theta, phi, get_eta2__j, d, body)
+    return gibbs_loop_body__j
+
+
+def T__j(key, theta, phi, x_prime, n_gibbs_steps) -> float:
+    """Generate a sample x ~ T(x | x')"""
+
+    # Do Gibbs Sampling n_steps times
+      
+      # Slice sample
+    
+      # Slice sample
+
+
+
+    # Evaluate the score function f(theta, phi, x)
+    
+
+    return x
+    
 
 
 #### Helper Functions for the Gibbs sampling Alagorithm of the Poisson SQR Model ###
@@ -519,7 +539,6 @@ def ais__j(
     key: PRNGKeyArray, d: Dimension, nsamples: int, ninterpol: int, T: Callable
 ) -> tuple[Array]:
     
-    
 
     """Annealed Importance Sampling from Radford M Neal 1997
        Indicies as defined in Neal 1997
@@ -553,18 +572,12 @@ def ais__j(
          3. Tn-1 - assign theta, phi, yn-1
             
             3a. Assign the sequence yn-2 according to n_gibbs_steps
+
+        Parameters:
+          T:
+            A callable transition distribution with the signature T(key, x)
+            What is x? T(key, x) -> x. The scoring function is encoded in the distribution T
                 
-
-
-
-            
-            
-
-
-
-
-       
-
 
     """
 
@@ -580,6 +593,17 @@ def ais__j(
     keys = jnp.zeros((ninterpol + 1, 2), dtype=jnp.uint32)
     keys = keys.at[0].set(key)
 
+
+    def set_phi_diag(i, val):
+        phi, phi_tilde = val
+
+        phi_tilde = phi_tilde.at[i, i].set(phi[i, i])
+
+        phi, phi_tilde = val
+
+        return val
+
+
     for i in range(0, nsamples):
 
         keys = jax.random.split(keys[0], num=ninterpol + 1)
@@ -593,7 +617,21 @@ def ais__j(
         for j in range(1, ninterpol):
             # Sample from the transition distribution
 
-            theta, phi = T(keys[j + 1], x)
+            # Set the values for theta~ and phi~ with invariant theta and phi
+            theta_tilde = theta * gammas[j]
+            phi_tilde = gammas[j] * phi
+            phi, phi_tilde = jax.lax.fori_loop(0, d, set_phi_diag, (phi, phi_tilde))
+            ###
+
+            # The transition probability is a function of theta_tilde and phi_tilde and x
+            # It is a random number generator
+
+            x = T(keys[j + 1], theta_tilde, phi_tilde, x)
+            
+            # x' ~ T(x'| x)
+            # MH scoref
+            # gamma * theta, phi_off * gamma + phi_diag
+            # scoref(theta, phi * gamma, x)
 
         samples = samples.at[i].set(x)
 
@@ -882,3 +920,29 @@ def gibbs_sampler(key, n_steps: int, x_init, gibbs_step, d=2) -> DeviceArray:
     
     return samples
 
+
+def get_Asqr__s(method,
+        ) -> Callable[Any, float]:
+    """
+    Yields a function that may be used to estimate the value of the normalizing
+    constant of the poisson sqr scoring function.
+
+    The yielded jittable function has the signature
+
+    get_Asqr__j(theta, phi, x) -> float
+
+    
+    """
+    ...
+
+
+"""
+
+1. Define f(x). Where f is unorm poisson sqr and x is theta, phi, xarr
+2. Sample over xarr to normalize using
+   - set the sampling hyper parameters
+   - get the weights and samples from AIS sampling
+   -  
+3. Evaluate p(x)
+
+"""
