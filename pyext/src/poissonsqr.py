@@ -167,6 +167,18 @@ def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
     def get_ulog_score__j(
         theta: Array1d, phi: ArraySquare, x: Array1d, i: Index, logfacx: Callable
     ) -> uLogScore:
+        """Returns the log unormalized score for poisson sqr
+           
+           phi[i,i] * x[i] + eta2 * sqrt(x[i]) - log x[i]!
+
+           params:
+             theta: d dimensional real array
+             phi: d x d dimensional real array
+             x: d dimensional non-negative integer array
+             i: float, index
+           returns:
+             u_log_score: float
+        """
         return (
             phi[i, i] * x[i] + eta2__j(theta, phi, x, i) * jnp.sqrt(x[i]) - logfacx[i]
         )
@@ -716,7 +728,7 @@ def slice_sweep__s(key, x: float, pstar: Callable, w: float) -> tuple:
       w: A weight parameter for the stepping our algorithm in step 3.
       
     Returns:
-      x_prime, u_prim
+      x_prime, u_prime
     """
     
     k1, k2, k3, k4 = jax.random.split(key, 4)
@@ -835,10 +847,29 @@ def gibbs__step__s(key, theta, phi, xarr, w):
     
     return (x0_prime, x1_prime)
 
+
+def gibbs_step_d_dimensions__s(key, d, theta, phi, xarr):
+    """Take a gibbs step for a d-dimensional poisson sqr model
+       generate the spectral counts vector xarr for given values of theta and phi"""
+
+    key_array = jax.random.split(key, d)
+
+    get_ulog_target__j = get_ulog_score__s(theta, phi, xarr)
+    
+
+    def body(i, val):
+        
+        key_array, theta, phi, xarr = val
+
+
+    # Sample node conditional 0
+
+    # Sample to node conditional N
+
+    ...
+
             
-def gibbs_step(key, xarr, 
-               rv_cond0=None, 
-               rv_cond1=None):
+def gibbs_step(key, xarr): 
     
     """Defines a single gibbs step for a bi-variate distribution.
        
