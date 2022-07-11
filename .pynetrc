@@ -1,0 +1,1 @@
+alias ptest="py -m test.local.test_poissonsqr"
