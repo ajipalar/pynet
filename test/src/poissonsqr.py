@@ -312,7 +312,7 @@ def pretty_print_ss(k4, x, start_x, x_prime, xl, xr, u_prime, loop_break):
 
     a3 = pre + f'x           :  {x}'
     g3 = " "*(statement_width - len(a3))
-    a4 = pre + f'x\'          :  {x_prime}'
+    a4 = pre + f'x_prime     :  {x_prime}'
     
     a5 = pre + f'xl          :  {xl}'
     g5 = " "*(statement_width -len(a5) )

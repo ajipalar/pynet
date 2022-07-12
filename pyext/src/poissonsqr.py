@@ -1,3 +1,52 @@
+"""
+This module provides the scoring and sampling of d-dimensional poisson
+square root graphical models (Inouye 2016) implemented in Jax.
+
+
+  fname__j are jittable functions
+      fname = jax.jit(fname__j)(args=args, kwargs=kwargs)
+
+  fname__g are generic functions that require specialization
+      fname__j = partial(fname__g, g_arg_1 = lower_func_1)
+      fname = jax.jit(fname__j)(args=args, kwargs=kwargs)
+
+  fname__s are functions that specialize generic functions to yield jittable functions
+      fname__j = fname__s(args, kwargs)
+
+Example Usage:
+
+
+    # Problem Dimension
+
+    d: int = 256  # number of nodes
+    rseed: int = 13
+    nkeys: int = 4
+    keys = jax.random.PRNGKey(rseed, nkeys)
+    replicates: int = 3
+
+    # Input information - synthetic data
+
+    X = get_X(d, replicates)  # 256 x 3  
+
+    # Representation
+
+    theta: jnp.array = get_theta(d)
+    phi: jnp.array = get_phi(d)
+    
+    # Scoring Function
+
+    scoref = get_ulog_score
+
+    # Optimization and Monte Carlo Sampling
+
+    nsamples = int(1e6)
+    n_gibbs_steps
+      ...
+    
+    
+
+
+"""
 import jax
 import jax.random
 import jax.numpy as jnp
@@ -687,11 +736,42 @@ def plot_surface(x, y, z, import_dependencies=False):
     plt.show()
 
 
-def slice_sweep__s(key, x: float, pstar: Callable, w: float) -> tuple:
-    """Univariate Slice Sampling
-    
+def slice_sweep__s(key, 
+        x: float, 
+        pstar: Callable, 
+        w: float, 
+        pstar_args: tuple = (), 
+        pstar_kwargs: dict = {},
+        uppstar_args=(lambda pt: ()),
+        uppstar_kwargs=(lambda pt: {})
+        ) -> tuple:
+
+    """
+
+    TODO: refactor to slice_sweep__g naming convention
+
+    Univariate Slice Sampling
+
     (x, u) -> (x', u')
+    (x, p*(x) -> (x', p*(x'))
+
+
+    In: PyTree
+
+    Out: (key, x, x_prime, xl, xr, u_prime, t, loop_break)
+                  _______          _______
+
+    Invariants
+
+    Constraints:
+      pstar(x: float, *pstar_args, **pstar_kwargs)
+    
     Maps a point x, u under the density function pstar to x' u'
+
+    This function is meant to be jit compiled to XLA using Jax.
+    The default update functions uppstar_args and uppstar_kwargs
+    return empty args and kwargs containers.
+    Therefore they do not effect the jaxpr representation. 
     
     Folowing David MacKay Book
 
@@ -725,6 +805,21 @@ def slice_sweep__s(key, x: float, pstar: Callable, w: float) -> tuple:
       x: A starting coordinate for the sweep within the domain of pstar
       pstar: A univariate (1-dimensional) probability mass or density function of one parameter.
              p(x)=1/Z*pstar(x). Thus pstar does not have to be normalized
+
+             Siganture constraint
+
+      
+      
+      pstar args and kwargs are specified so that pstar may be entirely generic.
+      These pytrees may change value but not shape
+      slice_sweep__s is jittable after specialization on pstar
+      
+      
+      pstar_args[optional]: tuple (jax pytree)
+
+      pstar_kwargs[optional]: dict (jax pytree)
+        
+
       w: A weight parameter for the stepping our algorithm in step 3.
       
     Returns:
@@ -733,7 +828,7 @@ def slice_sweep__s(key, x: float, pstar: Callable, w: float) -> tuple:
     
     k1, k2, k3, k4 = jax.random.split(key, 4)
     # step 1 evaluate pstar(x)
-    u = pstar(x)
+    u = pstar(x, *pstar_args, **pstar_kwargs)
     
     # step 2 draw a vertical coordinate
     u_prime = jax.random.uniform(k1, minval=0, maxval=u)
@@ -753,9 +848,14 @@ def slice_sweep__s(key, x: float, pstar: Callable, w: float) -> tuple:
     
     # step 5 draw x'
     x_prime = jax.random.uniform(k3, minval=xl, maxval=xr)
+
+    #Optional update to pstar args and kwargs
+
+    pstar_args = uppstar_args((x_prime, pstar_args, pstar_kwargs))
+    pstar_kwargs = uppstar_kwargs((x_prime, pstar_args, pstar_kwargs))
     
     # step 6 evaluate pstar(x')
-    t = pstar(x_prime)
+    t = pstar(x_prime, *pstar_args, **pstar_kwargs)
     
     
     def step7_true_func(val):
