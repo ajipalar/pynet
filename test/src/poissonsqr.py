@@ -263,6 +263,7 @@ def T1_nsteps_mh__univariate_probabilstic_test(key, mu1, mu2, sig1, sig2, nsteps
 
 
 def T1_nsteps_mh_unorm_prob_check(key, mu1, src: Module, nsteps=int(1e6), decimals=1):
+    """Apply a univariate normal pdf to the n-steps metropolis hastings algorithm"""
     scoref = lambda theta, phi: jax.scipy.stats.norm.pdf(theta[1], mu1)
 
     d = 2
@@ -297,6 +298,7 @@ def T1_nsteps_mh__probabilistic_check(key, nsteps: int, src: Module, theta, phi)
 def ais__s(
     key, d, nsamples: int, ninterpol: int, T: Callable, scoref: Callable, src: Module
 ):
+    """Tests the ais function: failing"""
     test_function = src.ais__s
     ais__j = test_function(d, nsamples, ninterpol, T, scoref)
     ais = jax.jit(ais__j)
@@ -304,7 +306,7 @@ def ais__s(
 
 
 def pretty_print_ss(k4, x, start_x, x_prime, xl, xr, u_prime, loop_break):
-    statement_width = 45
+    statement_width = 40
     pre = "  "
     a1 = pre + f'key         :  {k4}'
     g1 = " "*(statement_width - len(a1)  )
@@ -319,7 +321,7 @@ def pretty_print_ss(k4, x, start_x, x_prime, xl, xr, u_prime, loop_break):
     a6 = pre + f'xr          :  {xr}'
 
     a7 = pre + f'u_prime     :  {u_prime}'
-    g7 = " "*(statement_width - len(a7))
+    g7 = " "*(statement_width -len(a7))
     a8 = pre + f'loop_break  :  {loop_break}'
 
     out = '\n' + a1 + g1 + a2
@@ -359,13 +361,22 @@ def slice_sweep_expected_value_test_definition(key, f, w, start_x, nsamples, src
 
     pre = "  "
     print('\n' + pre + f'mean         :  {np.mean(samples)}')
-    print(pre + f'var         :  {np.var(samples)}')
+    print(pre + f'var           :  {np.var(samples)}')
 
     ss = jax.jit(ss__j)
     val = ss(k1, x_prime)
     k4, x, x_prime, xl, xr, u_prime, t, loop_break = val
 
     pretty_print_ss(k4, x, start_x, x_prime, xl, xr, u_prime, loop_break)
+
+def slice_sweep__s_poisson_sqr(key, src: Module):
+
+    """Tests the slice sweep algorithm against the
+       poisson sqr model"""
+
+    scoref__g = src.get_ulog_score__s
+
+    scoref =scoref__g()
 
 
 
@@ -391,7 +402,20 @@ class PoissUnitTests(IMP.test.TestCase):
         pstar = partial(jax.scipy.stats.poisson.pmf, mu=7.) 
         slice_sweep__s_test_definition(self.key, f=pstar, w=w, start_x=2., src=self.src)
 
-    def test_slice_sweep__s_HW_norm_(self):
+    def test_slice_sweep__s_LW_norm(self):
+        """Slice sweep norm low weight"""
+        w = 0.1
+        pstar = partial(jax.scipy.stats.norm.pdf, loc=7., scale=2.) 
+        slice_sweep__s_test_definition(self.key, f=pstar, w=w, start_x=2., src=self.src)
+
+    def test_slice_sweep__s_LW_poisson(self):
+        """Slice sweep poisson low weight """
+        w = 0.1
+        pstar = partial(jax.scipy.stats.poisson.pmf, mu=7.) 
+        slice_sweep__s_test_definition(self.key, f=pstar, w=w, start_x=2., src=self.src)
+
+
+    def test_slice_sweep__s_HW_norm(self):
         """Slice sweep norm high weight """
         w = 10.
         pstar = partial(jax.scipy.stats.norm.pdf, loc=7., scale=2.) 
@@ -423,7 +447,7 @@ class PoissUnitTests(IMP.test.TestCase):
         slice_sweep_expected_value_test_definition(self.key, f=pstar, w=w, start_x=start_x, nsamples=nsamples, src=self.src)
 
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_dev_remove_ith_entry(self):
         def run(key, shape):
             key, subkey = jax.random.split(key)
@@ -441,11 +465,11 @@ class PoissUnitTests(IMP.test.TestCase):
         key = run(key, (4, 4))
         # key = run(key, (111, 111))
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_dev_remove_ith_entry_vs_value(self):
         remove_ith_entry__s_vs_value(src=self.src)
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_get_ulog_score_is_jittable(self):
         d = 3
         n = 1
@@ -460,7 +484,7 @@ class PoissUnitTests(IMP.test.TestCase):
         # assert x.dtype == np.float32
         get_ulog_score__j_is_jittable(theta, phi, x, self.src)
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_logfactorial(self):
 
         factorial = [1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800]
@@ -469,7 +493,7 @@ class PoissUnitTests(IMP.test.TestCase):
             logfaci = self.src.logfactorial(i)
             np.testing.assert_almost_equal(lf, logfaci, decimal=self.decimal)
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_get_eta2__j(self):
         precision = 5
         n = 4
@@ -535,20 +559,20 @@ class PoissUnitTests(IMP.test.TestCase):
         del jf
         del get_eta2__j
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_get_eta2__j_values(self):
         get_eta2__j_values(src=self.src)
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_get_eta2__j_valuesd4(self):
         get_eta2__j_values(d=4, src=self.src)
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_get_ulog_score__j_values(self):
         DECIMALS = 5
         get_ulog_score__j_values(src=self.src, decimal=DECIMALS)
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_T1_nsteps_mh__s_normal(self):
         d = 2
         nsteps = 4
@@ -560,7 +584,8 @@ class PoissUnitTests(IMP.test.TestCase):
         phi = jnp.zeros((d, d)).block_until_ready()
         T1_nsteps_mh__s_normal(self.key, nsteps, d, self.src, theta, phi)
 
-   # @IMP.test.skip  #dev
+    #@IMP.test.skip
+    @IMP.test.skip  #dev
     def test_ais__j_jittable(self):
         d=2
         nsamples = 10
@@ -570,7 +595,7 @@ class PoissUnitTests(IMP.test.TestCase):
 
         ais__s(self.key, self.d, nsamples, ninterpol, T, scoref, self.src)
 
-   # @IMP.test.skip
+    @IMP.test.skip
     def test_T1_unormal_prob(self):
         nsteps = 10000
         mu1 = 0.3
@@ -582,7 +607,7 @@ class PoissUnitTests(IMP.test.TestCase):
             self.key, mu1, mu2, sig1, sig2, nsteps, self.src
         )
 
-   # @IMP.test.skip  #dev
+    @IMP.test.skip  #dev
     def test_T1_nsteps_mh_unorm_prob_check(self):
         key = jax.random.PRNGKey(self.rseed)
         mu1 = 123.3
