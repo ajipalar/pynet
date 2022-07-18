@@ -759,6 +759,37 @@ def slice_sweep__s(key,
     In: PyTree
 
     Out: (key, x, x_prime, xl, xr, u_prime, t, loop_break)
+
+    Params:
+    
+      key: 
+        A jax.random.PRNGKeyArray
+      x: 
+        A starting coordinate for the sweep within the domain of pstar
+      pstar: 
+        A univariate (1-dimensional) probability mass or density function of one parameter.
+        p(x)=1/Z*pstar(x). Thus pstar does not have to be normalized
+
+        Siganture constraint
+
+      
+      
+        pstar args and kwargs are specified so that pstar may be entirely generic.
+        These pytrees may change value but not shape
+        slice_sweep__s is jittable after specialization on pstar
+      
+      
+      pstar_args[optional]: tuple (jax pytree)
+        The *args to pstar that consist of fixed size arrays. Immutable.
+
+      pstar_kwargs[optional]: dict (jax pytree)
+        The **kwargs to pstar. Immutable. 
+
+      w: A
+        weight parameter for the stepping our algorithm in step 3.
+      
+    Returns:
+      x_prime, u_prime
                   _______          _______
 
     Invariants
@@ -799,31 +830,6 @@ def slice_sweep__s(key,
     8.   else modify the interval (xl, xr)
     }
     
-    Params:
-    
-      key: A jax.random.PRNGKeyArray
-      x: A starting coordinate for the sweep within the domain of pstar
-      pstar: A univariate (1-dimensional) probability mass or density function of one parameter.
-             p(x)=1/Z*pstar(x). Thus pstar does not have to be normalized
-
-             Siganture constraint
-
-      
-      
-      pstar args and kwargs are specified so that pstar may be entirely generic.
-      These pytrees may change value but not shape
-      slice_sweep__s is jittable after specialization on pstar
-      
-      
-      pstar_args[optional]: tuple (jax pytree)
-
-      pstar_kwargs[optional]: dict (jax pytree)
-        
-
-      w: A weight parameter for the stepping our algorithm in step 3.
-      
-    Returns:
-      x_prime, u_prime
     """
     
     k1, k2, k3, k4 = jax.random.split(key, 4)
