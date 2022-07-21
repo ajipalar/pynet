@@ -43,8 +43,15 @@ Example Usage:
     n_gibbs_steps
       ...
     
-    
 
+Dev notes:
+
+    In general functions should be called by keyword. It is easy to add and remove
+    keyword arguments from both caller and callee, opposed to positional arguments.
+    Additionally funciton calls become more readable.
+
+TODO:
+    Implement Function Types (A, B) -> R. Callable[[P], R]
 
 """
 import jax
@@ -94,7 +101,13 @@ Get = collections.namedtuple("Get", ["eta1", "eta2"])
 
 def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
     """Specialize the function 'remove_ith_entry' to a vector of length arr_l
-    such that it may be jit compiled"""
+    such that it may be jit compiled
+
+    a:
+      shape parameter. TODO refactor to shape
+
+
+    """
 
     # array values
     # array shape
@@ -129,7 +142,7 @@ def remove_ith_entry__s(a: Union[Array1d, ArraySquare]) -> JitFunc:
         assert pred.is_array1d(a)
 
         def fi__j(x, i):
-            o = jnp.zeros(outshape, dtype=x.dtype)
+            o = jnp.zeros(shape=outshape, dtype=x.dtype)
             # copy entries from [0, i) to [0, i)
             o, x = jax.lax.fori_loop(
                 0, i, lambda j, t: (t[0].at[j].set(t[1][j]), x), (o, x)
@@ -191,7 +204,7 @@ def logfactorial(n: Union[int, float]):
 
 
 def get_logfacx_lookuptable(x: Array1d):
-    lookup = jnp.zeros(len(x))
+    lookup = jnp.zeros(shape=len(x))
     for i, xi in enumerate(x):
         lookup = lookup.at[i].set(logfactorial(xi))
     return lookup
@@ -199,21 +212,21 @@ def get_logfacx_lookuptable(x: Array1d):
 
 def get_eta2__s(theta: Array1d, phi: ArraySquare, x: Array1d):
 
-    rm_i__j = remove_ith_entry__s(theta)
+    rm_i__j = remove_ith_entry__s(a=theta)
 
     def get_eta2__j(theta: Array1d, phi: ArraySquare, x: Array1d, i: Index):
         #         sa em                      mm
-        return theta[i] + 2 * (rm_i__j(phi[:, i], i) @ jnp.sqrt(rm_i__j(x, i)))
+        return theta[i] + 2 * (rm_i__j(arr=phi[:, i], i=i) @ jnp.sqrt(rm_i__j(arr=x, i=i)))
 
     return get_eta2__j
 
 
-def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
+def get_exponent__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
     """Generate the unormalized log score jit kernal for the poisson sqr model"""
-    eta2__j = get_eta2__s(theta, phi, x)
-    logfacx = get_logfacx_lookuptable(x)
+    eta2__j = get_eta2__s(theta=theta, phi=phi, x=x)
+    logfacx = get_logfacx_lookuptable(x=x)
 
-    def get_ulog_score__j(
+    def get_exponent__j(
         theta: Array1d, phi: ArraySquare, x: Array1d, i: Index, logfacx: Callable
     ) -> uLogScore:
         """Returns the log unormalized score for poisson sqr
@@ -229,12 +242,12 @@ def get_ulog_score__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
              u_log_score: float
         """
         return (
-            phi[i, i] * x[i] + eta2__j(theta, phi, x, i) * jnp.sqrt(x[i]) - logfacx[i]
+            phi[i, i] * x[i] + eta2__j(theta=theta, phi=phi, x=x, i=i) * jnp.sqrt(x[i]) - logfacx[i]
         )
 
-    get_ulog_score__j = partial(get_ulog_score__j, logfacx=logfacx)
+    get_exponent__j = partial(get_exponent__j, logfacx=logfacx)
 
-    return get_ulog_score__j
+    return get_exponent__j
 
 
 # Functions for AIS sampling of the Poisson SQR Model
@@ -364,6 +377,7 @@ def T1__j(
         The number of steps the Metropolis Hastings algorithm should take
       d:
         The dimensionality of the problem
+      rgen_theta : (K, SHAPE) -> 
 
     Returns:
       theta:
@@ -392,8 +406,8 @@ def T1__j(
     def fori_loop_body(loop_index, init_val):
         theta, phi, keys = init_val
 
-        theta_prime = theta + rgen_theta(keys[1], (d,))
-        phi_prime = phi + rgen_phi(keys[2], (d, d))
+        theta_prime = theta + rgen_theta(key=keys[1], shape=(d,))
+        phi_prime = phi + rgen_phi(key=keys[2], shape=(d, d))
 
         a = f(theta_prime, phi_prime) / f(theta, phi)
 
@@ -960,7 +974,7 @@ def gibbs_step_d_dimensions__s(key, d, theta, phi, xarr):
 
     key_array = jax.random.split(key, d)
 
-    get_ulog_target__j = get_ulog_score__s(theta, phi, xarr)
+    get_ulog_target__j = get_exponent__s(theta, phi, xarr)
     
 
     def body(i, val):
