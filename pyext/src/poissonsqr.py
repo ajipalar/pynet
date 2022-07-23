@@ -230,8 +230,9 @@ def get_exponent__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
         theta: Array1d, phi: ArraySquare, x: Array1d, i: Index, logfacx: Callable
     ) -> uLogScore:
         """Returns the log unormalized score for poisson sqr
-           
-           phi[i,i] * x[i] + eta2 * sqrt(x[i]) - log x[i]!
+          
+           --eta1--  -xi-   -eta2-  -sqrt xi-   + (log base measure) 
+           phi[i,i] * x[i] + eta2 * sqrt(x[i])      - log x[i]!
 
            params:
              theta: d dimensional real array
@@ -749,6 +750,48 @@ def plot_surface(x, y, z, import_dependencies=False):
 
     plt.show()
 
+def pstar(x, xarr, theta, phi, i, get_exponent__j) -> float:
+    """
+    The node conditional distribution of the poisson SQR model
+    known to a multaplicative constant.
+
+    p(x)=1/Z p*(x)
+
+    p(xi|x/i, theta, phi) = exp{theta_i * xi + phi_ii
+
+    """
+    xarr_internal = xarr.at[i].set(x)
+    return jnp.exp(get_exponent__j(theta=theta, phi=phi, x=xarr_internal, i=i))
+
+def get_lambda(eta: float) -> float:
+
+    """
+    Inverse mapping for univariate poisson disitrbution
+
+    lambda is the 
+
+    params:
+      eta: float
+        natural parameter of the poisson distribution
+    returns:
+      lambda_ : float
+        0 < lambda_ < inf. The average rate and variance of events
+
+    """
+
+    return jnp.exp(eta)
+
+def get_node_conditional_interval() -> tuple:
+    """
+    Closed form solution to get the interval for
+    the node conditional (univariate poisson) distribution.
+
+    
+
+    """
+
+    ...
+
 
 def slice_sweep__s(key, 
         x: float, 
@@ -756,8 +799,8 @@ def slice_sweep__s(key,
         w: float, 
         pstar_args: tuple = (), 
         pstar_kwargs: dict = {},
-        uppstar_args=(lambda pt: ()),
-        uppstar_kwargs=(lambda pt: {})
+        update_pstar_args: Callable=(lambda pt: ()),
+        update_pstar_kwargs: Callable=(lambda pt: {})
         ) -> tuple:
 
     """
@@ -814,7 +857,7 @@ def slice_sweep__s(key,
     Maps a point x, u under the density function pstar to x' u'
 
     This function is meant to be jit compiled to XLA using Jax.
-    The default update functions uppstar_args and uppstar_kwargs
+    The default update functions update_pstar_args and update_pstar_kwargs
     return empty args and kwargs containers.
     Therefore they do not effect the jaxpr representation. 
     
@@ -835,7 +878,7 @@ def slice_sweep__s(key,
     MacKay Pseudocode
   
     1. evaluate P*(x)
-    2. draw a vertical coordinate u' ~ Uniform(0, P*(x))
+    2. draw a vertical coordinate u' ~ Uniform(0, P*(x))  Note 0 < u' < p*(x)
     3. create a horizontal interval (xl, xr) enclosing x
     4. loop {
     5.   draw x' ~ Uniform(xl, xr)
@@ -859,8 +902,8 @@ def slice_sweep__s(key,
     xl = x - r * w
     xr = x + (1 - r) * w
     
-    xl = jax.lax.while_loop(lambda xl: pstar(xl) > u_prime, lambda xl: xl - w, xl)
-    xr = jax.lax.while_loop(lambda xr: pstar(xr) > u_prime, lambda xr: xr + w, xr)
+    xl = jax.lax.while_loop(lambda xl: pstar(xl, *pstar_args, **pstar_kwargs) > u_prime, lambda xl: xl - w, xl)
+    xr = jax.lax.while_loop(lambda xr: pstar(xr, *pstar_args, **pstar_kwargs) > u_prime, lambda xr: xr + w, xr)
     
     # step 4 loop 1st iteration
     
@@ -871,8 +914,8 @@ def slice_sweep__s(key,
 
     #Optional update to pstar args and kwargs
 
-    pstar_args = uppstar_args((x_prime, pstar_args, pstar_kwargs))
-    pstar_kwargs = uppstar_kwargs((x_prime, pstar_args, pstar_kwargs))
+    pstar_args = update_pstar_args((x_prime, pstar_args, pstar_kwargs))
+    pstar_kwargs = update_pstar_kwargs((x_prime, pstar_args, pstar_kwargs))
     
     # step 6 evaluate pstar(x')
     t = pstar(x_prime, *pstar_args, **pstar_kwargs)
