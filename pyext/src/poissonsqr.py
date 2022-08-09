@@ -202,6 +202,18 @@ def logfactorial(n: Union[int, float]):
         logfac += np.log(i)
     return logfac
 
+def logfactorial_dev(n: int) -> float:
+    """
+    returns ln(n!)
+    n must be a positive integer
+    """
+
+    logn = jax.lax.fori_loop(1, n+1, (lambda i, logn: logn + jnp.log(i)), 0.)
+    return logn
+
+
+
+
 
 def get_logfacx_lookuptable(x: Array1d):
     lookup = jnp.zeros(shape=len(x))
@@ -792,6 +804,139 @@ def get_node_conditional_interval() -> tuple:
 
     ...
 
+def slice_sweep_log__s(key, 
+        x: float, 
+        lpstar: Callable, 
+        w: float, 
+        lpstar_args: tuple = (), 
+        lpstar_kwargs: dict = {},
+        update_lpstar_args: Callable=(lambda pt: ()),
+        update_lpstar_kwargs: Callable=(lambda pt: {})
+        ) -> tuple:
+
+    """
+
+    As slice_sweep__s (see below) but for log p*
+
+    p(x) = 1/Z p*(x)
+    p*(x) = e^f(x)
+    f(x) = log(p*(x))
+
+    
+    """
+
+    def create_interval_step_out(key, x, w, lpstar, u_prime, lpstar_args=(), lpstar_kwargs={}) -> tuple[float, float]:
+        """Create the interval I=(L,R) using the stepping out method McKay 375"""
+        r = jax.random.uniform(key, minval=0, maxval=1)
+        
+        xl = x - r * w
+        xr = x + (1 - r) * w
+        
+        xl = jax.lax.while_loop(lambda xl: lpstar(xl, *pstar_args, **pstar_kwargs) > u_prime, lambda xl: xl - w, xl)
+        xr = jax.lax.while_loop(lambda xr: lpstar(xr, *pstar_args, **pstar_kwargs) > u_prime, lambda xr: xr + w, xr)
+        return xl, xr
+
+    def create_interval_large(key, x, w, pstar, pstar_args=(), pstar_kwargs={}) -> tuple[float, float]:
+        """This method creates the interval by selecting the entire range of reasonable x values.
+           This method is not preffered because the probability mass of the poisson sqr model
+           node conditional distribution typically falls within a narrower region. """
+
+        return 0., 1e4
+
+    def step4_loop_body(val):
+        
+        # step 5 draw x'
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val 
+        key, subkey = jax.random.split(key)
+        x_prime = jax.random.uniform(subkey, minval=xl, maxval=xr)
+        
+        # step 6 evaluate pstar(x')
+        t = pstar(x_prime)
+        
+        # step 7
+        
+        val = key, x, x_prime, xl, xr, u_prime, t, loop_break
+        val = step7_and_8(val)
+        return val
+
+    def step7_true_func(val):
+        """Do nothing break out of loop"""
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val
+        loop_break = True
+        return key, x, x_prime, xl, xr, u_prime, t, loop_break
+
+    def step8(val):
+        """Perform the shrinking method for step 8"""
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val       
+        
+        x_prime, x, xr, xl = jax.lax.cond(
+            x_prime > x, 
+            lambda x_prime, x, xr, xl: (x_prime, x, x_prime, xl),  # reduce the right side
+            lambda x_prime, x, xr, xl: (x_prime, x, xr, x_prime),  # reduce the left side
+            *(x_prime, x, xr, xl))
+        
+        return key, x, x_prime, xl, xr, u_prime, t, loop_break
+    
+    def step7_and_8(val):
+        val = jax.lax.cond(
+            val[6] > val[5], # p*(x')>u'
+            step7_true_func, # do nothing. Break out of loop
+            step8, # step 8 modify the interval (xl, xr)
+            val)
+        
+        return val
+    
+    k1, k2, k3, k4 = jax.random.split(key, 4)
+    # step 1 evaluate lpstar(x). -inf < u < inf
+    u = lpstar(x, *lpstar_args, **lpstar_kwargs)
+    
+    # step 2 draw a vertical coordinate
+    # Because -inf is not a valid minval we truncate
+    # u must be > -20
+    u_prime = jax.random.uniform(k1, minval=-20, maxval=u)
+    
+    # step 3 create a horizontal interval (xl, xr) enclosing x
+    xl, xr = create_interval_step_out(key=k2, x=x, w=w, pstar=pstar, 
+            u_prime=u_prime, pstar_args=pstar_args, pstar_kwargs=pstar_kwargs)
+    
+    # step 4 loop 1st iteration
+    
+    loop_break = False
+    
+    # step 5 draw x'
+    x_prime = jax.random.uniform(k3, minval=xl, maxval=xr)
+
+    #Optional update to pstar args and kwargs
+
+    pstar_args = update_pstar_args((x_prime, pstar_args, pstar_kwargs))
+    pstar_kwargs = update_pstar_kwargs((x_prime, pstar_args, pstar_kwargs))
+    
+    # step 6 evaluate pstar(x')
+    t = pstar(x_prime, *pstar_args, **pstar_kwargs)
+    
+
+    # step 7 if pstar(x') > u' break out of loop. else modify interval
+    
+    val = k4, x, x_prime, xl, xr, u_prime, t, loop_break
+    val = step7_and_8(val)
+
+    
+    # End 1st loop iteration
+    # Continue the loop executing the while loop
+    
+    def while_cond_func(val):
+        """Check the loop break condition,
+           terminate the loop if True"""
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val
+        return loop_break == False
+    
+    val = jax.lax.while_loop(
+        while_cond_func, # check the loop break condition
+        step4_loop_body, 
+        val) # u_prime <= p*(x') i.e., t
+        
+    return val
+
 
 def slice_sweep__s(key, 
         x: float, 
@@ -888,39 +1033,41 @@ def slice_sweep__s(key,
     }
     
     """
-    
-    k1, k2, k3, k4 = jax.random.split(key, 4)
-    # step 1 evaluate pstar(x)
-    u = pstar(x, *pstar_args, **pstar_kwargs)
-    
-    # step 2 draw a vertical coordinate
-    u_prime = jax.random.uniform(k1, minval=0, maxval=u)
-    
-    # step 3 create a horizontal interval (xl, xr) enclosing x
-    r = jax.random.uniform(k2, minval=0, maxval=1)
-    
-    xl = x - r * w
-    xr = x + (1 - r) * w
-    
-    xl = jax.lax.while_loop(lambda xl: pstar(xl, *pstar_args, **pstar_kwargs) > u_prime, lambda xl: xl - w, xl)
-    xr = jax.lax.while_loop(lambda xr: pstar(xr, *pstar_args, **pstar_kwargs) > u_prime, lambda xr: xr + w, xr)
-    
-    # step 4 loop 1st iteration
-    
-    loop_break = False
-    
-    # step 5 draw x'
-    x_prime = jax.random.uniform(k3, minval=xl, maxval=xr)
 
-    #Optional update to pstar args and kwargs
+    def create_interval_step_out(key, x, w, pstar, pstar_args=(), pstar_kwargs={}) -> tuple[float, float]:
+        """Create the interval I=(L,R) using the stepping out method McKay 375"""
+        r = jax.random.uniform(key, minval=0, maxval=1)
+        
+        xl = x - r * w
+        xr = x + (1 - r) * w
+        
+        xl = jax.lax.while_loop(lambda xl: pstar(xl, *pstar_args, **pstar_kwargs) > u_prime, lambda xl: xl - w, xl)
+        xr = jax.lax.while_loop(lambda xr: pstar(xr, *pstar_args, **pstar_kwargs) > u_prime, lambda xr: xr + w, xr)
+        return xl, xr
 
-    pstar_args = update_pstar_args((x_prime, pstar_args, pstar_kwargs))
-    pstar_kwargs = update_pstar_kwargs((x_prime, pstar_args, pstar_kwargs))
-    
-    # step 6 evaluate pstar(x')
-    t = pstar(x_prime, *pstar_args, **pstar_kwargs)
-    
-    
+    def create_interval_large(key, x, w, pstar, pstar_args=(), pstar_kwargs={}) -> tuple[float, float]:
+        """This method creates the interval by selecting the entire range of reasonable x values.
+           This method is not preffered because the probability mass of the poisson sqr model
+           node conditional distribution typically falls within a narrower region. """
+
+        return 0., 1e4
+
+    def step4_loop_body(val):
+        
+        # step 5 draw x'
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val 
+        key, subkey = jax.random.split(key)
+        x_prime = jax.random.uniform(subkey, minval=xl, maxval=xr)
+        
+        # step 6 evaluate pstar(x')
+        t = pstar(x_prime)
+        
+        # step 7
+        
+        val = key, x, x_prime, xl, xr, u_prime, t, loop_break
+        val = step7_and_8(val)
+        return val
+
     def step7_true_func(val):
         """Do nothing break out of loop"""
         key, x, x_prime, xl, xr, u_prime, t, loop_break = val
@@ -947,27 +1094,38 @@ def slice_sweep__s(key,
             val)
         
         return val
+    
+    k1, k2, k3, k4 = jax.random.split(key, 4)
+    # step 1 evaluate pstar(x)
+    u = pstar(x, *pstar_args, **pstar_kwargs)
+    
+    # step 2 draw a vertical coordinate
+    u_prime = jax.random.uniform(k1, minval=0, maxval=u)
+    
+    # step 3 create a horizontal interval (xl, xr) enclosing x
+    xl, xr = create_interval_step_out(key=k2, x=x, w=w, pstar=pstar, pstar_args=pstar_args, pstar_kwargs=pstar_kwargs)
+    
+    # step 4 loop 1st iteration
+    
+    loop_break = False
+    
+    # step 5 draw x'
+    x_prime = jax.random.uniform(k3, minval=xl, maxval=xr)
+
+    #Optional update to pstar args and kwargs
+
+    pstar_args = update_pstar_args((x_prime, pstar_args, pstar_kwargs))
+    pstar_kwargs = update_pstar_kwargs((x_prime, pstar_args, pstar_kwargs))
+    
+    # step 6 evaluate pstar(x')
+    t = pstar(x_prime, *pstar_args, **pstar_kwargs)
+    
 
     # step 7 if pstar(x') > u' break out of loop. else modify interval
     
     val = k4, x, x_prime, xl, xr, u_prime, t, loop_break
     val = step7_and_8(val)
 
-    def step4_loop_body(val):
-        
-        # step 5 draw x'
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val 
-        key, subkey = jax.random.split(key)
-        x_prime = jax.random.uniform(subkey, minval=xl, maxval=xr)
-        
-        # step 6 evaluate pstar(x')
-        t = pstar(x_prime)
-        
-        # step 7
-        
-        val = key, x, x_prime, xl, xr, u_prime, t, loop_break
-        val = step7_and_8(val)
-        return val
     
     # End 1st loop iteration
     # Continue the loop executing the while loop
