@@ -11,6 +11,8 @@ import jax.random
 from jax import jit
 import numpy as np
 from hypothesis import given, settings, strategies as st
+import hypothesis.extra.numpy as hnp
+import hypothesis
 from typing import Any, Callable
 from functools import partial
 import collections
@@ -342,6 +344,8 @@ def slice_sweep__s_test_definition(key, f: Callable, w: float, start_x: float, s
 
     pretty_print_ss(k4, x, start_x, x_prime, xl, xr, u_prime, loop_break)
 
+
+
 def slice_sweep_expected_value_test_definition(key, f, w, start_x, nsamples, src: Module):
     """Tests the expected value and variance of various distributions for the slice sweepinig
             algorithm"""
@@ -371,15 +375,50 @@ def slice_sweep_expected_value_test_definition(key, f, w, start_x, nsamples, src
 
     pretty_print_ss(k4, x, start_x, x_prime, xl, xr, u_prime, loop_break)
 
-def slice_sweep__s_poisson_sqr(key, src: Module):
+def slice_sweep__s_poisson_sqr_test_definition(key, theta, phi, xarr, x_start, d, w, src: Module):
 
     """Tests the slice sweep algorithm against the
-       poisson sqr model"""
+       poisson sqr model. 
 
-    scoref__g = src.get_exponent__s
+       params:
+         key: jax PRNGKey
+         theta: (d,) shape real array
+         phi: (d,d) shape real symmetric array
+         x: (d,) shape int32 array x[i] >= 0 for all i
+         w: slice samling weight
 
-    scoref =scoref__g()
+    """
 
+    # Define P*
+    get_exp__j = src.get_exponent__s(theta=theta, phi=phi, x=xarr)
+    pstar = partial(src.pstar, get_exponent__j = get_exp__j)
+    pstar_kwargs = {"theta": theta, "phi": phi, "xarr": xarr, "i": 0}
+
+    def update_pstar_kwargs(x, pstar_args, pstar_kwargs):
+        d = pstar_kwargs
+        theta = d['theta']
+        phi  = d['phi']
+        xarr = d['xarr']
+        x_old = d['x']
+        i_old = d['i']
+
+        ...
+
+    keys = jax.random.split(key, num=d)
+
+    ss = partial(src.slice_sweep__s, pstar=pstar) 
+    ss = jax.jit(ss)
+
+    for i in range(d):
+        val = ss(x=x_start, pstar=pstar, w=w, pstar_kwargs=pstar_kwargs)
+
+def property_test_exponent_min_max2d(theta, phi, xarr, get_exponent, bound):
+
+    exp0 = np.array(get_exponent(theta=theta, phi=phi, x=xarr, i=0))
+    exp1 = np.array(get_exponent(theta=theta, phi=phi, x=xarr, i=1)) 
+
+    assert  exp0 < bound, f"exp0 {exp0, bound}"
+    assert  exp1 < bound, f"exp1 {exp1, bound}"
 
 
 class PoissUnitTests(IMP.test.TestCase):
@@ -400,6 +439,15 @@ class PoissUnitTests(IMP.test.TestCase):
                 scale=2.) 
         slice_sweep__s_test_definition(key=self.key, 
             f=pstar, w=w, start_x=2., src=self.src)
+
+    def test_slice_sweep__s_distant_initial_value(self):
+        w = 1.
+        pstar = partial(jax.scipy.stats.norm.pdf, loc=7., scale=2.) 
+        slice_sweep__s_test_definition(key=self.key, f=pstar, w=w, start_x=-10., src=self.src)
+
+        # fails because f(x0) = 0.
+ #       slice_sweep__s_test_definition(key=self.key, f=pstar, w=w, start_x=-22., src=self.src)
+        slice_sweep__s_test_definition(key=self.key, f=pstar, w=w, start_x=22., src=self.src)
 
     def test_slice_sweep__s_poisson(self):
         """Slice sweep poisson """
@@ -450,6 +498,21 @@ class PoissUnitTests(IMP.test.TestCase):
         pstar = partial(jax.scipy.stats.poisson.pmf, mu=7.)
         w=1.
         slice_sweep_expected_value_test_definition(key=self.key, f=pstar, w=w, start_x=start_x, nsamples=nsamples, src=self.src)
+    
+    @IMP.test.skip
+    def test_slice_sweep__s_sqr(self):
+
+        slice_sweep__s_poisson_sqr_test_definition(key=self.key,
+                theta=self.theta2d,
+                phi=self.phi2d,
+                xarr=self.x2d,
+                x_start=1.,
+                d=2,
+                w=1.,
+                src=self.src)
+
+        
+        
 
 
     # @IMP.test.skip  #dev
@@ -626,9 +689,42 @@ class IsMatrixCompatible(IMP.test.TestCase):
 class PoissPropTests(IMP.test.TestCase):
     """Base class for Poisson SQR Property tests"""
 
+    @IMP.test.skip # dev
     @given(
         st.integers(min_value=2, max_value=13), st.integers(min_value=2, max_value=13)
     )
     @settings(deadline=None)
     def test_remove_ith_entry__s_vs_value(self, d1: int, d2: int):
         remove_ith_entry__s_vs_value(src=self.src, d1=d1, d2=d2)
+
+    # @given(
+    #        hnp.arrays(np.float32, (2,)), hnp.arrays(np.float32, (2, 2)), hnp.arrays(np.int32, (2,))
+    #)
+
+    @given( hnp.arrays(np.int32, (2,), elements=st.integers(min_value=0, max_value=100)))
+    @settings(deadline=None) #, verbosity=hypothesis.Verbosity.verbose)
+    def test_exponent_min_max(self, xarr):
+
+
+        get_exponent = self.get_exp2d
+        theta=self.theta2d
+        phi=self.phi2d
+
+        property_test_exponent_min_max2d(theta=theta, phi=phi, xarr=xarr, get_exponent=get_exponent, bound=1000)
+
+    @given( hnp.arrays(np.float32, (2,), elements=st.floats()))
+    def test_exponent_theta(self, theta):
+
+        get_exponent = self.get_exp2d
+        theta=self.theta2d
+        phi=self.phi2d
+        xarr = self.x2d
+        property_test_exponent_min_max2d(theta=theta, phi=phi, xarr=xarr, get_exponent=get_exponent, bound=1000)
+
+
+
+
+
+        
+
+        
