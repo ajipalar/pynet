@@ -86,6 +86,8 @@ class CullinBenchMark:
         ...
         
     def validate_prey(self):
+        """Checks prey are strings consistent with uniprot.
+           puts the failed cases in a list"""
         # Regex consitent with Uniprot Accession
         
         failed = []
@@ -93,18 +95,24 @@ class CullinBenchMark:
         for i, row in self.data.iterrows():
             
             prey_str = row["Prey"]
-            m = self.uniprot_acc_pattern.match(prey_str)
-            m = None if len(prey_str) in {0, 1, 2, 3, 4, 5, 7, 8, 9} else m
-            m = None if len(prey_str) > 10 else m
+            m = self.is_uniprot_accesion_id(prey_str)
             if m is None:
                 failed.append(i)
-
             r += 1
-            
-        assert r == 6555
+        assert r == len(self.data)
         self.failed = failed
         
-    def is_uniprot_accesion_id(self, s) -> []
+    def is_uniprot_accesion_id(self, s: str) -> tuple[bool, None]:
+        """Returns a re.Match object if s is consistent with
+           a UniProt Accession identifier. Else None"""
+        assert type(s) == str
+        assert len(s) >= 0
+        
+        m = self.uniprot_acc_pattern(s)
+        m = None if len(prey_str) in {0, 1, 2, 3, 4, 5, 7, 8, 9} else m
+        m = None if len(prey_str) > 10 else m
+        m = None if self.whitespace_pattern else m
+        return m
 
     def deprecated_validate_data_inner_loop(self, row):
         try:
@@ -134,6 +142,10 @@ cullin_benchmark.validate_prey()
 
 cullin_benchmark.data.loc[cullin_benchmark.failed, "Prey"]
 # -
+
+type('abc') == str
+
+type(type(None))
 
 p = re.compile(r"[A-Z]")
 m = p.match("S")
