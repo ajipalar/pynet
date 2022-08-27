@@ -1,20 +1,20 @@
----
-jupyter:
-  jupytext:
-    text_representation:
-      extension: .Rmd
-      format_name: rmarkdown
-      format_version: '1.2'
-      jupytext_version: 1.13.8
-  kernelspec:
-    display_name: Python 3 (ipykernel)
-    language: python
-    name: python3
----
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.13.8
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
 
-## CRL5 VIF CBF&#946; Benchmarking
+# ## CRL5 VIF CBF&#946; Benchmarking
 
-```{python}
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -30,9 +30,9 @@ import re
 import itertools
 import requests
 import json
-```
 
-```{python}
+
+# +
 # Load the system data into the notebook
 
 class CullinBenchMark:
@@ -133,36 +133,27 @@ cullin_benchmark.load_data()
 cullin_benchmark.validate_prey()
 
 cullin_benchmark.data.loc[cullin_benchmark.failed, "Prey"]
-```
+# -
 
-```{python}
 p = re.compile(r"[A-Z]")
 m = p.match("S")
-```
 
-```{python}
 type(m)
-```
 
-```{python}
+# +
 # Define the list of protein identifiers
 
 cullin_benchmark.data
-```
+# -
 
-```{python}
 prey_list = list(cullin_benchmark.data["Prey"].iloc[1:10])
-```
 
-```{python}
 
-```
 
-```{python}
 prey_list
-```
 
-```{python}
+
+# +
 class UniProtIDMapping:
     """Maps UniProt Accession IDs to Entrez Gene Ids"""
     
@@ -198,9 +189,10 @@ def to_str(preys):
         s += f"{prey},"
     s = s.strip(",")
     return s
-```
 
-```{python}
+
+# -
+
 preys = to_str(cullin_benchmark.data["Prey"])
 #preys = "Q01196"
 idmapping = UniProtIDMapping(ids = preys)
@@ -208,81 +200,56 @@ idmapping.post_job()
 idmapping.get_job_status()
 idmapping.get_results()
 idmapping.job_status
-```
 
-```{python}
 idmapping.get_job_status()
 idmapping.job_status.json()
-```
 
-```{python}
 idmapping.job_status.headers['x-total-results']
-```
 
-```{python}
 len(set(cullin_benchmark.data["Prey"]))
-```
 
-```{python}
 requests.get(idmapping.job_status.links['next']['url']).json()
-```
 
-```{python}
 idmapping.r.headers
-```
 
-```{python}
 
-```
 
-```{python}
 idmapping.job_status.headers["Link"]
-```
 
-```{python}
+
 def to_str(preys):
     s = ""
     for prey in preys:
         s += f"{prey},"
     s = s.strip(",")
     return s
-```
 
-```{python}
+
 s =to_str(cullin_benchmark.data["Prey"].iloc[0:13])
-```
 
-```{python}
 s
-```
 
-```{python}
 cullin_benchmark.data["Prey"].iloc[0:1000]
-```
 
-```{bash}
+# + language="bash"
+#
+# -
 
-```
-
-```{python}
 help(requests.adapters)
-```
 
-```{python}
+
+# +
 # Use the Gene ID as the unique identifier
-```
 
-```{python}
+# +
 # Get the Spectral counts data for the system
 
 # (bait_gene_id, prey_gene_id, spectral_counts)
-```
 
-```{python}
+# +
 # Count all unique pairs # 132*131 / 2 = 8646 pairs
-```
 
-```{python}
+# +
 # Query the protein databank for all structures with a pair
 
 class CullinPDBQuery:
@@ -293,10 +260,9 @@ class CullinPDBQuery:
     def query_pdb(self, gid_list):
         ...
         
-    
-```
 
-```{python}
+
+# +
 # Query BioGrid for Evidence of both pairs
 
 # Have a UniProt Accession ID
@@ -316,17 +282,14 @@ class CullinBioGridQuery:
         
 biogrid_query = CullinBioGridQuery()
 biogrid_query.load_biogrid_tab3()
-```
+# -
 
-```{python}
 
-```
 
-```{bash}
-ls ../data/biogrid
-```
+# + language="bash"
+# ls ../data/biogrid
 
-```{python}
+# +
 class BaseCoverage:
     def __init__(self):
         ...
@@ -348,37 +311,30 @@ class CullinBioGridCoverage(BaseCoverage):
         
         
         
-        
-```
 
-```{python}
+
+# +
 # Define all the evidence codes 
-```
 
-```{python}
+# +
 # Show the coverage of Experimental data
-```
+# -
 
-```{python}
 # Example coverage plot
 mat = np.random.rand(132*132).reshape((132, 132))
 mat = np.tril(mat) + np.tril(mat).T - np.eye(132) * mat
 plt.imshow(mat)
-```
 
-```{python}
+# +
 # Genome Wide loss of Function screens?
-```
 
-```{python}
+# +
 # Benchmarking cases
 # For a given pair there is either no evidence or evidence
 # PDB TPR (binary classification) (P)
 # PDB FNR (binary classification) (P)
 # PDB FPR (binary classifcation)  (N)
 # Cannot know FPR
-```
+# -
 
-```{python}
 
-```
