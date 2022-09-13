@@ -19,7 +19,9 @@ import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import pandas as pd
 import scipy as sp
 import scipy.stats
@@ -37,8 +39,7 @@ import json
 
 class CullinBenchMark:
     
-    
-    def __init__(self, dirpath: Path):
+    def __init__(self, dirpath: Path, load_data=True, validate=True, create_unique_prey=True):
         self.path = dirpath
         self.data = pd.DataFrame()
         self.uniprot_re = r"[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}"
@@ -53,8 +54,15 @@ class CullinBenchMark:
         #assert p.match("O0AAA0AAA0") is None
         assert self.uniprot_acc_pattern.match("Q1AZL2") is not None
         
-        
-        
+        if load_data:
+            self.load_data()
+            
+        if validate:
+            self.validate_prey()
+            self.validate_spec()
+            
+        if create_unique_prey:
+            self.create_unique_prey()
         
     def load_data(self):
         data_path = self.path / "1-s2.0-S1931312819302537-mmc2.xlsx"
@@ -85,6 +93,13 @@ class CullinBenchMark:
     def reproduce_published_results(self):
         ...
         
+    def validate_spec(self):
+        for i, j in self.data.iterrows():
+            assert len(j['Spec'].split('|')) == 4, print(j)
+            assert len(j['ctrlCounts'].split('|'))==12, print(j)
+            
+    
+
     def validate_prey(self):
         """Checks prey are strings consistent with uniprot.
            puts the failed cases in a list"""
@@ -108,11 +123,13 @@ class CullinBenchMark:
         assert type(s) == str
         assert len(s) >= 0
         
-        m = self.uniprot_acc_pattern(s)
-        m = None if len(prey_str) in {0, 1, 2, 3, 4, 5, 7, 8, 9} else m
-        m = None if len(prey_str) > 10 else m
-        m = None if self.whitespace_pattern else m
+        m = self.uniprot_acc_pattern.match(s)
+        m = None if len(s) in {0, 1, 2, 3, 4, 5, 7, 8, 9} else m
+        m = None if len(s) > 10 else m
+        m = None if self.whitespace_pattern.match(s) else m
         return m
+    
+    
 
     def deprecated_validate_data_inner_loop(self, row):
         try:
@@ -131,38 +148,194 @@ class CullinBenchMark:
                 pass   
         except AssertionError:
             failed.append(i)
-                
-        def get_unique_uniprot_prey(self):
+            
+            
+    def update_spec(self):
+        
+        spec = self.data['Spec']
+        self.data = self.data.drop(columns='Spec')
+          
+    def create_unique_prey(self):
+        self.unique_prey = set(self.data["Prey"])
+        self.n_unique_prey = len(self.unique_prey)
+        
+    def __repr__(self):
+        
+        def f(exp, s):
+            """Helper catcher wraps a try-except statement"""
+            try:
+                return s + exp()
+            except AttributeError:
+                return s
+        
+        s = ""
+        s = f(lambda : f"shape : {self.data.shape}", s)
+        #s = f(lambda : f"\ncolumns : {list(self.data.columns)}", s)
+        s = f(lambda : f"\nnfailed : {len(self.failed)}", s)
+        #s = f(lambda : f"\nfailed : {self.data.loc[cullin_benchmark.failed, 'Prey']}", s)
+
+        return s
+
 
 
 cullin_benchmark = CullinBenchMark(dirpath=Path("../data/cullin_e3_ligase"))
-cullin_benchmark.load_data()
+#cullin_benchmark.load_data()
 
-cullin_benchmark.validate_prey()
+#cullin_benchmark.validate_prey()
 
 cullin_benchmark.data.loc[cullin_benchmark.failed, "Prey"]
+
+# + language="bash"
+# head ../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt
 # -
 
-type('abc') == str
-
-type(type(None))
-
-p = re.compile(r"[A-Z]")
-m = p.match("S")
-
-type(m)
+# Check Biogrid Data
+data_path = "../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt"
+with open(data_path, 'r') as fi:
+    nlines = len(fi.readline().split("\t"))
+    assert nlines > 10
+    j=1
+    for i, line in enumerate(fi):
+        le = len(line.split("\t"))
+        assert le == nlines, f"{i, nlines, le}"
+        j+=1
+    print(j)
 
 # +
-# Define the list of protein identifiers
 
-cullin_benchmark.data
+n_unique_genes = len(set(biogrid['Entrez Gene Interactor A']).union(set('Entrez Gene Interactor B')))
+n_unique_interactions = len(set(biogrid['#BioGRID Interaction ID']))
+n_possible_interactions = int(0.5 * n_unique_genes * (n_unique_genes -1))
+interaction_density = n_unique_interactions / n_possible_interactions
+
+print(f"Biogrid has {n_unique_genes} unique genes \
+with {n_unique_interactions}. The interaction density is {interaction_density}")
+# -
+
+biogrid.columns
+
+# Load Biogrid into memory
+biogrid = pd.read_csv("../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt", delimiter="\t")
+
+etype = 'Experimental System Type'
+esys = 'Experimental System'
+
+# +
+# Get the frequencies of each experiment in the database
+experiment_keys = list(set(biogrid.loc[:, esys]))
+experiment_frequency = list(len(biogrid[biogrid.loc[:, esys] == key]) for key in experiment_keys)
+experiment_type = list(next(iter(
+    biogrid.loc[biogrid.loc[:, esys] == key, 
+                etype])) for key in experiment_keys)
+
+
+summary = pd.DataFrame({'Experiment': experiment_keys,
+                        'Frequency': experiment_frequency,
+                        'Type': experiment_type})
+summary.sort_values('Frequency', inplace = True, ascending = False)
+summary['log10(freq)'] = np.log10(summary['Frequency'])
+
+# +
+ax_params = {'x': np.linspace(0, 40, len(summary)),
+             'title': f"Experimental Evidence Codes in Biogrid (4.4.206)\
+              \nN={len(biogrid)}",
+             'colors': {'physical': cmap[0], 'genetic': cmap[1]},
+             "cmap": matplotlib.cm.tab10.colors,
+             "w": 12,
+             "l": 8,
+             "height": summary['log10(freq)'],
+            }
+
+rcParams = {'font.size': 16}
+fig, ax = plt.subplots(figsize=(ax_params['w'], ax_params['l']))
+plt.rcParams.update(**rcParams)
+plt.title(ax_params['title'])
+plt.bar(x = ax_params['x'],
+         height=summary['log10(freq)'],
+         color=list(
+             iter(map(lambda t: colors[t], summary['Type']
+                     )
+                 )
+         ))
+p_patch = mpatches.Patch(color=colors['physical'], label='physical')
+g_patch = mpatches.Patch(color=colors['genetic'], label='genetic')
+
+ax.set_xticks(x)
+ax.set_xticklabels(labels=summary['Experiment'], rotation='vertical')
+ax.set_ylabel("Log10 Frequency")
+ax.legend(handles=[p_patch, g_patch])
+plt.show()
+
+# +
+"""
+Most of the Prey in the cullin E3 Ligase Benchmark are mapped with UniProt Accession Ids.
+The biogrid interactors are identified using NCBI Entrez IDs
+
+
+"""
+
+
+    
+    
+    
+
+# Update the Cullin E3 Ring Ligase with 9
+
+# Remove failed cases
+
+
+cullin_benchmark.data["Prey"]
+# -
+
+requests
+
+matplotlib.cm.to_rgba(matplotlib.cm.get_cmap('Paired'))
+
+matplotlib.cm.tab10
+
+list(iter(map(lambda t: colors[t], summary['Type'])))
+
+np.linspace(0, 10, len(summary))
+
+# ?plt.barh
+
+summary.sort_values('Frequency')
+
+# ?summary.sort_values
+
+from collections import Ordered
+
+# Check the number of type of experiment
+experimenet_key_types = {}
+for key in experiment_keys:
+    subdf = biogrid[biogrid.loc[:, 'Experimental System'] == key]
+    selector = subdf['Experimental System Type']
+    nphys = len(subdf[selector == 'physical'])
+    ngene = len(subdf[selector == 'genetic'])
+    assert nphys + ngene == len(subdf), f"{key, nphys, ngene, len(subdf)}"
+    assert 0 in (ngene, nphys)
+    assert 0 not in ()
+    
+    experimenet_key_types[key] = {'phys': nphys, 'gen': ngene}
+    
+
+next(iter(biogrid.loc[:, 'Experimental System']))
+
+
+# +
+# Plot the Experiment Frequency
+
+# +
+def helper_catcher(expr, s):
+    try:
+        return expr()
+    except AttributeError:
+        return s
+    
+helper_catcher(lambda : f"{cullin_benchmark.asdlkjsadf}", "")
 # -
 
 prey_list = list(cullin_benchmark.data["Prey"].iloc[1:10])
-
-
-
-prey_list
 
 
 # +
