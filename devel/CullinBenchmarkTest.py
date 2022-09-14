@@ -186,7 +186,7 @@ cullin_benchmark = CullinBenchMark(dirpath=Path("../data/cullin_e3_ligase"))
 cullin_benchmark.data.loc[cullin_benchmark.failed, "Prey"]
 
 # + language="bash"
-# head ../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt
+# shasum -c ../data/biogrid/checksum512.txt
 # -
 
 # Check Biogrid Data
@@ -199,7 +199,93 @@ with open(data_path, 'r') as fi:
         le = len(line.split("\t"))
         assert le == nlines, f"{i, nlines, le}"
         j+=1
-    print(j)
+    print(f"n-lines {j}")
+
+# Load Biogrid into memory
+biogrid = pd.read_csv("../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt", delimiter="\t")
+nbytes_0 = 0
+for col in biogrid:
+    nbytes_0 += biogrid.loc[:, col].nbytes
+
+# +
+col = "Entrez Gene Interactor A"
+rows = biogrid.loc[:, col].apply(lambda x: type(x) == str)
+#assert np.all(biogrid.loc[rows, col].apply(lambda x: x.isnumeric())) # Fails due to "-"
+biogrid.loc[rows, col] = biogrid.loc[rows, col].apply(lambda x: np.nan if x=="-" else x)
+rows = biogrid.loc[:, col].apply(lambda x: type(x) == str)
+assert np.all(biogrid.loc[rows, col].apply(lambda x: x.isdigit())) # Passes
+assert np.all(biogrid.loc[rows, col].apply(lambda x: x[0] != '0'))
+biogrid.loc[rows, col] = biogrid.loc[rows, col].apply(lambda x: np.float64(x))
+biogrid.loc[:, col]=pd.to_numeric(biogrid.loc[:, col])
+
+col = "Entrez Gene Interactor B"
+rows = biogrid.loc[:, col].apply(lambda x: type(x) == str)
+#assert np.all(biogrid.loc[rows, col].apply(lambda x: x.isnumeric())) # Fails due to "-"
+biogrid.loc[rows, col] = biogrid.loc[rows, col].apply(lambda x: np.nan if x=="-" else x)
+rows = biogrid.loc[:, col].apply(lambda x: type(x) == str)
+assert np.all(biogrid.loc[rows, col].apply(lambda x: x.isdigit())) # Passes
+assert np.all(biogrid.loc[rows, col].apply(lambda x: x[0] != '0'))
+biogrid.loc[rows, col] = biogrid.loc[rows, col].apply(lambda x: np.float64(x))
+biogrid.loc[:, col]=pd.to_numeric(biogrid.loc[:, col])
+
+col = "Score"
+rows = biogrid.loc[:, col].apply(lambda x: type(x) == str)
+biogrid.loc[rows, col] = biogrid.loc[rows, col].apply(lambda x: np.nan if x=="-" else x)
+biogrid.loc[:, col]=pd.to_numeric(biogrid.loc[:, col])
+
+categorical_cols = ["Experimental System", 
+                    "Experimental System Type",
+                    "Publication Source",
+                    "Systematic Name Interactor A",
+                    "Systematic Name Interactor B",
+                    "Official Symbol Interactor A",
+                    "Official Symbol Interactor B",
+                    "Author",
+                    "Publication Source",
+                    "Organism ID Interactor A",
+                    "Organism ID Interactor B",
+                    "Synonyms Interactor A",
+                    "Synonyms Interactor B",
+                    "Throughput",
+                    "Modification",
+                    "Qualifications",
+                    "Tags",
+                    "Source Database",
+                    "Ontology Term Categories",
+                    "Ontology Term IDs",
+                    "Ontology Term Names",
+                    "Ontology Term Qualifier Names",
+                    "Ontology Term Qualifier IDs",
+                    "Ontology Term Types",
+                    "SWISS-PROT Accessions Interactor A",
+                    "SWISS-PROT Accessions Interactor B",
+                    "TREMBL Accessions Interactor A",
+                    "TREMBL Accessions Interactor B",
+                    "REFSEQ Accessions Interactor A",
+                    "REFSEQ Accessions Interactor B",
+                    "Organism Name Interactor A",
+                    "Organism Name Interactor B"
+                   ]
+for col in categorical_cols:
+    biogrid.loc[:, col] = biogrid.loc[:, col].astype("category")
+
+
+selected_cols = ['#BioGRID Interaction ID', 
+                 'Entrez Gene Interactor A', 
+                 'Entrez Gene Interactor B',
+                 'Experimental System',
+                 'Experimental System Type', 
+                 'Score',
+                 "Organism Name Interactor A",
+                 "Organism Name Interactor B",
+                 "Ontology Term Categories"
+                 ]
+biogrid = biogrid[selected_cols]
+# -
+
+nbytes = 0
+for col in biogrid:
+    nbytes += biogrid[col].nbytes
 
 # +
 
@@ -209,13 +295,8 @@ n_possible_interactions = int(0.5 * n_unique_genes * (n_unique_genes -1))
 interaction_density = n_unique_interactions / n_possible_interactions
 
 print(f"Biogrid has {n_unique_genes} unique genes \
-with {n_unique_interactions}. The interaction density is {interaction_density}")
+with {n_unique_interactions}.\nThe interaction density is {interaction_density}")
 # -
-
-biogrid.columns
-
-# Load Biogrid into memory
-biogrid = pd.read_csv("../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt", delimiter="\t")
 
 etype = 'Experimental System Type'
 esys = 'Experimental System'
@@ -239,12 +320,14 @@ summary['log10(freq)'] = np.log10(summary['Frequency'])
 ax_params = {'x': np.linspace(0, 40, len(summary)),
              'title': f"Experimental Evidence Codes in Biogrid (4.4.206)\
               \nN={len(biogrid)}",
-             'colors': {'physical': cmap[0], 'genetic': cmap[1]},
-             "cmap": matplotlib.cm.tab10.colors,
              "w": 12,
              "l": 8,
              "height": summary['log10(freq)'],
             }
+
+cmap = matplotlib.cm.tab10.colors
+colors = {'physical': cmap[0], 'genetic': cmap[1]}
+x = np.linspace(0, 40, len(summary))
 
 rcParams = {'font.size': 16}
 fig, ax = plt.subplots(figsize=(ax_params['w'], ax_params['l']))
@@ -274,8 +357,6 @@ The biogrid interactors are identified using NCBI Entrez IDs
 
 """
 
-
-    
     
     
 
@@ -287,55 +368,7 @@ The biogrid interactors are identified using NCBI Entrez IDs
 cullin_benchmark.data["Prey"]
 # -
 
-requests
-
-matplotlib.cm.to_rgba(matplotlib.cm.get_cmap('Paired'))
-
 matplotlib.cm.tab10
-
-list(iter(map(lambda t: colors[t], summary['Type'])))
-
-np.linspace(0, 10, len(summary))
-
-# ?plt.barh
-
-summary.sort_values('Frequency')
-
-# ?summary.sort_values
-
-from collections import Ordered
-
-# Check the number of type of experiment
-experimenet_key_types = {}
-for key in experiment_keys:
-    subdf = biogrid[biogrid.loc[:, 'Experimental System'] == key]
-    selector = subdf['Experimental System Type']
-    nphys = len(subdf[selector == 'physical'])
-    ngene = len(subdf[selector == 'genetic'])
-    assert nphys + ngene == len(subdf), f"{key, nphys, ngene, len(subdf)}"
-    assert 0 in (ngene, nphys)
-    assert 0 not in ()
-    
-    experimenet_key_types[key] = {'phys': nphys, 'gen': ngene}
-    
-
-next(iter(biogrid.loc[:, 'Experimental System']))
-
-
-# +
-# Plot the Experiment Frequency
-
-# +
-def helper_catcher(expr, s):
-    try:
-        return expr()
-    except AttributeError:
-        return s
-    
-helper_catcher(lambda : f"{cullin_benchmark.asdlkjsadf}", "")
-# -
-
-prey_list = list(cullin_benchmark.data["Prey"].iloc[1:10])
 
 
 # +
@@ -378,6 +411,51 @@ def to_str(preys):
 
 # -
 
+def get_prey_selector(db):
+    """
+    Remove the failed prey from the list
+    """
+    
+    selector = []
+    failed = db.failed
+    failed = sorted(failed, reverse=True)
+    x = None
+    
+    current_found = True
+    unfinished = True
+    
+    for i in rdb.data.index:
+        if current_found:
+            current_found = False
+            if len(failed) == 0:
+                break
+            
+            current_failed = failed.pop()
+            
+        if i < current_failed:
+            selector.append(i)
+        elif i == current_failed:
+            current_found = True
+        else:
+            assert False, f"{i, current_failed}
+            
+        
+    return selector, failed
+
+
+# +
+class TesterIndex:
+    index = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    
+    
+class Testeroo:
+    failed = [0, 1, 3, 7, 9]
+    data = TesterIndex
+    
+get_prey_selector(Testeroo)
+    
+# -
+
 preys = to_str(cullin_benchmark.data["Prey"])
 #preys = "Q01196"
 idmapping = UniProtIDMapping(ids = preys)
@@ -397,8 +475,6 @@ requests.get(idmapping.job_status.links['next']['url']).json()
 
 idmapping.r.headers
 
-
-
 idmapping.job_status.headers["Link"]
 
 
@@ -412,15 +488,7 @@ def to_str(preys):
 
 s =to_str(cullin_benchmark.data["Prey"].iloc[0:13])
 
-s
-
 cullin_benchmark.data["Prey"].iloc[0:1000]
-
-# + language="bash"
-#
-# -
-
-help(requests.adapters)
 
 
 # +
@@ -467,10 +535,6 @@ class CullinBioGridQuery:
         
 biogrid_query = CullinBioGridQuery()
 biogrid_query.load_biogrid_tab3()
-# -
-
-
-
 # + language="bash"
 # ls ../data/biogrid
 
