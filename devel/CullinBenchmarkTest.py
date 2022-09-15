@@ -287,6 +287,11 @@ nbytes = 0
 for col in biogrid:
     nbytes += biogrid[col].nbytes
 
+print(f"{np.log2(nbytes_0), np.log2(nbytes), biogrid.shape}")
+print(f"{np.log10(nbytes_0), np.log10(nbytes)}")
+
+
+
 # +
 
 n_unique_genes = len(set(biogrid['Entrez Gene Interactor A']).union(set('Entrez Gene Interactor B')))
@@ -367,13 +372,13 @@ jobId = response.json()['jobId']
 GET_END_POINT = f"{API_URL}/idmapping/status/{jobId}"
 job_status = requests.get(GET_END_POINT)
 assert job_status.status_code == 200
-x_total_results = status.headers['x-total-results']
+x_total_results = job_status.headers['x-total-results']
 n_unique_mappable_prey = len(list(unique_uniprot_prey))
 
 
 GET_END_POINT = f"{API_URL}/idmapping/stream/{jobId}"
 stream_response = requests.get(GET_END_POINT)
-assert status.status_code == 200
+assert job_status.status_code == 200
 response_dict = stream_response.json()
 response_dict = response_dict['results']
 id_mapping = {}
@@ -383,6 +388,12 @@ for pair in response_dict:
 failed_ids = job_status.json()['failedIds']
 assert len(failed_ids) + len(set(id_mapping)) == len(unique_uniprot_prey)
 # -
+
+# Prior Mappings  
+# 13 failed to map  
+# 2834 succeeded  
+# of 2847 total  
+#
 
 print(f"{len(failed_ids)} failed to map\n{len(set(id_mapping))} succeeded\nof {len(unique_uniprot_prey)} total")
 
@@ -398,6 +409,8 @@ failed_df = cullin_benchmark.data[cullin_benchmark.data['Prey'].apply(lambda x: 
 # +
 # How many interactions are there for the entrez genes
 
+"""
+Brute Force. Do not run
 entrez_ids = [val for key, val in id_mapping.items()]
 
 
@@ -411,20 +424,397 @@ biogrid = biogrid.loc[not_nan]
 # Filter Out the Places missing Entrez IDS
 new_shape = biogrid.shape
 col = "Entrez Gene Interactor A"
-found_rows = []
-not_found_rows = biogrid.index
+
+not_found_row_indicies = biogrid.index
 for i, eid in enumerate(entrez_ids):
-    rows = biogrid.loc[not_found_rows, 1].apply(lambda x: int(x) == int(eid))
-    found = rows[rows==True].index
-    not_found_rows = rows[]
+    rows = biogrid.loc[not_found_row_indicies, col].apply(lambda x: int(x) == int(eid))
+    not_found_rows_indicies = rows[rows==False].index
+    print((i, len(rows))) if i % 200 == 0 else ...
+
+
+"""
+# -
+
+
+2 * 2834 * 2312698
+
+"""
+Search Problem Statement
+
+For every gene in Cullin BenchMark, construct a subdata frame with those entries
+
+Brute Force 2 * 2834 * 2,312,698 = 13, 108, 372, 264
+
+find_indicies_from_sorted_list_A
+  index set
+find_indicies_from_sorted_list_B
+  index set
+Take the set_intersection
+
+find_start
+linear_search
+"""
+
+
+# +
+def binary_search(n, a, start, end, linear):
+    """
+    Find the starting index i where a[i] == n
+    If n not in a, return None
+    """
+    
+    assert type(end) == int
+    assert type(start) == int
+    assert start <= end
+    
+    if start == end:
+        return None
+    
+    middle = (start + end) // 2
+    #print(start, middle, end)
+
+    if a[middle] > n:
+        return binary_search(n, a, start, middle, linear)
+    elif a[middle] < n:
+        return binary_search(n, a, middle+1, end, linear)
+    else:
+        """
+        Do a linear search to the left to wind the start
+        """
+        return linear(n, a, middle, end)
+    
+def find_start(n, a, start, end):
+    """
+    Linear search for starting index
+    """
+    while a[start] == n:
+        if start == 0:
+            return start
+        start -=1
+    return start + 1
+
+def find_end(n, a, start, end):
+    """
+    Linear search for ending index
+    """
+    assert start <= len(a)
+    if start == len(a):
+        return start
+    while a[start] == n:
+        start += 1
+        if start == len(a):
+            return start
+    return start
+
+def find_bounds(n, a, start, end):
+    """
+    Return the inclusive exclusive [lb, rb) left and right bounds of a contigous array
+    whose values == n
+    """
+    assert 0 <= start <= end
+    lb = find_start(n, a, start, end)
+    rb = find_end(n, a, start, end)
+    assert lb < rb, f"{start, end, lb, rb}"
+    return lb, rb
+    
+def make_bounds(df, col, ids):
+    df = df.sort_values(col, ascending=True)
+    bounds = {}
+    for eid in ids:
+        eid = int(eid)
+        val = binary_search(eid, df.loc[:, col].values, 0, len(df), find_bounds)
+        if val:
+            bounds[eid] = val
+    return bounds
+
+
+# +
+eids = set(val for key, val in id_mapping.items())
+
+colA = "Entrez Gene Interactor A"
+colB = "Entrez Gene Interactor B"
+
+col = colA
+eids_in_biogrid = set(map(lambda x: x if int(x) in biogrid.loc[:, col] else None, eids))
+eids_in_biogrid.remove(None)
+bounds_A = make_bounds(biogrid, col, eids_in_biogrid)
+
+col = colB
+eids_in_biogrid = set(map(lambda x: x if int(x) in biogrid.loc[:, col] else None, eids))
+eids_in_biogrid.remove(None)
+bounds_B = make_bounds(biogrid, col, eids_in_biogrid)
+
+def check_bounds(df, bounds, ids, colnum):
+    """
+    Checks the assumptions of the bounds
+    """
+    
+    assert np.nan not in bounds
+    assert len(set(bounds)) <= len(ids)
+    
+    colname = df.columns[colnum]
+    df = df.sort_values(colname, ascending=True)
+    ldf = len(df)
+    for key, bound in bounds.items():
+        lb, rb = bound
+        assert type(lb) == type(rb) == int
+        assert 0 <= lb < rb <= ldf, f"{key, lb, rb, ldf}"
+        
+        if lb > 0:
+            assert df.iloc[lb -1, colnum] < df.iloc[lb, colnum]
+        if rb < len(df):
+            assert df.iloc[rb-1, colnum] < df.iloc[rb, colnum], f""
+            
+
+check_bounds(biogrid, bounds_A, eids, colA, colnum=1)
+check_bounds(biogrid, bounds_B, eids, colB, colnum=2)
+
+
+# +
+def accumulate_indicies(df, colnum, bounds):
+    """
+    Get the set of index labels from the dataframe
+    Args:
+    
+    Params:
+    
+    
+    """
+    print(f"{len(bounds)} incoming bounds")
+    colname = df.columns[colnum]
+    array_indicies = set()
+    df = df.sort_values(colname, ascending=True)
+    for key, bound in bounds.items():
+        lb, rb = bound
+        assert 0 <= lb < rb < len(df)
+
+        array_indicies = array_indicies.union(range(lb, rb))
+        
+    array_indicies = list(array_indicies)
+    index_labels = set(df.iloc[array_indicies].index)
+    return index_labels
+    
+def get_all_indicies(df, bounds_A, bounds_B, colnum_A, colnum_B):
+    
+    a_index_labels : set = accumulate_indicies(df, colnum_A, bounds_A)
+    b_index_labels : set = accumulate_indicies(df, colnum_B, bounds_B)
+    
+    index_labels = a_index_labels.intersection(b_index_labels)
+    return index_labels
+
 
 # -
 
-rows[rows==True].index
+index_labels = get_all_indicies(biogrid, bounds_A, bounds_B, 1, 2)
 
-new_shape
+nnodes = len(eids_in_biogrid)
+n_possible_edges = int(0.5*nnodes*(nnodes-1))
+density = len(list(index_labels)) / n_possible_edges
+print(f"for {nnodes} with {n_possible_edges} possible edges\n{len(list(index_labels))} were found in the database")
+print(f"for an edge density of {np.round(density*100, decimals=4)}%")
 
-new_shape
+# +
+# Look at the subset of biogrid
+
+cullin_bg = biogrid.loc[index_labels]
+
+# Validate the data frame
+assert np.all(cullin_bg.iloc[:, 1].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
+assert np.all(cullin_bg.iloc[:, 2].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
+
+# +
+ax_params = {'x': np.linspace(0, 40, len(summary)),
+             'title': f"Experimental Evidence Codes in Cullin Biogrid Subset (4.4.206)\
+              \nN={len(biogrid)}",
+             "w": 12,
+             "l": 8,
+             "height": summary['log10(freq)'],
+            }
+
+cmap = matplotlib.cm.tab10.colors
+colors = {'physical': cmap[0], 'genetic': cmap[1]}
+x = np.linspace(0, 40, len(summary))
+
+rcParams = {'font.size': 16}
+fig, ax = plt.subplots(figsize=(ax_params['w'], ax_params['l']))
+plt.rcParams.update(**rcParams)
+plt.title(ax_params['title'])
+plt.bar(x = ax_params['x'],
+         height=summary['log10(freq)'],
+         color=list(
+             iter(map(lambda t: colors[t], summary['Type']
+                     )
+                 )
+         ))
+p_patch = mpatches.Patch(color=colors['physical'], label='physical')
+g_patch = mpatches.Patch(color=colors['genetic'], label='genetic')
+
+ax.set_xticks(x)
+ax.set_xticklabels(labels=summary['Experiment'], rotation='vertical')
+ax.set_ylabel("Log10 Frequency")
+ax.legend(handles=[p_patch, g_patch])
+plt.show()
+# -
+
+set(range(-10, 10)).intersection(set(range(5, 1000)))
+
+q = 102157402
+lb, rb = bounds_A[q]
+biogrid.iloc[rb:lb, :]
+
+q = 51009
+lb, rb = bounds_A[q]
+biogrid.iloc[lb:rb, :]
+
+binary_search(4, [1, 2, 3], 0, 1, find_bounds)
+
+str(q)
+
+set(biogrid.iloc[[1,2, 7, 11, 99, 1234]].index)
+
+biogrid.iloc[rb-1:lb+1, :]
+
+biogrid[biogrid.loc[:, col]==q]
+
+
+
+# +
+col = "Entrez Gene Interactor A"
+
+A_bounds = make_bounds(biogrid,)
+# -
+
+a = [0, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 4, 5, 6, 7, 7, 88, 88, 9000]
+b = [1]
+c = [1, 2]
+d = [1.1, 2.0, 2.01, 2.01, 2.01000, 3.14]
+e = [0., 1., 2., 3., 3., 4., np.nan]
+
+print(binary_search(np.float64(3), e, 0, len(e), find_bounds))
+
+lb, rb = binary_search(1., biogrid.loc[:, col].values, 0, len(biogrid), find_bounds)
+
+
+
+
+
+# +
+def binary_search(n, a, start, end):
+    """
+    Find the entry
+    """
+    assert type(end) == int
+    assert type(start) == int
+    assert start <= end
+    
+    if start == end:
+        return None
+    
+    middle = (start + end) // 2
+
+    if a[middle] > n:
+        return binary_search(n, a, start, middle)
+    elif a[middle] < n:
+        return binary_search(n, a, middle, end)
+    else:
+        return middle
+    
+def left_step(n, a, i, stepsize):
+    if stepsize == 0:
+        return i
+
+    assert n == a[i]
+    assert len(a) > 2
+    while i - stepsize < 0:
+        stepsize = stepsize // 2
+    
+    while i - stepsize > len(a) - 1:
+        stepsize = stepsize // 2
+        
+        
+    
+        
+    inclusive, exclusive = a[i-stepsize], a[i-stepsize]
+    
+        
+    if n > a[i-stepsize]:
+        # Take a smaller step
+        return left_step(n, a, i, stepsize)
+    elif n < a[i-stepsize]:
+        
+        
+   
+
+
+    
+def get_left_index_in_block(n, a, i):
+    """
+    Args:
+    
+    Returns:
+      i where i is the leftmost index
+    
+    """
+    assert n == a[i]
+    assert i < len(a) - 1
+    
+    
+    step = len(a) / 100
+    
+    
+    
+    while n == a[i]:
+        if i == 0:
+            return i
+        i -= 1
+    return i + 1
+
+def get_right_index(n, a, i):
+    assert i < len(a)
+    assert n==a[i]
+        
+    while n==a[i]:
+        if i == len(a)-1:
+            return i
+        i += 1
+    return i - 1
+        
+def get_block_bounds(n, a):
+    loc = binary_search(n, a, 0, len(a))
+    if loc == None:
+        return tuple()
+    return get_left_index(n, a, loc), get_right_index(n, a, loc)
+
+
+# -
+
+i = 0
+for j in biogrid.index:
+    i+=1
+
+i
+
+binary_search(4, a, 0, len(a))
+
+get_right_index(1, b, 0)
+
+  
+
+get_block_bounds(1, b)
+
+search_right(3, a, 0)
+
+np.sort(biogrid.loc[:, 'Entrez Gene Interactor A'])
+
+biogrid = biogrid.sort_values(col, ascending=True)
+
+biogrid
+
+biogrid.sort_index()
+
+biogrid.sort_values(col, ascending=True)
+
+
 
 old_shape
 
