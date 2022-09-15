@@ -350,10 +350,94 @@ ax.legend(handles=[p_patch, g_patch])
 plt.show()
 
 # +
+# Map IDS
+col = "Prey"
+rows = cullin_benchmark.data.loc[:, col].apply(
+    lambda x: True if cullin_benchmark.uniprot_acc_pattern.match(x) else False)
+unique_uniprot_prey = set(cullin_benchmark.data.loc[rows, col])
+
+test_list = list(unique_uniprot_prey)[0:100]
+data = {"from": "UniProtKB_AC-ID", "to": "GeneID", "ids":",".join(unique_uniprot_prey), "size": 5000}
+API_URL = "https://rest.uniprot.org"
+POST_END_POINT = f"{API_URL}/idmapping/run"
+response = requests.post(POST_END_POINT, data=data)
+assert response.status_code == 200
+jobId = response.json()['jobId']
+
+GET_END_POINT = f"{API_URL}/idmapping/status/{jobId}"
+job_status = requests.get(GET_END_POINT)
+assert job_status.status_code == 200
+x_total_results = status.headers['x-total-results']
+n_unique_mappable_prey = len(list(unique_uniprot_prey))
+
+
+GET_END_POINT = f"{API_URL}/idmapping/stream/{jobId}"
+stream_response = requests.get(GET_END_POINT)
+assert status.status_code == 200
+response_dict = stream_response.json()
+response_dict = response_dict['results']
+id_mapping = {}
+for pair in response_dict:
+    id_mapping[pair['from']] = pair['to']
+    
+failed_ids = job_status.json()['failedIds']
+assert len(failed_ids) + len(set(id_mapping)) == len(unique_uniprot_prey)
+# -
+
+print(f"{len(failed_ids)} failed to map\n{len(set(id_mapping))} succeeded\nof {len(unique_uniprot_prey)} total")
+
+# +
+# Check the Failed Cases
+failed_df = cullin_benchmark.data[cullin_benchmark.data['Prey'].apply(lambda x: x in failed_ids)]
+
+# The failed cases amount to only 20 Bait prey Pairs
+# The Saint Score < 0.14 for all cases
+# Therefore we ignore the 13 failed cases instead of mapping them
+# Except for L0R6Q1. Consider for later
+
+# +
+# How many interactions are there for the entrez genes
+
+entrez_ids = [val for key, val in id_mapping.items()]
+
+
+old_shape = biogrid.shape
+col = "Entrez Gene Interactor A"
+not_nan = biogrid.loc[:, col].apply(lambda x: not np.isnan(x))
+biogrid = biogrid.loc[not_nan]
+col = "Entrez Gene Interactor B"
+not_nan = biogrid.loc[:, col].apply(lambda x: not np.isnan(x))
+biogrid = biogrid.loc[not_nan]
+# Filter Out the Places missing Entrez IDS
+new_shape = biogrid.shape
+col = "Entrez Gene Interactor A"
+found_rows = []
+not_found_rows = biogrid.index
+for i, eid in enumerate(entrez_ids):
+    rows = biogrid.loc[not_found_rows, 1].apply(lambda x: int(x) == int(eid))
+    found = rows[rows==True].index
+    not_found_rows = rows[]
+
+# -
+
+rows[rows==True].index
+
+new_shape
+
+new_shape
+
+old_shape
+
+len(biogrid.loc[not_found_rows, col])
+
+cullin_benchmark[cullin_benchmark.data['Prey'].apply(lambda x: x in failed_ids)
+
+# +
 """
 Most of the Prey in the cullin E3 Ligase Benchmark are mapped with UniProt Accession Ids.
 The biogrid interactors are identified using NCBI Entrez IDs
 
+Map UniProt IDs to Entrez IDs
 
 """
 
