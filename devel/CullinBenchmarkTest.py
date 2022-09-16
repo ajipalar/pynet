@@ -15,6 +15,7 @@
 
 # ## CRL5 VIF CBF&#946; Benchmarking
 
+from collections import namedtuple
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
@@ -23,15 +24,15 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import pandas as pd
+from pathlib import Path
+from functools import partial
+import itertools
+import re
+import requests
+import json
 import scipy as sp
 import scipy.stats
 import sys
-from pathlib import Path
-from functools import partial
-import re
-import itertools
-import requests
-import json
 
 
 # +
@@ -607,12 +608,6 @@ def get_all_indicies(df, bounds_A, bounds_B, colnum_A, colnum_B):
 
 index_labels = get_all_indicies(biogrid, bounds_A, bounds_B, 1, 2)
 
-nnodes = len(eids_in_biogrid)
-n_possible_edges = int(0.5*nnodes*(nnodes-1))
-density = len(list(index_labels)) / n_possible_edges
-print(f"for {nnodes} with {n_possible_edges} possible edges\n{len(list(index_labels))} were found in the database")
-print(f"for an edge density of {np.round(density*100, decimals=4)}%")
-
 # +
 # Look at the subset of biogrid
 
@@ -622,10 +617,117 @@ cullin_bg = biogrid.loc[index_labels]
 assert np.all(cullin_bg.iloc[:, 1].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
 assert np.all(cullin_bg.iloc[:, 2].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
 
+nnodes = len(eids_in_biogrid)
+n_possible_edges = int(0.5*nnodes*(nnodes-1))
+
+nself = len(cullin_bg[cullin_bg.iloc[:, 1]==cullin_bg.iloc[:, 2]])
+not_self = cullin_bg.iloc[:, 1]!=cullin_bg.iloc[:, 2]
+
+cullin_bg = cullin_bg[not_self]
+
+df = cullin_bg
+
+
+# How many edges are unique?
+
+    
+
+
+# +
+n_unique_edges = len(list(unique_edges))
+density = n_unique_edges / n_possible_edges
+
+s_nnodes = '{:,}'.format(nnodes)
+s_n_possible_edges = '{:,}'.format(n_possible_edges)
+s_n_interactions = '{:,}'.format(len(list(index_labels)))
+s_n_self = '{:,}'.format(nself)
+s_n_non_self = '{:,}'.format(len(df))
+s_n_unique_edges = '{:,}'.format(n_unique_edges)
+s_percent_density = np.round(density*100, decimals=4)
+
+s = f"""For {s_nnodes} genes there are {s_n_possible_edges} possible interactions
+{s_n_interactions} interactions were found in the biogrid
+Of these interactions  {nself} are self interactions.
+Leaving {s_n_non_self} non-self interactions.
+{s_n_unique_edges} interactions are unique
+The Cullin System BioGrid edge density is {s_percent_density}%
+"""
+print(s)
+assert np.all(df.iloc[:, 1] != df.iloc[:, 2])
+
+
+# +
+def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Interactor B"):
+    
+
+    unique_GeneId_set = set()
+    unique_GeneId_set = unique_GeneId_set.union(set(df.loc[:, colA]))
+    unique_GeneId_set = unique_GeneId_set.union(set(df.loc[:, colB]))
+    n_unique_GebeIds = len(unique_GeneId_set)
+    
+    unique_edges = set()
+    
+    not_identified_A = np.sum(np.isnan(df.loc[:, colA]))
+    not_identified_B = np.sum(np.isnan(df.loc[:, colB]))
+    not_identified_total = not_identified_A + not_identified_B
+    
+    for i, row in df.iterrows():
+        e = row[colA], row[colB]
+        unique_edges = unique_edges.union(frozenset(e))
+        
+    n_unique_edges = len(unique_edges)
+    
+    nself = len(df[df.iloc[:, 1]==df.iloc[:, 2]])
+    
+    
+    
+    
+    
+
+# +
+n_cullin_bench = len(list(set(cullin_benchmark.data)))
+
+
+s2 = f"""Biogrid:
+
+
+The Biogrid 'Ground Truth' is a {cullin_bg.shape} database
+  n unqiue nodes: {s_nnodes}
+  n non-self interactions : {s_n_non_self}
+  unique edges : {s_n_unique_edges}
+  density : {s_percent_density}%
+The Cullin AP-MS system is a {cullin_benchmark.data.shape} database
+  n nodes : {}
+  n mapped nodes : {}
+  n failed mapped : {}
+  n mapped to biogrid : {}
+"""
+print(s2)
+# -
+
+
+
+# +
+# Get the frequencies of each experiment in the database
+df = cullin_bg
+
+experiment_keys = list(set(df.loc[:, esys]))
+experiment_frequency = list(len(df[df.loc[:, esys] == key]) for key in experiment_keys)
+experiment_type = list(next(iter(
+    df.loc[df.loc[:, esys] == key, 
+                etype])) for key in experiment_keys)
+
+
+summary = pd.DataFrame({'Experiment': experiment_keys,
+                        'Frequency': experiment_frequency,
+                        'Type': experiment_type})
+summary.sort_values('Frequency', inplace = True, ascending = False)
+summary['log10(freq)'] = np.log10(summary['Frequency'])
+
 # +
 ax_params = {'x': np.linspace(0, 40, len(summary)),
              'title': f"Experimental Evidence Codes in Cullin Biogrid Subset (4.4.206)\
-              \nN={len(biogrid)}",
+              \nN={len(df)}",
              "w": 12,
              "l": 8,
              "height": summary['log10(freq)'],
@@ -656,11 +758,10 @@ ax.legend(handles=[p_patch, g_patch])
 plt.show()
 # -
 
-set(range(-10, 10)).intersection(set(range(5, 1000)))
+summary["frequency"] = 10 ** summary["log10(freq)"].values
+summary = summary.sort_values("frequency", ascending=False)
 
-q = 102157402
-lb, rb = bounds_A[q]
-biogrid.iloc[rb:lb, :]
+
 
 q = 51009
 lb, rb = bounds_A[q]
