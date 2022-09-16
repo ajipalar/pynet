@@ -256,41 +256,6 @@ def transform_and_validate_biogrid(df):
     return df
 
 
-def get_biogrid_stats(df):
-    colA = "Entrez Gene Interactor A"
-    colB = "Entrez Gene Interactor B"
-
-    unique_a_genes = set(df[colA])
-    unique_b_genes = set(df[colB])
-
-    unique_genes = unique_a_genes.union(unique_b_genes)
-    n_unique_genes = len(unique_genes)
-
-    colI = "#BioGRID Interaction ID"
-    n_unique_interactions = len(set(df[colI]))
-    n_possible_interactions = int(0.5 * n_unique_genes * (n_unique_genes - 1))
-
-    interaction_density = n_unique_interactions / n_possible_interactions
-
-    return {
-        "n_unique_genes": n_unique_genes,
-        "n_possible_interactions": n_possible_interactions,
-        "interaction_density": interaction_density,
-        "n_unique_interactions" : n_unique_interactions
-    }
-
-
-def show_biogrid_stats(stats):
-
-    n_unique_genes = stats["n_unique_genes"]
-    n_unique_interactions = stats["n_unique_interactions"]
-    interaction_density = stats["interaction_density"]
-
-    print(
-        f"Biogrid has {n_unique_genes} unique genes \
-    with {n_unique_interactions}.\nThe interaction density is {interaction_density}"
-    )
-
 
 def get_biogrid_summary(df):
     """
