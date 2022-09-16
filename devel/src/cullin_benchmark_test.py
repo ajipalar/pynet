@@ -293,6 +293,15 @@ def show_biogrid_stats(stats):
 
 
 def get_biogrid_summary(df):
+    """
+    Gets a summary dataframe from a biogrid dataframe
+
+    Summary:
+      frequency
+      Experiment
+      Experiment Type
+
+    """
     etype = "Experimental System Type"
     esys = "Experimental System"
 
@@ -421,7 +430,7 @@ def uniprot_id_mapping(cullin_benchmark, verbose=True, size=5000, waittime=15):
     assert len(id_mapping) == len(set(id_mapping))
     return id_mapping, failed_ids, prey_set_idmapping_input
 
-def show_idmaping_results(id_mapping, failed_ids, prey_set_idmapping_input):
+def show_idmapping_results(id_mapping, failed_ids, prey_set_idmapping_input):
     print(f"{len(failed_ids)} failed to map\n{len(id_mapping)} succeeded\nof {len(prey_set_idmapping_input)} total")
 
 def binary_search(n, a, start, end, linear):
@@ -548,13 +557,28 @@ def get_all_indicies(df, bounds_A, bounds_B, colnum_A, colnum_B):
 
 def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Interactor B",
                       verbose = True):
+    """
+    Gets a report of the dataframe
+
+    An 'interaction' is a row in the biogrid database
+    An 'edge' is a pair of different unordered gene ids
+
+    Retruns:
+      A dict containing
+        n_interactions
+        n_unique_GeneIds
+        unique_GeneId_set
+        n_self_interactions
+        n_non_self_interactions
+        n_blank_GeneIds 
+        n_unique_edges
+    """
     
     if verbose:
         def verbosity(ncalled):
             
-            message = [""]
-            
-            print(message[ncalled])
+            messages = [""]
+            print(messages[ncalled])
             
             
             
@@ -582,20 +606,28 @@ def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Int
     assert n_self_interactions + n_non_self_interactions == len(df)
     
     
-    not_identified_A = np.sum(np.isnan(df.loc[:, colA]))
-    not_identified_B = np.sum(np.isnan(df.loc[:, colB]))
-    not_identified_total = not_identified_A + not_identified_B
+    n_blank_GeneIdsA = np.sum(np.isnan(df.loc[:, colA]))
+    n_blank_GeneIdsB = np.sum(np.isnan(df.loc[:, colB]))
+    n_blank_GeneIds = n_blank_GeneIdsA + n_blank_GeneIdsB
     
     unique_edges = set()
     
     df = df[non_self_interaction_selector]
     
     unique_edge_labels = []
+
+    N = len(df)
+    
     for label, row in df.iterrows():
         e = row[colA], row[colB]
         if e not in  unique_edges:
             unique_edge_labels.append(label)
             unique_edges = unique_edges.union(frozenset(e))
+
+
+        i = int(label)
+        if i % (N // 10) == 0: 
+            print(f"{np.round((i/N)*100, decimals=2)}%")
         
     n_unique_edges = len(unique_edges)
     
@@ -604,6 +636,35 @@ def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Int
             "n_unique_GeneIds": n_unique_GeneIds,
             "n_self_interactions": n_self_interactions,
             "n_non_self_interactions": n_non_self_interactions,
-            "not_identified_total": not_identified_total,
+            "n_blank_GeneIds": n_blank_GeneIds,
             "n_unique_edges": n_unique_edges,
-            "unique_edge_labels": unique_edge_labels}
+            "unique_edge_labels": unique_edge_labels,
+            "n_blank_GeneIdsA": n_blank_GeneIdsA,
+            "n_blank_GeneIdsB": n_blank_GeneIdsB
+            }
+
+def format_biogrid_df_report(n_interactions,
+                             unique_GeneId_set,
+                             n_unique_GeneIds,
+                             n_self_interactions,
+                             n_non_self_interactions,
+                             n_blank_GeneIds,
+                             n_unique_edges,
+                             unique_edge_labels) -> str:
+
+    N_possible_edges = sp.special.comb(n_unique_GeneIds, 2)
+    percent_edge_density = (N_possible_edges / n_unique_edges) * 100 
+    
+
+    return f"""N interactions {n_interactions}
+    N self-interactions {n_self_interactions}
+    N non-self interactions {n_non_self_interactions}
+    N unique GeneIds {n_unique_GeneIds}
+    N blank GeneIds A {n_blank_GeneIdsA}
+    N blank GeneIds B {n_blank_GeneIdsB}
+    N blank GeneIds {n_blank_GeneIds}
+    N possible edges {N_possible_edges}
+    N unique edges {n_unique_edges}
+    Edge density {percent_edge_density}%
+    """
+
