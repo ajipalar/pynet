@@ -45,33 +45,42 @@ from src.cullin_benchmark_test import (
     biogrid_df_report,
     check_biogrid_data,
     check_bounds,
+    compare_reports,
     find_bounds,
     find_end,
     find_start,
     format_biogrid_df_report,
     get_all_indicies,
-    get_biogrid_stats,
     get_biogrid_summary,
+    get_json_report_from_report,
     make_bounds,
-    show_biogrid_stats,
     show_idmapping_results,
     transform_and_validate_biogrid,
     uniprot_id_mapping,
 )
-# -
 
+# +
 # Global Notebook Flags
 CHECK_BIOGRID_DATA = True
-GET_BIOGRID_REPORT = False
-SAVE_BIOGRID_JSON = False
+GET_BIOGRID_REPORT = True # Expensive
+SAVE_BIOGRID_JSON = True
 LOAD_BIOGRID_JSON = True
 SHOW_BIOGRID_JSON = True
+
 GET_BIOGRID_SUMMARY = True
 PLOT_BIOGRID_SUMMARY = True
 POST_UNIPROT_IDMAPPING = True
 SHOW_UNIPROT_IDMAPPING = True
+GET_CULLIN_BG = True
 GET_CULLIN_BG_REPORT = True
 SHOW_CULLIN_BG_REPORT = True
+
+COMPARE_REPORTS = True
+
+GET_CULLIN_BG_SUMMARY = True
+PLOT_CULLIN_BG_SUMMARY = True
+
+
 
 # +
 cullin_benchmark = CullinBenchMark(dirpath=Path("../data/cullin_e3_ligase"))
@@ -97,31 +106,28 @@ biogrid = transform_and_validate_biogrid(biogrid)
 if GET_BIOGRID_REPORT:
     transformed_report = biogrid_df_report(biogrid)
 
+# +
 # Save the serializable output to json
+
 if SAVE_BIOGRID_JSON:
-    json_report = {key: int(transformed_report[key]) for key in ["n_interactions",
-                                     "n_unique_GeneIds",
-                                     "n_self_interactions",
-                                     "n_non_self_interactions",
-                                     "n_blank_GeneIds",
-                                     "n_unique_edges",
-                                     "n_blank_GeneIdsA",
-                                     "n_blank_GeneIdsB",
-                                     "n_blank_GeneIds"]}
+    json_report = get_json_report_from_report(transformed_report)
+
     # Save the output of the previous cell
     with open("src/transformed_report.json", "w") as fp:
         json.dump(json_report, fp)
 
+# -
+
+LOAD_BIOGRID_JSON
 
 if LOAD_BIOGRID_JSON:
     json_report = json.load(open("src/transformed_report.json", "r"))
 if SHOW_BIOGRID_JSON:
     print(format_biogrid_df_report(**json_report))
 
-if GET_BIOGRID_STATS:
-    stats = get_biogrid_stats(biogrid)
-if SHOW_BIOGRID_STATS:
-    show_biogrid_stats(stats)
+# + language="bash"
+# cat src/transformed_report.json
+# -
 
 if GET_BIOGRID_SUMMARY:
     summary = get_biogrid_summary(biogrid)
@@ -165,240 +171,148 @@ eids_in_biogrid.remove(None)
 bounds_B = make_bounds(biogrid, col, eids_in_biogrid)
             
 
-check_bounds(biogrid, bounds_A, eids, colA, colnum=1)
-check_bounds(biogrid, bounds_B, eids, colB, colnum=2)
-# -
-
-index_labels = get_all_indicies(biogrid, bounds_A, bounds_B, 1, 2)
+check_bounds(biogrid, bounds_A, eids, colnum=1)
+check_bounds(biogrid, bounds_B, eids, colnum=2)
 
 # +
-# Look at the subset of biogrid
+if GET_CULLIN_BG:
+    index_labels = get_all_indicies(biogrid, bounds_A, bounds_B, 1, 2)
 
-cullin_bg = biogrid.loc[index_labels]
+    # Look at the subset of biogrid
 
-# Validate the data frame
-assert np.all(cullin_bg.iloc[:, 1].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
-assert np.all(cullin_bg.iloc[:, 2].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
+    cullin_bg = biogrid.loc[index_labels]
 
-nnodes = len(eids_in_biogrid)
-n_possible_edges = int(0.5*nnodes*(nnodes-1))
+    # Validate the data frame
+    assert np.all(cullin_bg.iloc[:, 1].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
+    assert np.all(cullin_bg.iloc[:, 2].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
 
-nself = len(cullin_bg[cullin_bg.iloc[:, 1]==cullin_bg.iloc[:, 2]])
-not_self = cullin_bg.iloc[:, 1]!=cullin_bg.iloc[:, 2]
+    nnodes = len(eids_in_biogrid)
+    n_possible_edges = int(0.5*nnodes*(nnodes-1))
 
-cullin_bg = cullin_bg[not_self]
+    nself = len(cullin_bg[cullin_bg.iloc[:, 1]==cullin_bg.iloc[:, 2]])
+    not_self = cullin_bg.iloc[:, 1]!=cullin_bg.iloc[:, 2]
 
-df = cullin_bg
+    cullin_bg = cullin_bg[not_self]
+
+    df = cullin_bg
 
 
-# How many edges are unique?
+    # How many edges are unique?
 
+    
+
+
+# +
+if GET_CULLIN_BG_REPORT:
+    cullin_report = biogrid_df_report(df)
     
 
 # -
 
-if GET_CULLIN_BG_REPORT:
-    cullin_report = biogrid_df_report(df)
+SHOW_CULLIN_BG_REPORT
+
+# +
 if SHOW_BIOGRID_JSON:
     print("Biogrid Report")
     print(format_biogrid_df_report(**json_report))
 if SHOW_CULLIN_BG_REPORT:
     print("Cullin BG Report")
     print(format_biogrid_df_report(**cullin_report))
-
-# +
-n_unique_edges = len(list(unique_edges))
-density = n_unique_edges / n_possible_edges
-
-s_nnodes = '{:,}'.format(nnodes)
-s_n_possible_edges = '{:,}'.format(n_possible_edges)
-s_n_interactions = '{:,}'.format(len(list(index_labels)))
-s_n_self = '{:,}'.format(nself)
-s_n_non_self = '{:,}'.format(len(df))
-s_n_unique_edges = '{:,}'.format(n_unique_edges)
-s_percent_density = np.round(density*100, decimals=4)
-
-s = f"""For {s_nnodes} genes there are {s_n_possible_edges} possible interactions
-{s_n_interactions} interactions were found in the biogrid
-Of these interactions  {nself} are self interactions.
-Leaving {s_n_non_self} non-self interactions.
-{s_n_unique_edges} interactions are unique
-The Cullin System BioGrid edge density is {s_percent_density}%
-"""
-print(s)
-assert np.all(df.iloc[:, 1] != df.iloc[:, 2])
-
-# +
-# Get the frequencies of each experiment in the database
-df = cullin_bg
-
-experiment_keys = list(set(df.loc[:, esys]))
-experiment_frequency = list(len(df[df.loc[:, esys] == key]) for key in experiment_keys)
-experiment_type = list(next(iter(
-    df.loc[df.loc[:, esys] == key, 
-                etype])) for key in experiment_keys)
-
-
-summary = pd.DataFrame({'Experiment': experiment_keys,
-                        'Frequency': experiment_frequency,
-                        'Type': experiment_type})
-summary.sort_values('Frequency', inplace = True, ascending = False)
-summary['log10(freq)'] = np.log10(summary['Frequency'])
-
-# +
-ax_params = {'x': np.linspace(0, 40, len(summary)),
-             'title': f"Experimental Evidence Codes in Cullin Biogrid Subset (4.4.206)\
-              \nN={len(df)}",
-             "w": 12,
-             "l": 8,
-             "height": summary['log10(freq)'],
-            }
-
-cmap = matplotlib.cm.tab10.colors
-colors = {'physical': cmap[0], 'genetic': cmap[1]}
-x = np.linspace(0, 40, len(summary))
-
-rcParams = {'font.size': 16}
-fig, ax = plt.subplots(figsize=(ax_params['w'], ax_params['l']))
-plt.rcParams.update(**rcParams)
-plt.title(ax_params['title'])
-plt.bar(x = ax_params['x'],
-         height=summary['log10(freq)'],
-         color=list(
-             iter(map(lambda t: colors[t], summary['Type']
-                     )
-                 )
-         ))
-p_patch = mpatches.Patch(color=colors['physical'], label='physical')
-g_patch = mpatches.Patch(color=colors['genetic'], label='genetic')
-
-ax.set_xticks(x)
-ax.set_xticklabels(labels=summary['Experiment'], rotation='vertical')
-ax.set_ylabel("Log10 Frequency")
-ax.legend(handles=[p_patch, g_patch])
-plt.show()
+    
+    
 # -
 
-summary["frequency"] = 10 ** summary["log10(freq)"].values
-summary = summary.sort_values("frequency", ascending=False)
+if COMPARE_REPORTS:
+    json_cullin_report = get_json_report_from_report(cullin_report)
+    report_comparison = compare_reports(json_report, json_cullin_report, "Biogrid", "Cullin")
 
-q = 51009
-lb, rb = bounds_A[q]
-biogrid.iloc[lb:rb, :]
+if GET_CULLIN_BG_SUMMARY:
+    cullin_bg_summary = get_biogrid_summary(cullin_bg)
+if PLOT_CULLIN_BG_SUMMARY:
+    bar_plot_df_summary(cullin_bg, cullin_bg_summary)
 
-binary_search(4, [1, 2, 3], 0, 1, find_bounds)
-
-str(q)
-
-set(biogrid.iloc[[1,2, 7, 11, 99, 1234]].index)
-
-biogrid.iloc[rb-1:lb+1, :]
-
-biogrid[biogrid.loc[:, col]==q]
+report_comparison
 
 # +
-col = "Entrez Gene Interactor A"
+nodes = cullin_report['unique_GeneId_set']
+d =pd.DataFrame(data = np.zeros((len(nodes), len(nodes))), index = nodes, columns = nodes, dtype=int)
+print('{:,}'.format(d.values.nbytes))
 
-A_bounds = make_bounds(biogrid,)
+def get_experimental_coverage_df(biogrid_df, report):
+    
+    df = biogrid_df
+    nodes = report['unique_GeneId_set']
+    nodes = sorted(nodes)
+    d =pd.DataFrame(data = np.zeros((len(nodes), len(nodes))), index = nodes, columns = nodes, dtype=float)
+    
+    experiments = {key: i for i, key in enumerate(set(df["Experimental System"]))}
+    
+    j = 0
+    for i, row in biogrid_df.iterrows():
+        nodeA = row.iloc[1]
+        nodeB = row.iloc[2]
+        
+        if nodeB > nodeA:
+            t = nodeA
+            nodeA = nodeB
+            nodeB = t
+        
+        experiment = row["Experimental System"]
+        val = experiments[experiment]
+        
+        d.loc[nodeA, nodeB] += val
+        j +=1
+
+    return d
+        
+        
+        
+        
+
+
+
 # -
 
-a = [0, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 4, 5, 6, 7, 7, 88, 88, 9000]
-b = [1]
-c = [1, 2]
-d = [1.1, 2.0, 2.01, 2.01, 2.01000, 3.14]
-e = [0., 1., 2., 3., 3., 4., np.nan]
-
-print(binary_search(np.float64(3), e, 0, len(e), find_bounds))
-
-lb, rb = binary_search(1., biogrid.loc[:, col].values, 0, len(biogrid), find_bounds)
+d = get_experimental_coverage_df(cullin_bg, cullin_report)
 
 
+def triangular_to_symmetric(A):
+    Lower = np.tril(A)
+    diag_indices = np.diag_indices(len(A))
+    Lower = Lower + Lower.T
+    Lower[diag_indices] = A[diag_indices]
+    return Lower
 
 
+def coverage_plot(d, w=12, l=12, title="Experimental Coverage of Cullin BG"):
+    w = 12
+    l = w
+    size = (l, w)
+    plt.figure(figsize=size)
+    plt.imshow(triangular_to_symmetric(d.values != 0))
+    plt.title(title)
+    plt.colorbar()
+    plt.show()
+coverage_plot(d)
 
-# +
-def binary_search(n, a, start, end):
-    """
-    Find the entry
-    """
-    assert type(end) == int
-    assert type(start) == int
-    assert start <= end
-    
-    if start == end:
-        return None
-    
-    middle = (start + end) // 2
+np.sum(d.values != 0), np.min(d.values), np.max(d.values), d.values.shape
 
-    if a[middle] > n:
-        return binary_search(n, a, start, middle)
-    elif a[middle] < n:
-        return binary_search(n, a, middle, end)
-    else:
-        return middle
-    
-def left_step(n, a, i, stepsize):
-    if stepsize == 0:
-        return i
+testdf = pd.DataFrame(index = np.arange(8), columns = np.arange(8), data=np.arange(64).reshape((8, 8)), dtype=float)
 
-    assert n == a[i]
-    assert len(a) > 2
-    while i - stepsize < 0:
-        stepsize = stepsize // 2
-    
-    while i - stepsize > len(a) - 1:
-        stepsize = stepsize // 2
-        
-        
-    
-        
-    inclusive, exclusive = a[i-stepsize], a[i-stepsize]
-    
-        
-    if n > a[i-stepsize]:
-        # Take a smaller step
-        return left_step(n, a, i, stepsize)
-    elif n < a[i-stepsize]:
-        
-        
-   
+plt.imshow(testdf.values)
+plt.colorbar()
+
+# ?plt.imshow
+
+testdf.
+
+plt.imshow(np.arange(64).reshape((8, 8)))
+
+# Imagine the biogrid data as an n x n x r tensor
+n = len(set(cullin_bg.iloc[:, 1]))
+r = len(set(cullin_bg.iloc[:, 3]))
 
 
-    
-def get_left_index_in_block(n, a, i):
-    """
-    Args:
-    
-    Returns:
-      i where i is the leftmost index
-    
-    """
-    assert n == a[i]
-    assert i < len(a) - 1
-    
-    
-    step = len(a) / 100
-    
-    
-    
-    while n == a[i]:
-        if i == 0:
-            return i
-        i -= 1
-    return i + 1
+np.sum(d.values != 0)
 
-def get_right_index(n, a, i):
-    assert i < len(a)
-    assert n==a[i]
-        
-    while n==a[i]:
-        if i == len(a)-1:
-            return i
-        i += 1
-    return i - 1
-        
-def get_block_bounds(n, a):
-    loc = binary_search(n, a, 0, len(a))
-    if loc == None:
-        return tuple()
-    return get_left_index(n, a, loc), get_right_index(n, a, loc)
+

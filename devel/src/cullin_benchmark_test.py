@@ -256,7 +256,6 @@ def transform_and_validate_biogrid(df):
     return df
 
 
-
 def get_biogrid_summary(df):
     """
     Gets a summary dataframe from a biogrid dataframe
@@ -335,10 +334,12 @@ def bar_plot_df_summary(
 
 def uniprot_id_mapping(cullin_benchmark, verbose=True, size=5000, waittime=15):
     if not verbose:
+
         def show(x):
             ...
 
     else:
+
         def show(x):
             print(x)
 
@@ -355,7 +356,12 @@ def uniprot_id_mapping(cullin_benchmark, verbose=True, size=5000, waittime=15):
     fro = "UniProtKB_AC-ID"
     t = "GeneID"
 
-    data = {"from": fro, "to": t, "ids": ",".join(prey_set_idmapping_input), "size": size}
+    data = {
+        "from": fro,
+        "to": t,
+        "ids": ",".join(prey_set_idmapping_input),
+        "size": size,
+    }
 
     show(f"from {fro} to {t} size {size}")
 
@@ -395,35 +401,40 @@ def uniprot_id_mapping(cullin_benchmark, verbose=True, size=5000, waittime=15):
     assert len(id_mapping) == len(set(id_mapping))
     return id_mapping, failed_ids, prey_set_idmapping_input
 
+
 def show_idmapping_results(id_mapping, failed_ids, prey_set_idmapping_input):
-    print(f"{len(failed_ids)} failed to map\n{len(id_mapping)} succeeded\nof {len(prey_set_idmapping_input)} total")
+    print(
+        f"{len(failed_ids)} failed to map\n{len(id_mapping)} succeeded\nof {len(prey_set_idmapping_input)} total"
+    )
+
 
 def binary_search(n, a, start, end, linear):
     """
     Find the starting index i where a[i] == n
     If n not in a, return None
     """
-    
+
     assert type(end) == int
     assert type(start) == int
     assert start <= end
-    
+
     if start == end:
         return None
-    
+
     middle = (start + end) // 2
-    #print(start, middle, end)
+    # print(start, middle, end)
 
     if a[middle] > n:
         return binary_search(n, a, start, middle, linear)
     elif a[middle] < n:
-        return binary_search(n, a, middle+1, end, linear)
+        return binary_search(n, a, middle + 1, end, linear)
     else:
         """
         Do a linear search to the left to wind the start
         """
         return linear(n, a, middle, end)
-    
+
+
 def find_start(n, a, start, end):
     """
     Linear search for starting index
@@ -431,8 +442,9 @@ def find_start(n, a, start, end):
     while a[start] == n:
         if start == 0:
             return start
-        start -=1
+        start -= 1
     return start + 1
+
 
 def find_end(n, a, start, end):
     """
@@ -447,6 +459,7 @@ def find_end(n, a, start, end):
             return start
     return start
 
+
 def find_bounds(n, a, start, end):
     """
     Return the inclusive exclusive [lb, rb) left and right bounds of a contigous array
@@ -457,7 +470,8 @@ def find_bounds(n, a, start, end):
     rb = find_end(n, a, start, end)
     assert lb < rb, f"{start, end, lb, rb}"
     return lb, rb
-    
+
+
 def make_bounds(df, col, ids):
     df = df.sort_values(col, ascending=True)
     bounds = {}
@@ -468,14 +482,15 @@ def make_bounds(df, col, ids):
             bounds[eid] = val
     return bounds
 
+
 def check_bounds(df, bounds, ids, colnum):
     """
     Checks the assumptions of the bounds
     """
-    
+
     assert np.nan not in bounds
     assert len(set(bounds)) <= len(ids)
-    
+
     colname = df.columns[colnum]
     df = df.sort_values(colname, ascending=True)
     ldf = len(df)
@@ -483,20 +498,21 @@ def check_bounds(df, bounds, ids, colnum):
         lb, rb = bound
         assert type(lb) == type(rb) == int
         assert 0 <= lb < rb <= ldf, f"{key, lb, rb, ldf}"
-        
+
         if lb > 0:
-            assert df.iloc[lb -1, colnum] < df.iloc[lb, colnum]
+            assert df.iloc[lb - 1, colnum] < df.iloc[lb, colnum]
         if rb < len(df):
-            assert df.iloc[rb-1, colnum] < df.iloc[rb, colnum], f""
+            assert df.iloc[rb - 1, colnum] < df.iloc[rb, colnum], f""
+
 
 def accumulate_indicies(df, colnum, bounds):
     """
     Get the set of index labels from the dataframe
     Args:
-    
+
     Params:
-    
-    
+
+
     """
     print(f"{len(bounds)} incoming bounds")
     colname = df.columns[colnum]
@@ -507,21 +523,24 @@ def accumulate_indicies(df, colnum, bounds):
         assert 0 <= lb < rb < len(df)
 
         array_indicies = array_indicies.union(range(lb, rb))
-        
+
     array_indicies = list(array_indicies)
     index_labels = set(df.iloc[array_indicies].index)
     return index_labels
-    
+
+
 def get_all_indicies(df, bounds_A, bounds_B, colnum_A, colnum_B):
-    
-    a_index_labels : set = accumulate_indicies(df, colnum_A, bounds_A)
-    b_index_labels : set = accumulate_indicies(df, colnum_B, bounds_B)
-    
+
+    a_index_labels: set = accumulate_indicies(df, colnum_A, bounds_A)
+    b_index_labels: set = accumulate_indicies(df, colnum_B, bounds_B)
+
     index_labels = a_index_labels.intersection(b_index_labels)
     return index_labels
 
-def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Interactor B",
-                      verbose = True):
+
+def biogrid_df_report(
+    df, colA="Entrez Gene Interactor A", colB="Entrez Gene Interactor B", verbose=True
+):
     """
     Gets a report of the dataframe
 
@@ -535,93 +554,127 @@ def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Int
         unique_GeneId_set
         n_self_interactions
         n_non_self_interactions
-        n_blank_GeneIds 
+        n_blank_GeneIds
         n_unique_edges
     """
-    
+
     if verbose:
+
         def verbosity(ncalled):
-            
+
             messages = [""]
             print(messages[ncalled])
-            
-            
-            
-            
+
     else:
+
         def verbosity(ncalled):
             return None
-    
-    
-    
-    
+
     n_interactions = len(df)
     unique_GeneId_set = set()
     unique_GeneId_set = unique_GeneId_set.union(set(df.loc[:, colA]))
     unique_GeneId_set = unique_GeneId_set.union(set(df.loc[:, colB]))
     n_unique_GeneIds = len(unique_GeneId_set)
-    
 
-    
-    self_interaction_selector = df.iloc[:, 1]==df.iloc[:, 2]
-    non_self_interaction_selector = df.iloc[:, 1]!=df.iloc[:, 2]
+    self_interaction_selector = df.iloc[:, 1] == df.iloc[:, 2]
+    non_self_interaction_selector = df.iloc[:, 1] != df.iloc[:, 2]
     n_self_interactions = np.sum(self_interaction_selector)
     n_non_self_interactions = np.sum(non_self_interaction_selector)
-    
+
     assert n_self_interactions + n_non_self_interactions == len(df)
-    
-    
+
     n_blank_GeneIdsA = np.sum(np.isnan(df.loc[:, colA]))
     n_blank_GeneIdsB = np.sum(np.isnan(df.loc[:, colB]))
     n_blank_GeneIds = n_blank_GeneIdsA + n_blank_GeneIdsB
-    
+
     unique_edges = dict()
-    
+
     df = df[non_self_interaction_selector]
-    
+
     unique_edge_labels = []
 
     N = len(df)
-    
+    j = 0
+
     for label, row in df.iterrows():
         e = row[colA], row[colB]
         unique_edges[frozenset(e)] = None
-        i = int(label)
-        if i % (N // 10) == 0: 
-            print(f"{np.round((i/N)*100, decimals=2)}%")
-        
+        if j % (N // 10) == 0:
+            print(f"{np.round((j/N)*100, decimals=2)}%")
+        j+=1
+
     n_unique_edges = len(unique_edges)
-    
-    return {"n_interactions": n_interactions,
-            "unique_GeneId_set": unique_GeneId_set,
-            "n_unique_GeneIds": n_unique_GeneIds,
-            "n_self_interactions": n_self_interactions,
-            "n_non_self_interactions": n_non_self_interactions,
-            "n_blank_GeneIds": n_blank_GeneIds,
-            "n_unique_edges": n_unique_edges,
-            "unique_edge_labels": unique_edge_labels,
-            "unique_edges": unique_edges,
-            "n_blank_GeneIdsA": n_blank_GeneIdsA,
-            "n_blank_GeneIdsB": n_blank_GeneIdsB
-            }
 
-def format_biogrid_df_report(n_interactions,
-                             n_unique_GeneIds,
-                             n_self_interactions,
-                             n_non_self_interactions,
-                             n_blank_GeneIds,
-                             n_blank_GeneIdsA,
-                             n_blank_GeneIdsB,
-                             n_unique_edges,
-                             **kwargs) -> str:
+    n_possible_edges = sp.special.comb(n_unique_GeneIds, 2, exact=True)
+    percent_edge_density = (n_unique_edges / n_possible_edges) * 100
 
-    N_possible_edges = sp.special.comb(n_unique_GeneIds, 2, exact=True)
-    percent_edge_density = (n_unique_edges/ N_possible_edges) * 100 
-    percent_edge_density = np.round(percent_edge_density, decimals=4)
+    return {
+        "n_interactions": n_interactions,
+        "unique_GeneId_set": unique_GeneId_set,
+        "n_unique_GeneIds": n_unique_GeneIds,
+        "n_self_interactions": n_self_interactions,
+        "n_non_self_interactions": n_non_self_interactions,
+        "n_blank_GeneIds": n_blank_GeneIds,
+        "n_unique_edges": n_unique_edges,
+        "unique_edge_labels": unique_edge_labels,
+        "unique_edges": unique_edges,
+        "n_blank_GeneIdsA": n_blank_GeneIdsA,
+        "n_blank_GeneIdsB": n_blank_GeneIdsB,
+        "n_possible_edges": n_possible_edges,
+        "percent_edge_density": percent_edge_density,
+    }
 
+
+def get_json_report_from_report(report):
+    jreport = {
+        key: int(report[key])
+        for key in [
+            "n_interactions",
+            "n_unique_GeneIds",
+            "n_self_interactions",
+            "n_non_self_interactions",
+            "n_blank_GeneIds",
+            "n_unique_edges",
+            "n_blank_GeneIdsA",
+            "n_blank_GeneIdsB",
+            "n_blank_GeneIds",
+            "percent_edge_density",
+            "n_possible_edges",
+        ]
+    }
+    jreport["percent_edge_density"] = report["percent_edge_density"]  # don't cast to int
+    return jreport
+
+
+def compare_reports(rA, rB, Aname="A", Bname="B"):
+
+    df = pd.DataFrame(
+        {Aname: rA.values(), Bname: rB.values()},
+        index=rA.keys(),
+        columns=[Aname, Bname],
+    )
+
+    df["A/B"] = np.divide(df[Aname], df[Bname])
+    df["log2(A/B)"] = np.log2(df[Aname]) - np.log2(df[Bname])
+    df["|A-B|"] = np.abs(np.subtract(df[Aname], df[Bname]))
+    return df
+
+
+def format_biogrid_df_report(
+    n_interactions,
+    n_unique_GeneIds,
+    n_self_interactions,
+    n_non_self_interactions,
+    n_blank_GeneIds,
+    n_blank_GeneIdsA,
+    n_blank_GeneIdsB,
+    n_unique_edges,
+    n_possible_edges,
+    percent_edge_density,
+    **kwargs,
+) -> str:
     def h(s):
-        return '{:,}'.format(s)
-    
+        return "{:,}".format(s)
 
     return f"""
 N interactions {h(n_interactions)}
@@ -631,8 +684,7 @@ N unique GeneIds {h(n_unique_GeneIds)}
 N blank GeneIds A {h(n_blank_GeneIdsA)}
 N blank GeneIds B {h(n_blank_GeneIdsB)}
 N blank GeneIds {h(n_blank_GeneIds)}
-N possible edges {h(N_possible_edges)}
+N possible edges {h(n_possible_edges)}
 N unique edges {h(n_unique_edges)}
 Edge density {h(percent_edge_density)}%
 """
-
