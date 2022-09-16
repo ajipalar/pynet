@@ -610,7 +610,7 @@ def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Int
     n_blank_GeneIdsB = np.sum(np.isnan(df.loc[:, colB]))
     n_blank_GeneIds = n_blank_GeneIdsA + n_blank_GeneIdsB
     
-    unique_edges = set()
+    unique_edges = dict()
     
     df = df[non_self_interaction_selector]
     
@@ -620,11 +620,7 @@ def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Int
     
     for label, row in df.iterrows():
         e = row[colA], row[colB]
-        if e not in  unique_edges:
-            unique_edge_labels.append(label)
-            unique_edges = unique_edges.union(frozenset(e))
-
-
+        unique_edges[frozenset(e)] = None
         i = int(label)
         if i % (N // 10) == 0: 
             print(f"{np.round((i/N)*100, decimals=2)}%")
@@ -639,32 +635,39 @@ def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Int
             "n_blank_GeneIds": n_blank_GeneIds,
             "n_unique_edges": n_unique_edges,
             "unique_edge_labels": unique_edge_labels,
+            "unique_edges": unique_edges,
             "n_blank_GeneIdsA": n_blank_GeneIdsA,
             "n_blank_GeneIdsB": n_blank_GeneIdsB
             }
 
 def format_biogrid_df_report(n_interactions,
-                             unique_GeneId_set,
                              n_unique_GeneIds,
                              n_self_interactions,
                              n_non_self_interactions,
                              n_blank_GeneIds,
+                             n_blank_GeneIdsA,
+                             n_blank_GeneIdsB,
                              n_unique_edges,
-                             unique_edge_labels) -> str:
+                             **kwargs) -> str:
 
-    N_possible_edges = sp.special.comb(n_unique_GeneIds, 2)
-    percent_edge_density = (N_possible_edges / n_unique_edges) * 100 
+    N_possible_edges = sp.special.comb(n_unique_GeneIds, 2, exact=True)
+    percent_edge_density = (n_unique_edges/ N_possible_edges) * 100 
+    percent_edge_density = np.round(percent_edge_density, decimals=4)
+
+    def h(s):
+        return '{:,}'.format(s)
     
 
-    return f"""N interactions {n_interactions}
-    N self-interactions {n_self_interactions}
-    N non-self interactions {n_non_self_interactions}
-    N unique GeneIds {n_unique_GeneIds}
-    N blank GeneIds A {n_blank_GeneIdsA}
-    N blank GeneIds B {n_blank_GeneIdsB}
-    N blank GeneIds {n_blank_GeneIds}
-    N possible edges {N_possible_edges}
-    N unique edges {n_unique_edges}
-    Edge density {percent_edge_density}%
-    """
+    return f"""
+N interactions {h(n_interactions)}
+N self-interactions {h(n_self_interactions)}
+N non-self interactions {h(n_non_self_interactions)}
+N unique GeneIds {h(n_unique_GeneIds)}
+N blank GeneIds A {h(n_blank_GeneIdsA)}
+N blank GeneIds B {h(n_blank_GeneIdsB)}
+N blank GeneIds {h(n_blank_GeneIds)}
+N possible edges {h(N_possible_edges)}
+N unique edges {h(n_unique_edges)}
+Edge density {h(percent_edge_density)}%
+"""
 
