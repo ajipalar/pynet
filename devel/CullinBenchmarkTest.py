@@ -656,33 +656,63 @@ print(s)
 assert np.all(df.iloc[:, 1] != df.iloc[:, 2])
 
 
-# +
+# -
+
 def biogrid_df_report(df, colA="Entrez Gene Interactor A", colB="Entrez Gene Interactor B"):
     
-
+    n_interactions = len(df)
     unique_GeneId_set = set()
     unique_GeneId_set = unique_GeneId_set.union(set(df.loc[:, colA]))
     unique_GeneId_set = unique_GeneId_set.union(set(df.loc[:, colB]))
-    n_unique_GebeIds = len(unique_GeneId_set)
+    n_unique_GeneIds = len(unique_GeneId_set)
     
-    unique_edges = set()
+
+    
+    self_interaction_selector = df.iloc[:, 1]==df.iloc[:, 2]
+    non_self_interaction_selector = df.iloc[:, 1]!=df.iloc[:, 2]
+    n_self_interactions = np.sum(self_interaction_selector)
+    n_non_self_interactions = np.sum(non_self_interaction_selector)
+    
+    assert n_self_interactions + n_non_self_interactions == len(df)
+    
     
     not_identified_A = np.sum(np.isnan(df.loc[:, colA]))
     not_identified_B = np.sum(np.isnan(df.loc[:, colB]))
     not_identified_total = not_identified_A + not_identified_B
     
-    for i, row in df.iterrows():
+    unique_edges = set()
+    
+    df = df[non_self_interaction_selector]
+    
+    unique_edge_labels = []
+    for label, row in df.iterrows():
         e = row[colA], row[colB]
+        if e
         unique_edges = unique_edges.union(frozenset(e))
         
     n_unique_edges = len(unique_edges)
     
-    nself = len(df[df.iloc[:, 1]==df.iloc[:, 2]])
-    
-    
-    
-    
-    
+    return {"n_interactions": n_interactions,
+            "unique_GeneId_set": unique_GeneId_set,
+            "n_unique_GeneIds": n_unique_GeneIds,
+            "n_self_interactions": n_self_interactions,
+            "n_non_self_interactions": n_non_self_interactions,
+            "not_identified_total": not_identified_total,
+            "n_unique_edges": n_unique_edges}
+
+
+for i, r in df.iterrows():
+    print(i, r)
+    break
+
+df
+
+a = "asldkhjf"
+a == a
+
+hash(a) == hash(a)
+
+
 
 # +
 n_cullin_bench = len(list(set(cullin_benchmark.data)))
