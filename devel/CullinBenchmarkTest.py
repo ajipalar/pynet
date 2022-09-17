@@ -271,9 +271,163 @@ def get_experimental_coverage_df(biogrid_df, report):
 
 
 
+
+# +
+def split(u):
+    a = u.split("|")
+    for i in a:
+        assert i.isdigit()
+    a = [int(i) for i in a]
+    for i in a:
+        assert 0 <= i < 256
+    a = np.array(a)
+    return a
+
+def to_entrez(u, id_mapping):
+    return id_mapping[u] if u in id_mapping else "-"
+
+def transform_cullin_benchmark_data(df, id_mapping):
+    out = np.zeros((len(df), 4))
+    out_ctrl = np.zeros((len(df), 12))
+    entrez = []
+    j=0
+    for i, row in df.iterrows():
+        out[j, :] = split(row["Spec"])
+        out_ctrl[j, :] = split(row["ctrlCounts"])
+        entrez.append(to_entrez(row["Prey"], id_mapping))
+        j+=1
+    
+    
+    for i in range(1, 5):
+        #assert f"r{i}" not in df.columns
+        df[f"r{i}"] = out[:, i-1]
+        
+    for i in range(1, 13):
+        #assert f"ctrl_{i}" not in df.columns
+        df[f"ctrl_{i}"] = out_ctrl[:, i-1]
+        
+    assert "Entrez" not in df.columns
+    df["Entrez"] = entrez
+    
+    return df
+
+    
 # -
 
+TRANSFORM_CULLIN = True
+if TRANSFORM_CULLIN == True:
+    cullin_benchmark_transformed = transform_cullin_benchmark_data(cullin_benchmark.data, id_mapping)
+
 d = get_experimental_coverage_df(cullin_bg, cullin_report)
+
+
+def cullin_benchmark_report(df):
+    cbfb_sel = df["Bait"]=="CBFBwt_MG132"
+    elob_sel = df["Bait"]=="ELOBwt_MG132"
+    cul5_sel = df["Bait"]=="CUL5wt_MG132"
+    
+    def n_unique(sel, colname):
+        return len(set(df.loc[sel, colname]))
+    
+    n_unique_CBFB_prey = n_unique(cbfb_sel, "Prey")
+    n_unique_ELOB_prey = n_unique(elob_sel, "Prey")
+    n_unique_CUL5_prey = n_unique(cul5_sel, "Prey")
+    
+    n_unique_CBFB_entrez = n_unique(cbfb_sel, "Entrez")
+    n_unique_ELOB_entrez = n_unique(elob_sel, "Entrez")
+    n_unique_CUL5_entrez = n_unique(cul5_sel, "Entrez")
+    
+    mid_confidence = df["SaintScore"] > 0.01
+    
+    
+    
+    return {'n_unique_CBFB_prey': n_unique_CBFB_prey,
+           'n_unique_ELOB_prey': n_unique_ELOB_prey,
+           'n_unique_CUL5_prey': n_unique_CUL5_prey,
+           'n_unique_CBFB_entrez':n_unique_CBFB_entrez,
+           'n_unique_ELOB_entrez':n_unique_ELOB_entrez,
+           'n_unique_CUL5_entrez':n_unique_CUL5_entrez}
+
+df = cullin_benchmark_transformed
+cullin_benchmark_report(df)
+
+df.apply(lambda x: len(set(x)))
+
+
+# +
+# Look at the Frequency of the Saint Scores
+def plot_saint_score_frequency(df, l=8, w=20, title="Saint Score Frequency", bins=100,
+                              rcParams={},
+                               cmap = matplotlib.cm.tab10.colors
+                              ):
+    title += f"\nN={len(df)}"
+    plt.figure(figsize=(w, l))
+    plt.title(title)
+    plt.ylabel("Frequency")
+    plt.xlabel("Score")
+    plt.hist(df["SaintScore"].values, bins=bins)
+    plt.show()
+    
+plot_saint_score_frequency(cullin_benchmark.data)
+# -
+
+s1 = cullin_benchmark.data["SaintScore"] > 0.001
+plot_saint_score_frequency(cullin_benchmark.data[s1])
+
+# +
+# Apply a set of filters
+# SaintScore > 0.01
+# 
+df = cullin_benchmark_transformed
+thresh = 0.01
+s1 = df["SaintScore"] > thresh
+
+
+s2 = df["Bait"] == "CBFBwt_MG132"
+s3 = df["Bait"] == "ELOBwt_MG132"
+s4 = df["Bait"] == "CUL5wt_MG132"
+
+s5 = df["Entrez"] != "-"
+a = s1 & s2
+b = s1 & s3
+c = s1 & s4
+
+
+np.sum(s1), np.sum(s2), np.sum(s1 & s2), np.sum(s1 & s3), np.sum(s1 & s4), np.sum(s1 & s5)
+
+# Select Saint score > thresh and Entrez ID not '-'
+df = df[s1 & s5]
+# -
+
+df.apply(lambda x: len(set(x)))
+
+# +
+# Train on the first pulldown
+
+s2 = df["Bait"] == "CBFBwt_MG132"
+df = df[s2]
+df.apply(lambda x: len(set(x)))
+
+# +
+#How many positives are there in the training set?
+
+training_index_labels = sorted(df["Entrez"].apply(int))
+colA = "Entrez Gene Interactor A"
+s1 = cullin_bg[colA].apply(lambda x: int(x) in training_index_labels)
+colB = "Entrez Gene Interactor B"
+s2 = cullin_bg[colB].apply(lambda x: int(x) in training_index_labels)
+s3 = s1 & s2
+cullin_train_df = cullin_bg[s3]
+
+# +
+# Plot the Saint Scores for the training Data
+
+plot_saint_score_frequency(df)
+# -
+
+TRANSFORM_CULLIN = True
+if TRANSFORM_CULLIN == True:
+    cullin_benchmark_transformed = transform_cullin_benchmark_data(cullin_benchmark.data, id_mapping)
 
 
 def triangular_to_symmetric(A):
@@ -284,35 +438,65 @@ def triangular_to_symmetric(A):
     return Lower
 
 
-def coverage_plot(d, w=12, l=12, title="Experimental Coverage of Cullin BG"):
-    w = 12
-    l = w
-    size = (l, w)
-    plt.figure(figsize=size)
-    plt.imshow(triangular_to_symmetric(d.values != 0))
-    plt.title(title)
-    plt.colorbar()
+def coverage_plot(d, w=12, h=12, title="Experimental Coverage of Cullin BG"):
+
+    
+    
+    fig, axs = plt.subplots(1, 2)
+    fig.set_figheight(h)
+    fig.set_figwidth(w)
+    
+    ax = axs[0]
+    mappable = ax.imshow(triangular_to_symmetric(d.values != 0))
+    ax.set_title(title)
+    #plt.colorbar(mappable, ax=ax)
+    ax = axs[1]
+    ax.imshow(d.values)
+    ax.set_title("Null")
+    plt.tight_layout()
     plt.show()
-coverage_plot(d)
+coverage_plot(d, w=16, h=14,)
 
-np.sum(d.values != 0), np.min(d.values), np.max(d.values), d.values.shape
+# +
+cullin_train_df_report = biogrid_df_report(cullin_train_df)
+d_train = get_experimental_coverage_df(cullin_train_df, cullin_train_df_report)
 
-testdf = pd.DataFrame(index = np.arange(8), columns = np.arange(8), data=np.arange(64).reshape((8, 8)), dtype=float)
+coverage_plot(d_train)
+# -
 
-plt.imshow(testdf.values)
-plt.colorbar()
+print(format_biogrid_df_report(**cullin_train_df_report))
 
-# ?plt.imshow
-
-testdf.
-
-plt.imshow(np.arange(64).reshape((8, 8)))
-
-# Imagine the biogrid data as an n x n x r tensor
-n = len(set(cullin_bg.iloc[:, 1]))
-r = len(set(cullin_bg.iloc[:, 3]))
+cullin_train_df.shape
 
 
-np.sum(d.values != 0)
+def plot_spectral_counts_distribution(df,
+    columns = ["r1", "r2", "r3", "r4"],
+    l=8,
+    w=8,
+    xlabel="Spectral Counts",
+    ylabel="Frequency",
+    title="Spectral Counts",
+    bins=20,
+    cmap=matplotlib.cm.tab10.colors,
+    log10=False
+):
+    plt.figure(figsize=(w, l))
+    plt.title(title)
+    plt.ylabel(ylabel)
+    plt.legend()
+    
+    if log10:
+        data = np.log10(df[columns].values)
+        plt.xlabel("log10 SC")
+    else:
+        data = df[columns].values
+        plt.xlabel(xlabel)
+    plt.hist(data, bins=20)
+    plt.show()
+    
 
 
+transformed_cullin_df = transform_cullin_benchmark_data(cullin_benchmark.data)
+
+
+plot_spectral_counts_distribution(transform_cullin_benchmark_data(cullin_benchmark.data), log10=False)
