@@ -34,6 +34,7 @@ import requests
 import json
 import scipy as sp
 import scipy.stats
+import sklearn
 import sys
 import time
 
@@ -466,8 +467,68 @@ coverage_plot(d_train)
 
 print(format_biogrid_df_report(**cullin_train_df_report))
 
-cullin_train_df.shape
 
+# +
+# Dummy Model
+def fit_dummy_model(key, nv, p, n_reps=None):
+    if n_reps:
+        M = np.zeros((nv, nv, n_reps))
+        for i in range(n_reps):
+            key, k1 = jax.random.split(key)
+            rep = jax.random.bernoulli(k1, p=p, shape=(nv, nv))
+            rep = np.array(rep)
+            rep = triangular_to_symmetric(rep)
+            M[:, :, i] = rep
+    else:
+        M = jax.random.bernoulli(key, p=p, shape=(nv, nv))
+        M = np.array(M)
+        M = triangular_to_symmetric(M)
+    return M
+
+
+nv = 268
+n_reps = 100
+M = fit_dummy_model(jax.random.PRNGKey(41), nv, 0.04, n_reps=n_reps)
+M = np.array(M)
+
+accuracies = np.zeros(n_reps)
+precisions = np.zeros(n_reps)
+if n_reps:
+    y_true = d_train.values != 0
+    y_true = triangular_to_symmetric(d_train.values)
+    y_true = np.ravel(y_true)
+    y_true = np.array(y_true, dtype=int)
+    for rep in range(n_reps):
+        mat = M[:, :, rep]
+        accuracies[rep] = sklearn.metrics.accuracy_score(y_true=y_true, y_pred=np.ravel(mat))
+        #precisions[rep] = sklearn.metrics.precision_score(y_true=y_true, y_pred=np.ravel(mat))
+    
+    
+# Accuracy TP + FN / (TP + FP + TN + FN) Prec TP/(TP + F)
+
+
+# -
+
+bins=20
+cmap = "bone"
+fig, axs = plt.subplots(1, 2)
+ax = axs[0]
+ax.hist(accuracies, bins=bins)
+ax.set_title("Accuracy")
+ax = axs[1]
+ax.set_title("Precision")
+ax.hist(precisions, bins=bins)
+plt.tight_layout()
+plt.suptitle("Dummy Model")
+print(np.sum(precisions))
+plt.show()
+
+plt.imshow(d_train != 0)
+
+(d_train.values != 0)
+
+
+# ?sklearn.metrics.accuracy_score
 
 def plot_spectral_counts_distribution(df,
     columns = ["r1", "r2", "r3", "r4"],
