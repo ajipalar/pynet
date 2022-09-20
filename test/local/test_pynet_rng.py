@@ -8,13 +8,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from ..src import random as td
+from ..src import pynet_rng as td
 
-import pyext.src.random as src_module
+import pyext.src.pynet_rng as src_module
 
 
 class Tests(td.RandomUnitTests):
-    ...
+    ... 
 
 
 if __name__ == "__main__":
