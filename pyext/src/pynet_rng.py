@@ -7,23 +7,6 @@ import jax.scipy as jsp
 import jax.scipy.linalg as lin
 
 
-def is_positive_definite(key, n):
-    """
-    Generate a real n-by-n positive definite matrix
-
-    A = LL* where A is a Hermitian matrix and L is a lower triangular matrix
-    L* is the conjugate transpose
-
-    """
-    ...
-
-def positive_semidefinite(key, n):
-    """
-    Generate an n-by-n positive semi-definite real matrix
-
-    """
-    ...
-
 def chi2(key, k, shape=None, dtype=None):
     """
     Sample a chi2 distributed random variate
