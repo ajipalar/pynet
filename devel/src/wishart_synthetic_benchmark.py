@@ -122,8 +122,8 @@ def helper_vline_hist(ax, vx, ymin, ymax, vals, vlabel, hlabel, vcolor, hcolor, 
 
 
 
-def quad_plot(prior_mat_stat_df, ground_truth, n, n_samples, font_rc, **kwargs):
-    Kstats = get_precision_matrix_stats(ground_truth, n=n)
+def quad_plot(prior_mat_stat_df, ground_truth, n, n_samples, font_rc, p, suptitle: str =None, **kwargs):
+    Kstats = get_precision_matrix_stats(ground_truth, n=n, p=p)
     names = ["rowsum", "medians", "vars", "means", "mins", "maxs", "absdets"]
 
     Kstats = {names[i]: Kstats[i] for i in range(len(Kstats))}
@@ -158,8 +158,10 @@ def quad_plot(prior_mat_stat_df, ground_truth, n, n_samples, font_rc, **kwargs):
         ax.vlines(
             ymin=0, ymax=ylim[1], x=Kstats[col.name], color=vlinecolor, label=label
         )
-
-    plt.suptitle(f"N={n_samples}")
+    if suptitle:
+        plt.suptitle(suptitle)
+    else:
+        plt.suptitle(f"N={n_samples}")
     plt.rc("font", **font_rc)
     fig.set_figheight(h)
     fig.set_figwidth(w)
@@ -221,9 +223,9 @@ def sample_from_prior(key, nu, p, n_samples, K_0):
     return val
 
 
-def get_precision_matrix_stats(K, n):
+def get_precision_matrix_stats(K, n, p=64):
     Stats = namedtuple("Stats", "rowsum medians means vars mins maxs absdets")
-    assert K.shape == (64, 64)
+    assert K.shape == (p, p)
 
     return Stats(
         [np.sum(x) for x in K],
