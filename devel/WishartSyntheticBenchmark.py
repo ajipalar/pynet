@@ -920,6 +920,51 @@ jsp.linalg.eigh(K_theta, eigvals_only=True)
 K_theta[diag]
 
 # +
+# Lets look at prior accuracy and precision
+# TP TN FP FN
+from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve
+
+
+def get_accuracies_and_precisions(A, exp):
+    nedges = sp.special.binom(p, 2)
+
+    AUROC = np.zeros(n_samples, dtype=float) # Average AUROC
+    AUPRC = np.zeros(n_samples, dtype=float)
+    for i, Ksamp in enumerate(np.array(exp.samples.samples)):
+        assert Ksamp.shape == (p, p)
+        minval = np.min(np.tril(Ksamp, k=-1))
+        maxval = np.max(np.tril(Ksamp, k=-1))
+        #assert minval < 0 < maxval
+        d = maxval - minval
+
+        LT = A[np.tril_indices(p, k=-1)]
+        LTK = Ksamp[np.tril_indices(p, k=-1)]
+        LT = np.array(LT)
+        LTK = np.array(LTK) 
+
+        #assert np.all(LT == LTK)
+        y_test = np.ravel(LT)
+        y_score = np.ravel(LTK)
+        #assert np.all(y_test == y_score)
+        #assert np.sum(y_test) > 0
+        
+        fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_test, y_score)
+        precision, recall, thresholds_prec = sklearn.metrics.precision_recall_curve(y_test, y_score)
+
+        AP = sklearn.metrics.average_precision_score(y_test, y_true)
+        area_under_roc = sklearn.metrics.auc(fpr, tpr)
+        area_under_prc = sklearn.metric.auc(recall, precision)
+
+        AUROC[i] = area_under_roc
+        AUPRC[i] = area_under_prc
+        
+        #assert APs.shape == (n_samples, )
+        #assert AAUROCs.shape == (n_samples, )
+    
+    return AUROC, AUPRC, thresholds, thresholds_prec
+
+
+# +
 # Generate the Ground Truth Network
 key = jax.random.PRNGKey(22)
 keys = jax.random.split(key, 10)
@@ -996,6 +1041,14 @@ ground_truth_pair_plot(A, K_theta, title1="A",
 
 do_gridplot(exp, decomposition="prec")
 
+do_gridplot(exp, decomposition="svd")
+
+assert A.shape == (p, p)
+assert np.sum(A[diag]) == 0
+accs, aps, t, tp = get_accuracies_and_precisions(A, exp)
+
+plot_accuracies_and_precisions(accs, aps)
+
 # +
 K0 = np.eye(p)
 K0[np.diag_indices(p)] = K_theta[np.diag_indices(p)]
@@ -1014,32 +1067,13 @@ do_gridplot(exp, decomposition="prec")
 
 do_gridplot(exp, decomposition="svd")
 
-# +
-# Average Value
-AVERAGE = np.mean(exp.samples.samples, axis=(0, ))
-AVERAGE = np.array(AVERAGE)
-AVERAGE[diag] = 1
-VAR = np.var(exp.samples.samples, axis=(0, ))
-VAR = np.array(VAR)
-MED = np.median(exp.samples.samples, axis=(0, ))
-MED = np.array(MED)
-
-ground_truth_pair_plot(A, np.log10(AVERAGE), title1="A", 
-                       title2="log10Average",
-                       cmap1=cmap1,
-                       cmap2 = "GnBu")
-# -
-
-ground_truth_pair_plot(A, np.log10(VAR), title1="A", 
-                       title2="log10 VAR",
-                       cmap1=cmap1,
-                       cmap2 = "GnBu")
-
-V[diag][8]
-
-ground_truth_pair_plot(A,  np.log10(MED), 
-                       title1="A", title2="log10 MEDIAN",
-                      cmap1=cmap1, cmap2="GnBu")
+assert A.shape == (p, p)
+assert np.sum(A[diag]) == 0
+assert np.alltrue(A == A.T)
+#check_cov(A)
+assert np.sum(A) != 0
+aacs, aps, t, tp = get_accuracies_and_precisions(A, exp)
+plot_accuracies_and_precisions(AAUROCs, APs)
 
 # +
 # Lets look at prior accuracy and precision
@@ -1047,40 +1081,96 @@ ground_truth_pair_plot(A,  np.log10(MED),
 from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve
 
 
-def get_accuracies_and_precisions(exp):
+def get_accuracies_and_precisions(A, exp):
     nedges = sp.special.binom(p, 2)
 
-    AAUROCs = np.zeros(n_samples) # Average AUROC
-    APs = np.zeros(n_samples)
+    AAUROCs = np.zeros(n_samples, dtype=float) # Average AUROC
+    APs = np.zeros(n_samples, dtype=float)
     for i, Ksamp in enumerate(np.array(exp.samples.samples)):
         assert Ksamp.shape == (p, p)
         minval = np.min(np.tril(Ksamp, k=-1))
         maxval = np.max(np.tril(Ksamp, k=-1))
-        assert minval < 0 < maxval
+        #assert minval < 0 < maxval
         d = maxval - minval
 
         LT = A[np.tril_indices(p, k=-1)]
         LTK = Ksamp[np.tril_indices(p, k=-1)]
-        LT = np.array(LT, dtype=float)
-        LTK = np.array(LTK)
+        LT = np.array(LT)
+        LTK = np.array(LTK) 
 
-
+        #assert np.all(LT == LTK)
         y_test = np.ravel(LT)
         y_score = np.ravel(LTK)
+        #assert np.all(y_test == y_score)
+        #assert np.sum(y_test) > 0
+        
+        fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_test, y_score)
+        precision, recall, thresholds_prec = sklearn.metrics.precision_recall_curve(y_test, y_score)
 
-        fpr, tpr, thresholds = roc_curve(y_test, y_score)
-        precision, recall, thresholds_prec = precision_recall_curve(y_test, y_score)
-
-        AP = sklearn.metrics.average_precision_score(y_test, y_score)
-        area_roc = auc(fpr, tpr)
+        AP = sklearn.metrics.average_precision_score(precision, recall)
+        area_under_roc = sklearn.metrics.auc(fpr, tpr)
 
         APs[i] = AP
-        AAUROCs[i] = area_roc
+        AAUROCs[i] = area_under_roc
         
-        return AAUROCs, APs
+        #assert APs.shape == (n_samples, )
+        #assert AAUROCs.shape == (n_samples, )
+    
+    return AAUROCs, APs, thresholds, thresholds_prec
 
 
+# +
+i = 0
+Ksamp = As.samples[0]
+assert Ksamp.shape == (p, p), f"{Ksamp.shape}, {p}"
+minval = np.min(np.tril(Ksamp, k=-1))
+maxval = np.max(np.tril(Ksamp, k=-1))
+#assert minval < 0 < maxval
+d = maxval - minval
+
+LT = A[np.tril_indices(p, k=-1)]
+LTK = Ksamp[np.tril_indices(p, k=-1)]
+LT = np.array(LT)
+LTK = np.array(LTK) 
+
+
+y_test = np.ravel(LT)
+y_score = np.ravel(LTK)
+
+fpr, tpr, thresholds = roc_curve(y_test, y_score)
+precision, recall, thresholds_prec = precision_recall_curve(y_test, y_score)
+
+AP = sklearn.metrics.average_precision_score(y_test, y_score)
+area_roc = sklearn.metrics.auc(fpr, tpr)
+
+APs[i] = AP
+AAUROCs[i] = area_roc
 # -
+
+area_roc
+
+# +
+# Dummy test for plotting accuracies and precisions
+SynthExper = namedtuple("SynthExp", "cov cov_inv nu n p K0 n_samples key samples")
+exp_test = exp
+As = np.zeros((n_samples, p, p))
+Samples = namedtuple("Samples", "samples")
+
+for i in range(n_samples):
+    As[i] = A
+As = Samples(As)
+exp_test = SynthExper(A, A, nu, n, p, A, n_samples, key, As)
+accs_test, precs_test, ts, tps = get_accuracies_and_precisions(A, exp_test)
+plot_accuracies_and_precisions(accs_test, precs_test)
+# -
+
+accs.shape
+
+A
+
+
+
+# ?plot_accuracies_and_precisions
 
 def plot_accuracies_and_precisions(aacs, precs):
     bins=20
@@ -1097,6 +1187,9 @@ def plot_accuracies_and_precisions(aacs, precs):
     plt.show()
 
 
+AAUROCs, APs = get_accuracies_and_precisions(exp)
+
+plot_accuracies_and_precisions(AAUROCs, APs)
 
 plt.figure()
 lw = 2
@@ -1228,50 +1321,4 @@ for x in xs:
     assert (h + (f + g))(3) == ((h + f) + g)(3)
 
     assert (f - f)(123498723489) == 0 # Additive Inverse
-
-# -
-
-np.sqrt(-3)
-
-
-
-(g+f)(0)
-
-# +
-# vf \in FS
-# Python Functions
-# -
-
-(f + g) == (g + f)
-
-hash(f + g)
-
-hash((g + f).f)
-
-# +
-
-
-hash(g - f) == hash(g - f)
-
-
-# -
-
-def eq(x, y):
-    return x == y
-
-
-jax.make_jaxpr(eq)(x, x)
-
-jax.make_jaxpr(f + g)(x)
-
-hash(f)
-
-
-
-jax.make_jaxpr(f - g)(x)
-
-(f - g)(2)
-
-(g - f)(2)
-
 
