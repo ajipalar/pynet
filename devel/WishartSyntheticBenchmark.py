@@ -987,12 +987,12 @@ exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
 cmap = "twilight_shifted"
 cmap = "PuOr"
 cmap = "seismic"
+#cmap = "ocean" # "slategrey" # "steelblue" #whitesmoke
+cmap1 = matplotlib.colors.ListedColormap(['w', 'lightskyblue'])
 ground_truth_pair_plot(A, K_theta, title1="A", 
                        title2="K" + u"\u03B8"
-                       ,cmap1=cmap,
+                       ,cmap1=cmap1,
                        cmap2 = cmap)
-
-K_theta[diag]
 
 do_gridplot(exp, decomposition="prec")
 
@@ -1014,13 +1014,128 @@ do_gridplot(exp, decomposition="prec")
 
 do_gridplot(exp, decomposition="svd")
 
-do_gridplot(exp)
+# +
+# Average Value
+AVERAGE = np.mean(exp.samples.samples, axis=(0, ))
+AVERAGE = np.array(AVERAGE)
+AVERAGE[diag] = 1
+VAR = np.var(exp.samples.samples, axis=(0, ))
+VAR = np.array(VAR)
+MED = np.median(exp.samples.samples, axis=(0, ))
+MED = np.array(MED)
+
+ground_truth_pair_plot(A, np.log10(AVERAGE), title1="A", 
+                       title2="log10Average",
+                       cmap1=cmap1,
+                       cmap2 = "GnBu")
+# -
+
+ground_truth_pair_plot(A, np.log10(VAR), title1="A", 
+                       title2="log10 VAR",
+                       cmap1=cmap1,
+                       cmap2 = "GnBu")
+
+V[diag][8]
+
+ground_truth_pair_plot(A,  np.log10(MED), 
+                       title1="A", title2="log10 MEDIAN",
+                      cmap1=cmap1, cmap2="GnBu")
+
+# +
+# Lets look at prior accuracy and precision
+# TP TN FP FN
+from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve
 
 
+def get_accuracies_and_precisions(exp):
+    nedges = sp.special.binom(p, 2)
+
+    AAUROCs = np.zeros(n_samples) # Average AUROC
+    APs = np.zeros(n_samples)
+    for i, Ksamp in enumerate(np.array(exp.samples.samples)):
+        assert Ksamp.shape == (p, p)
+        minval = np.min(np.tril(Ksamp, k=-1))
+        maxval = np.max(np.tril(Ksamp, k=-1))
+        assert minval < 0 < maxval
+        d = maxval - minval
+
+        LT = A[np.tril_indices(p, k=-1)]
+        LTK = Ksamp[np.tril_indices(p, k=-1)]
+        LT = np.array(LT, dtype=float)
+        LTK = np.array(LTK)
+
+
+        y_test = np.ravel(LT)
+        y_score = np.ravel(LTK)
+
+        fpr, tpr, thresholds = roc_curve(y_test, y_score)
+        precision, recall, thresholds_prec = precision_recall_curve(y_test, y_score)
+
+        AP = sklearn.metrics.average_precision_score(y_test, y_score)
+        area_roc = auc(fpr, tpr)
+
+        APs[i] = AP
+        AAUROCs[i] = area_roc
+        
+        return AAUROCs, APs
+
+
+# -
+
+def plot_accuracies_and_precisions(aacs, precs):
+    bins=20
+
+    plt.subplot(121)
+
+    plt.hist(aacs, bins=bins)
+    plt.xlabel("AUROC")
+    plt.ylabel("Frequency")
+    plt.subplot(122)
+    plt.hist(precs, bins=bins)
+    plt.xlabel("Average Precision")
+    plt.suptitle(f"Prior Accuracy and precision")
+    plt.show()
+
+
+
+plt.figure()
+lw = 2
+plt.plot(
+    fpr,
+    tpr,
+    color="darkorange",
+    lw=lw,
+    label="ROC curve (area = %0.2f)" % area,
+)
+plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("Receiver operating characteristic example")
+plt.legend(loc="lower right")
+plt.show()
+
+# Lets do a misfit prior
+K0 = jax.random.exponential(key, shape=(p, p))
+K0 = K0 * np.eye(p)
+K0 = K0 * np.arange(-8, 8, 1)
+K0 = np.array(K0)
+K0[np.diag_indices(p)] += 10
+V = K0 / (nu)
+#check_cov(V)
+
+plt.imshow(V, cmap=cmap)
+
+exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
+
+do_gridplot(exp, decomposition="prec")
 
 do_gridplot(exp, decomposition="svd")
 
-np.log10(K_theta)
+accs, precs = get_accuracies_and_precisions(exp)
+
+plot_accuracies_and_precisions(accs, precs)
 
 # +
 example_string = "A0B1C2D3E4F5G6H7I8J9"
