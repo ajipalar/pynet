@@ -740,7 +740,7 @@ do_quad_plot(exp)
 """
 Let's Do an Example with an 8 x 8 matrix
 """
-p=4 # The length of the date vector
+p=16 # The length of the date vector
 nu = p
 n_trial = 4 # The number of AP-MS trials
 factor = 4
@@ -762,7 +762,7 @@ K_theta = np.array(K_theta)
 K_theta /= factor
 K_theta[np.where(A == 0)] = 0
 K_theta = np.tril(K_theta, k=-1) + np.tril(K_theta, k=-1).T
-K_theta[diag_idx] = 3 + 4*jax.random.normal(keys[2], shape=(p,))/4
+K_theta[diag_idx] = 1 + jax.random.normal(keys[2], shape=(p,))/4
 
 check_cov(K_theta)
 #assert np.sum(K_theta[diag_idx]) == p
@@ -837,7 +837,7 @@ def get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial):
 
 K0 = np.ones(shape=(p, p)) * -0.1
 #diag_K0 = jax.random.uniform(keys[2], minval=0, maxval=0.01, shape=(p, ))
-K0[np.diag_indices(p)] = 1
+K0[np.diag_indices(p)] = 2
 check_cov(K0)
 n_samples = 1000
 V = K0 / p
@@ -857,7 +857,7 @@ def get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial):
     return exp
 
 
-nu = 13
+nu = p-1
 exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
 
 
@@ -873,97 +873,154 @@ diag = np.diag_indices(p)
 check_cov(K0)
 n_samples = 1000
 
-V = K0 / p
+
+
+nu = p - 2
+
+V = K0 / (nu)
 
 check_cov(V)
+
+exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
 # -
 
-Ks = sample_from_prior(keys[3], nu, p, n_samples, V)
-K_theta = np.array(K_theta)
-K0 = np.array(K0)
-
-SynthExper = namedtuple("SynthExp", "cov cov_inv nu n p K0 n_samples key samples")
-nu = 14
-exp = SynthExper(np.array(jsp.linalg.inv(K_theta)), np.array(K_theta), nu, n_trial, p, K0, n_samples, keys, Ks)
-
 do_gridplot(exp, decomposition="prec")
+
 
 do_gridplot(exp, decomposition="svd")
 
 # +
 # Conclusion - setting a prior of K_theta is worse. Perhaps because of the zeros
-# -
-
-
 
 # +
-# p length of the data vector
-#assert np.sum(K_theta[diag_idx]) == p, f"{p, np.sum(K_theta[diag_idx])}"
-
-
 K0 = np.eye(p)
 diag = np.diag_indices(p)
 #diag_K0 = jax.random.uniform(keys[2], minval=0, maxval=0.01, shape=(p, ))
-K0[diag] = 1
-check_cov(K0)
-n_samples = 1000
 
-V = K_theta
+check_cov(K0)
+n_samples = 10000
+
+
 
 check_cov(V)
+nu = p - 2
+V = K0 / (nu)
+
+exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
 # -
 
-Ks = sample_from_prior(keys[3], nu, p, n_samples, V)
-K_theta = np.array(K_theta)
-K0 = np.array(K0)
-
-# sp.linalg.eigh
-do_gridplot(exp, check_finite=False, decomposition="prec")
+do_gridplot(exp, decomposition="prec")
 
 do_gridplot(exp, decomposition="svd")
 
-Sigma = jsp.linalg.inv(K_theta)
+do_gridplot(exp)
 
+jsp.linalg.eigh(K_theta, eigvals_only=True)
 
-rng.wishart(keys[1], K_theta, 14, len(K_theta))
-
-K_theta.shape
-
-U, s, Vh = scipy.linalg.svd(K_theta)
-
-_, s1, u = sp.linalg.svd(K_theta)
-
-_, s2, u = sp.linalg.svd(K0)
-
-s1
+K_theta[diag]
 
 # +
-n_close = 0
-nk = sp.special.binom(p, 2)
-ACC = np.zeros(len(Ks.samples))
-PREC = np.zeros(len(Ks.samples))
-for i, sample in enumerate(Ks.samples):
-    assert sample.shape == (p, p)
-    minv = np.min(sample)
-    maxv = np.max(sample)
-    assert minv < 0
-    assert maxv > 0
-    
-    d = maxv - minv
-    percent = 0.01
-    
-    P = np.abs(sample) < d*percent
-    P = np.array(P)
-    P[diag] = 0
-    ACC[i] = 0.5*np.sum(P == A) / nk
-    
-    
-    
-n_close /= n_samples
+# Generate the Ground Truth Network
+key = jax.random.PRNGKey(22)
+keys = jax.random.split(key, 10)
+A = jax.random.bernoulli(keys[0], shape=(p, p))
+diag_idx = np.diag_indices(p)
+A = np.tril(A) + np.tril(A).T
+A = np.array(A)
+A[diag_idx] = 0
+A = np.array(A, dtype=int)
+
+# Generate the K_theta, the simulate known precicion matrix
+del K_theta
+K_theta = jax.random.uniform(keys[1], minval=-1., maxval=1.,  shape=(p, p))
+K_theta = np.array(K_theta)
+K_theta /= factor
+
+K_theta[0:10] += 0.05
+K_theta[4:7] += 0.3
+K_theta[4, 3] = 1
+K_theta[9, 2] = -1
+K_theta[7:15, 7:15] -= 0.2
+K_theta[5:9, 5:9] += 0.1
+
+K_theta[np.where(A == 0)] = 0
+K_theta = np.tril(K_theta, k=-1) + np.tril(K_theta, k=-1).T
+K_theta[diag_idx] = 1 + jax.random.normal(keys[2], shape=(p,))/4
+
+
+K_theta[0, 0] = 10
+K_theta[1, 1] = 1
+K_theta[2, 2] = 2
+K_theta[3, 3] = 5
+K_theta[4, 4] = 12
+K_theta[5, 5] = 231
+K_theta[6, 6] = 10121
+K_theta[7, 7] = 100232
+K_theta[8, 8] = 999999
+K_theta[9, 9] = 1283828
+K_theta[10, 10] = 4
+K_theta[11, 11] = 4
+K_theta[12, 12] = 5
+K_theta[13, 13] = 9
+K_theta[14, 14] = 20
+K_theta[15, 15] = 40
+
+#K_theta = sp.linalg.inv(K_theta)
+
+
+#K_theta[10, 10] = 7
+K0 = K_theta
+diag = np.diag_indices(p)
+#diag_K0 = jax.random.uniform(keys[2], minval=0, maxval=0.01, shape=(p, ))
+
+check_cov(K0)
+n_samples = 1000
+
+V = K0 / p
+
+check_cov(V)
+
+nu = p - 1
+exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
 # -
 
-plt.hist(ACC, bins=20)
-plt.xlabel("Accuracy")
+cmap = "twilight_shifted"
+cmap = "PuOr"
+cmap = "seismic"
+ground_truth_pair_plot(A, K_theta, title1="A", 
+                       title2="K" + u"\u03B8"
+                       ,cmap1=cmap,
+                       cmap2 = cmap)
+
+K_theta[diag]
+
+do_gridplot(exp, decomposition="prec")
+
+# +
+K0 = np.eye(p)
+K0[np.diag_indices(p)] = K_theta[np.diag_indices(p)]
+check_cov(K0)
+n_samples = 1000
+
+V = K0 / p
+
+check_cov(V)
+
+nu = p - 1
+exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
+# -
+
+do_gridplot(exp, decomposition="prec")
+
+do_gridplot(exp, decomposition="svd")
+
+do_gridplot(exp)
+
+
+
+do_gridplot(exp, decomposition="svd")
+
+np.log10(K_theta)
 
 # +
 example_string = "A0B1C2D3E4F5G6H7I8J9"
