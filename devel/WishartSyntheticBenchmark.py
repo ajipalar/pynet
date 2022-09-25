@@ -147,6 +147,8 @@ A = randPOSDEFMAT(k, p)
 diag_idx = np.diag_indices(p)
 A = A.at[diag_idx].set(jnp.sqrt(A[diag_idx]) + jnp.arange(p) / 2).block_until_ready()
 A = np.array(A)
+assert np.alltrue(A[diag_idx] > 0)
+assert mat.is_positive_definite(A)
 
 n_replicates = 4
 mus = jax.random.normal(k1, shape=(p,))*5
@@ -155,7 +157,9 @@ data = jax.random.multivariate_normal(k2, mus, A, shape=(n_replicates,))
 assert mat.is_positive_definite(A)
 
 K = np.linalg.inv(A)
-
+assert np.alltrue(K[diag_idx] > 0)
+assert np.alltrue(K[diag_idx] > 0)
+assert mat.is_positive_definite(K)
 #K =  K / np.abs((np.max(K) - np.min(K))) # put two -1, 1
 #K = K * 2
 
@@ -574,6 +578,393 @@ for i in range(m):
     plt.suptitle(f"N={n_samples}")
 plt.show()
 
+
+# +
+# More Complex 4x4
+def set_up_synth_exp(key, nu, cov,):
+    SynthExper = namedtuple("SynthExp", "cov cov_inv nu n p K0 n_samples key samples")
+    assert mat.is_positive_definite(cov)
+
+    cov_inv = sp.linalg.inv(cov)
+    n=len(cov)
+    p = len(cov)
+    K0 = (1/nu)*cov_inv
+    n_samples = 1000
+
+    key = jax.random.PRNGKey(22)
+
+    samples = sample_from_prior(key, nu, p, n_samples, K0)
+    return SynthExper(cov, cov_inv, nu, n, p, K0, n_samples, key, samples)
+
+cov = np.array([[1.1,  0.0, 0.1, 1.],
+                [0.,  1.2, 1., 0.],
+                [0.1, 1.0,  1.1,0.],
+                [1.,  0.,  0., 1.]])
+
+
+def check_cov(m):
+    assert np.alltrue(m[np.diag_indices(len(m))] > 0), f"fail : diag"
+    assert np.alltrue(cov == cov.T)
+    assert mat.is_positive_definite(m), f"fail pos"
+    
+def do_quad_plot(exp, font_rc={"size": 16}):
+    mat_stats = [get_precision_matrix_stats(S, exp.n, p=exp.p) for S in exp.samples.samples]
+    prior_mat_stat_df = df_from_stats(mat_stats, exp.n)
+    quad_plot(prior_mat_stat_df, exp.cov_inv, n=exp.n, n_samples=exp.n_samples, font_rc=font_rc, p=exp.p)
+
+key = jax.random.PRNGKey(4)
+ex4 = set_up_synth_exp(key, nu, cov)
+do_quad_plot(ex4)
+
+
+# -
+
+def do_gridplot(
+    exp,
+    scale = 6,
+    w = 1.5 * scale,
+    h = 1 * scale,
+    bins=30,
+    hcolor="steelblue",
+    vcolor="darkorange",
+
+    font_rc = {"size": 16, "family": "sans-serif"}, 
+    check_finite=True,
+    decomposition="eigh"):
+    
+    
+
+    if decomposition == "eigh":
+        def decomp(x):
+            return sp.linalg.eigh(x, eigvals_only=True, check_finite=check_finite)
+    
+    elif decomposition == "svd":
+        def decomp(x):
+            U, s, VH = sp.linalg.svd(x)
+            return s
+    elif decomposition == "prec":
+        def decomp(x):
+            return x[np.diag_indices(len(x))]
+        
+    ground_truth = decomp(exp.cov_inv)
+    
+    eigs = np.zeros((len(exp.samples.samples), exp.p))
+    
+    
+    for i in range(len(exp.samples.samples)):
+        eigs[i] = decomp(exp.samples.samples[i])
+    
+    
+    
+    assert len(exp.cov) % 2 == 0, f"rank cov is odd"
+    m = int(np.sqrt(len(exp.cov)))
+    fig, axs = plt.subplots(m, m, layout="constrained")
+    fig.set_figheight(h)
+    fig.set_figwidth(w)
+
+    count = -1
+    axs[0, 0].set_ylabel("Frequency")
+    
+
+    
+    for i in range(m):
+        for j in range(m):
+            count +=1
+            ax = axs[i, j]
+            eigvals = eigs[:, count]
+            vx = ground_truth[count]
+            ymin = 0
+
+            vlabel = f"K eigenvalues" if count == m*m-1 else None
+            hlabel = f"prior samples" if count == m*m-1 else None
+
+            #helper_vline_hist(ax, vx, ymin, ymax, eigvals, vlabel, hlabel,
+                             #vcolor, hcolor, bins, ylabel=None, xlabel=None)
+
+
+            truth = ground_truth[count]
+            ax.hist(eigvals, bins=bins, label=hlabel, facecolor=hcolor)
+            ymax = ax.get_ylim()[1]
+            ax.vlines(x=truth, ymin=0, ymax=ymax, color=vcolor)
+            
+            if decomposition == "eigh":
+                s = u"\u03BB"
+
+            elif decomposition == "svd":
+                s = u"\u03C3"
+            
+            elif decomposition == "prec":
+                s = f"p"
+
+            SUB = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+            s = s + str(count + 1)
+            s = s.translate(SUB)
+            ax.set_xlabel(s)
+            #ax.scatter(x, y)
+
+            plt.suptitle(f"N={n_samples}")
+    #plt.legend()
+    plt.show()
+
+do_gridplot(ex4)
+
+# +
+key = jax.random.PRNGKey(1123123)
+key, k1 = jax.random.split(key, 2)
+p = 16
+nu = p
+A = jax.random.uniform(key, shape=(p, p)).block_until_ready()
+
+A = A @ A.T
+A = A / (np.sqrt(A) @ np.sqrt(A))
+A = A + np.eye(p)
+A = np.array(A)
+A[0, 3] = 0
+A[3, 0] = 0
+
+check_cov(A)
+exp = set_up_synth_exp(k1, nu, A) # check invertible, pos def
+
+check_cov(exp.cov_inv) # check inverse
+
+assert np.alltrue(np.isnan(exp.K0)==False)
+assert np.alltrue(np.isinf(exp.K0)==False)
+assert np.alltrue(np.isnan(exp.samples.samples)==False)
+# -
+
+do_gridplot(exp)
+
+do_quad_plot(exp)
+
+# +
+"""
+Let's Do an Example with an 8 x 8 matrix
+"""
+p=4 # The length of the date vector
+nu = p
+n_trial = 4 # The number of AP-MS trials
+factor = 4
+
+# Generate the Ground Truth Network
+key = jax.random.PRNGKey(22)
+keys = jax.random.split(key, 10)
+A = jax.random.bernoulli(keys[0], shape=(p, p))
+diag_idx = np.diag_indices(p)
+A = np.tril(A) + np.tril(A).T
+A = np.array(A)
+A[diag_idx] = 0
+A = np.array(A, dtype=int)
+
+# Generate the K_theta, the simulate known precicion matrix
+
+K_theta = jax.random.uniform(keys[1], minval=-1., maxval=1.,  shape=(p, p))
+K_theta = np.array(K_theta)
+K_theta /= factor
+K_theta[np.where(A == 0)] = 0
+K_theta = np.tril(K_theta, k=-1) + np.tril(K_theta, k=-1).T
+K_theta[diag_idx] = 3 + 4*jax.random.normal(keys[2], shape=(p,))/4
+
+check_cov(K_theta)
+#assert np.sum(K_theta[diag_idx]) == p
+
+# +
+def ground_truth_pair_plot(A, K, title1="", title2="", cmap1="nipy_spectral", cmap2="CMRmap", factor=1.):
+    font_rc = {"size": 14, "family": "sans-serif"}
+
+    scale = 16
+    w = 1 * scale
+    h = 1 * scale
+    cbar_scale = 0.35
+
+    fig, axs = plt.subplots(1, 2, gridspec_kw={'width_ratios':[1, 1],
+                                               'height_ratios':[1]}, layout="constrained")
+
+    plt.rc("font", **font_rc)
+    fig.set_figheight(h)
+    fig.set_figwidth(w)
+    ax = axs[0]
+
+
+    covim = ax.imshow(A, vmin=np.min(A), vmax=2*np.median(A), cmap=cmap1)
+    fig.colorbar(covim, ax=ax, location="left", shrink=cbar_scale)
+    ax.set_title(title1)
+    #ax.legend()
+
+    ax = axs[1]
+    ax.set_title(title2)
+    
+   # if type(cmap2) == str:
+   #     cmap2 = matplotlib.colors.Colormap(cmap2)
+    K_plot = K.copy()
+    
+    K_plot[np.diag_indices(len(K_plot))] = np.max(np.tril(K_plot, k=-1))
+    
+    precim = ax.imshow(K_plot, vmin=np.min(K_plot), cmap=cmap2)
+    
+    #bounds = [-1/factor, 1/factor]
+    #cnorm = matplotlib.colors.BoundaryNorm(bounds, cmap2.N)
+
+    fig.colorbar(precim, ax=ax, location="right", shrink=cbar_scale)
+    #plt.suptitle(, y=0.75)
+    plt.show()
+    
+cmap1 = matplotlib.colors.ListedColormap(['w', 'steelblue'])
+
+
+ground_truth_pair_plot(A, K_theta, title1="A", 
+                       title2="K" + u"\u03B8"
+                       , cmap1=cmap1,
+                       cmap2 = "RdBu")
+
+check_cov(K_theta)
+
+
+# -
+
+def get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial):
+    keys = jax.random.split(key)
+    Ks = sample_from_prior(keys[0], nu, p, n_samples, V)
+    K_theta = np.array(K_theta)
+    K0 = np.array(K0)
+    SynthExper = namedtuple("SynthExp", "cov cov_inv nu n p K0 n_samples key samples")
+    exp = SynthExper(np.array(jsp.linalg.inv(K_theta)), K_theta, nu, n_trial, p, K0, n_samples, keys[1], Ks)
+    return exp
+
+# +
+# p length of the data vector
+#assert np.sum(K_theta[diag_idx]) == p, f"{p, np.sum(K_theta[diag_idx])}"
+
+
+K0 = np.ones(shape=(p, p)) * -0.1
+#diag_K0 = jax.random.uniform(keys[2], minval=0, maxval=0.01, shape=(p, ))
+K0[np.diag_indices(p)] = 1
+check_cov(K0)
+n_samples = 1000
+V = K0 / p
+
+check_cov(V)
+
+
+# -
+
+def get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial):
+    keys = jax.random.split(key)
+    Ks = sample_from_prior(keys[0], nu, p, n_samples, V)
+    K_theta = np.array(K_theta)
+    K0 = np.array(K0)
+    SynthExper = namedtuple("SynthExp", "cov cov_inv nu n p K0 n_samples key samples")
+    exp = SynthExper(np.array(jsp.linalg.inv(K_theta)), K_theta, nu, n_trial, p, K0, n_samples, keys[1], Ks)
+    return exp
+
+
+nu = 13
+exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
+
+
+do_gridplot(exp, check_finite=False, decomposition="prec")
+
+do_gridplot(exp, decomposition="svd")
+
+# +
+K0 = K_theta
+diag = np.diag_indices(p)
+#diag_K0 = jax.random.uniform(keys[2], minval=0, maxval=0.01, shape=(p, ))
+
+check_cov(K0)
+n_samples = 1000
+
+V = K0 / p
+
+check_cov(V)
+# -
+
+Ks = sample_from_prior(keys[3], nu, p, n_samples, V)
+K_theta = np.array(K_theta)
+K0 = np.array(K0)
+
+SynthExper = namedtuple("SynthExp", "cov cov_inv nu n p K0 n_samples key samples")
+nu = 14
+exp = SynthExper(np.array(jsp.linalg.inv(K_theta)), np.array(K_theta), nu, n_trial, p, K0, n_samples, keys, Ks)
+
+do_gridplot(exp, decomposition="prec")
+
+do_gridplot(exp, decomposition="svd")
+
+# +
+# Conclusion - setting a prior of K_theta is worse. Perhaps because of the zeros
+# -
+
+
+
+# +
+# p length of the data vector
+#assert np.sum(K_theta[diag_idx]) == p, f"{p, np.sum(K_theta[diag_idx])}"
+
+
+K0 = np.eye(p)
+diag = np.diag_indices(p)
+#diag_K0 = jax.random.uniform(keys[2], minval=0, maxval=0.01, shape=(p, ))
+K0[diag] = 1
+check_cov(K0)
+n_samples = 1000
+
+V = K_theta
+
+check_cov(V)
+# -
+
+Ks = sample_from_prior(keys[3], nu, p, n_samples, V)
+K_theta = np.array(K_theta)
+K0 = np.array(K0)
+
+# sp.linalg.eigh
+do_gridplot(exp, check_finite=False, decomposition="prec")
+
+do_gridplot(exp, decomposition="svd")
+
+Sigma = jsp.linalg.inv(K_theta)
+
+
+rng.wishart(keys[1], K_theta, 14, len(K_theta))
+
+K_theta.shape
+
+U, s, Vh = scipy.linalg.svd(K_theta)
+
+_, s1, u = sp.linalg.svd(K_theta)
+
+_, s2, u = sp.linalg.svd(K0)
+
+s1
+
+# +
+n_close = 0
+nk = sp.special.binom(p, 2)
+ACC = np.zeros(len(Ks.samples))
+PREC = np.zeros(len(Ks.samples))
+for i, sample in enumerate(Ks.samples):
+    assert sample.shape == (p, p)
+    minv = np.min(sample)
+    maxv = np.max(sample)
+    assert minv < 0
+    assert maxv > 0
+    
+    d = maxv - minv
+    percent = 0.01
+    
+    P = np.abs(sample) < d*percent
+    P = np.array(P)
+    P[diag] = 0
+    ACC[i] = 0.5*np.sum(P == A) / nk
+    
+    
+    
+n_close /= n_samples
+# -
+
+plt.hist(ACC, bins=20)
+plt.xlabel("Accuracy")
+
 # +
 example_string = "A0B1C2D3E4F5G6H7I8J9"
 
@@ -583,11 +974,132 @@ SUP = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
 print(example_string.translate(SUP))
 print(example_string.translate(SUB))
 # -
-
-# ?sp.linalg.eigh
-
-wK, vK = sp.linalg.eigh(K)
+matplotlib.colors.Colormap(cmap1)
 
 
+A
 
-sp.linalg.eigh(K, eigvals_only=True, check_finite=True)
+
+class FunctionSpace:
+    """
+    A vector space of functions from x in X to y in Y
+    F: X -> Y
+    """
+    def __init__(self, f):
+        if type(f) == FunctionSpace:
+            self.f = f.f
+        else:
+            self.f = f
+        
+    def __call__(self, x):
+        return self.f(x)
+    
+    def __add__(self, g):
+        return FunctionSpace(lambda x: self.f(x) + g(x)) # be a member of the vector space
+    
+    def __radd__(self, g):
+        return FunctionSpace(lambda x: self.f(x) + g(x))
+    
+    def __sub__(self, g):
+        return FunctionSpace(lambda x: self.f(x) - g(x))
+    
+    def __rsub__(self, g):
+        return FunctionSpace(lambda x: g(x) - self.f(x))
+    
+    def __mul__(self, lam):
+        # scalar multiplication
+        return FunctionSpace(lambda x: self.f(x) * lam)   
+    
+    def __rmul__(self, lam):
+        return FunctionSpace(lambda x: self.f(x) * lam)
+
+
+# +
+fs = FunctionSpace
+
+def f(x):
+    return np.sqrt(x + 1)
+
+def g(x):
+    return x**2 + 2
+
+def h(x):
+    return x**2 + 9 / 3
+
+def z(x):
+    return x + 1
+
+def q(x):
+    return x + 1
+
+
+# +
+# Check our Assumptions
+
+f = fs(f)
+h = fs(h)
+g = fs(g)
+
+xs = [0, 2., np.array([[0, 1, 2],
+                       [1., 1., -3.]])]
+
+for x in xs:
+    # Commutative over addition
+    np.testing.assert_almost_equal( (f + g)(x), (g + f)(x)), f"{x}"
+
+    # Scalar Multiplication
+    np.testing.assert_almost_equal(0 * (f + h)(x), 0 * (h + f)(x))
+    np.testing.assert_almost_equal(123 * (f + h)(x), (123 * f + 123 * h)(x))
+
+    # Ascociative
+
+    assert (h + (f + g))(3) == ((h + f) + g)(3)
+
+    assert (f - f)(123498723489) == 0 # Additive Inverse
+
+# -
+
+np.sqrt(-3)
+
+
+
+(g+f)(0)
+
+# +
+# vf \in FS
+# Python Functions
+# -
+
+(f + g) == (g + f)
+
+hash(f + g)
+
+hash((g + f).f)
+
+# +
+
+
+hash(g - f) == hash(g - f)
+
+
+# -
+
+def eq(x, y):
+    return x == y
+
+
+jax.make_jaxpr(eq)(x, x)
+
+jax.make_jaxpr(f + g)(x)
+
+hash(f)
+
+
+
+jax.make_jaxpr(f - g)(x)
+
+(f - g)(2)
+
+(g - f)(2)
+
+
