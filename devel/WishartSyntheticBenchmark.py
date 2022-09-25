@@ -951,9 +951,9 @@ def get_accuracies_and_precisions(A, exp):
         fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_test, y_score)
         precision, recall, thresholds_prec = sklearn.metrics.precision_recall_curve(y_test, y_score)
 
-        AP = sklearn.metrics.average_precision_score(y_test, y_true)
+        #AP = sklearn.metrics.average_precision_score(y_test, y_true)
         area_under_roc = sklearn.metrics.auc(fpr, tpr)
-        area_under_prc = sklearn.metric.auc(recall, precision)
+        area_under_prc = sklearn.metrics.auc(recall, precision)
 
         AUROC[i] = area_under_roc
         AUPRC[i] = area_under_prc
@@ -1021,12 +1021,47 @@ diag = np.diag_indices(p)
 check_cov(K0)
 n_samples = 1000
 
+
+
 V = K0 / p
 
 check_cov(V)
 
 nu = p - 1
-exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
+post_exp = get_exp(key, nu + 4, p, n, n_samples, V + data @ data.T, K_theta, K0, n_trial)
+
+# Data for fitting the posterior
+
+n_data_replicates = 100
+data = jax.random.multivariate_normal(keys[4], np.zeros(p), jsp.linalg.inv(K_theta), 
+                                      shape=(n_data_replicates,))
+data = data.T
+
+Vpost = jsp.linalg.inv(jsp.linalg.inv(K0) + data @ data.T) / p
+nupost = nu + n_data_replicates
+check_cov(Vpost)
+# -
+
+# Posterior, fitting to the data
+post_exp = get_exp(key, nu + n_data_replicates, p, n, n_samples, V + data @ data.T, K_theta, K0, n_trial)
+
+do_gridplot(post_exp, decomposition="svd")
+
+do_gridplot(post_exp, decomposition="prec")
+
+# +
+
+accs, precs, t, tps = get_accuracies_and_precisions(A, post_exp)
+plot_accuracies_and_precisions(accs, precs, suptitle=f"Prior accuracy and precision for balanced data")
+# -
+
+plt.imshow(data @ data.T, cmap=cmap)
+
+# +
+
+plt.imshow(np.log10(V), cmap=cmap)
+plt.title(f"log10 prior V")
+plt.colorbar()
 # -
 
 cmap = "twilight_shifted"
@@ -1047,9 +1082,10 @@ assert A.shape == (p, p)
 assert np.sum(A[diag]) == 0
 accs, aps, t, tp = get_accuracies_and_precisions(A, exp)
 
-plot_accuracies_and_precisions(accs, aps)
+plot_accuracies_and_precisions(accs, aps, suptitle=f"Prior accuracy and precision for balanced data")
 
 # +
+# Diagonal Elements
 K0 = np.eye(p)
 K0[np.diag_indices(p)] = K_theta[np.diag_indices(p)]
 check_cov(K0)
@@ -1063,6 +1099,10 @@ nu = p - 1
 exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
 # -
 
+plt.imshow(np.log10(V), cmap=cmap)
+plt.title(f"log10 prior V")
+plt.colorbar()
+
 do_gridplot(exp, decomposition="prec")
 
 do_gridplot(exp, decomposition="svd")
@@ -1073,81 +1113,7 @@ assert np.alltrue(A == A.T)
 #check_cov(A)
 assert np.sum(A) != 0
 aacs, aps, t, tp = get_accuracies_and_precisions(A, exp)
-plot_accuracies_and_precisions(AAUROCs, APs)
-
-# +
-# Lets look at prior accuracy and precision
-# TP TN FP FN
-from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve
-
-
-def get_accuracies_and_precisions(A, exp):
-    nedges = sp.special.binom(p, 2)
-
-    AAUROCs = np.zeros(n_samples, dtype=float) # Average AUROC
-    APs = np.zeros(n_samples, dtype=float)
-    for i, Ksamp in enumerate(np.array(exp.samples.samples)):
-        assert Ksamp.shape == (p, p)
-        minval = np.min(np.tril(Ksamp, k=-1))
-        maxval = np.max(np.tril(Ksamp, k=-1))
-        #assert minval < 0 < maxval
-        d = maxval - minval
-
-        LT = A[np.tril_indices(p, k=-1)]
-        LTK = Ksamp[np.tril_indices(p, k=-1)]
-        LT = np.array(LT)
-        LTK = np.array(LTK) 
-
-        #assert np.all(LT == LTK)
-        y_test = np.ravel(LT)
-        y_score = np.ravel(LTK)
-        #assert np.all(y_test == y_score)
-        #assert np.sum(y_test) > 0
-        
-        fpr, tpr, thresholds = sklearn.metrics.roc_curve(y_test, y_score)
-        precision, recall, thresholds_prec = sklearn.metrics.precision_recall_curve(y_test, y_score)
-
-        AP = sklearn.metrics.average_precision_score(precision, recall)
-        area_under_roc = sklearn.metrics.auc(fpr, tpr)
-
-        APs[i] = AP
-        AAUROCs[i] = area_under_roc
-        
-        #assert APs.shape == (n_samples, )
-        #assert AAUROCs.shape == (n_samples, )
-    
-    return AAUROCs, APs, thresholds, thresholds_prec
-
-
-# +
-i = 0
-Ksamp = As.samples[0]
-assert Ksamp.shape == (p, p), f"{Ksamp.shape}, {p}"
-minval = np.min(np.tril(Ksamp, k=-1))
-maxval = np.max(np.tril(Ksamp, k=-1))
-#assert minval < 0 < maxval
-d = maxval - minval
-
-LT = A[np.tril_indices(p, k=-1)]
-LTK = Ksamp[np.tril_indices(p, k=-1)]
-LT = np.array(LT)
-LTK = np.array(LTK) 
-
-
-y_test = np.ravel(LT)
-y_score = np.ravel(LTK)
-
-fpr, tpr, thresholds = roc_curve(y_test, y_score)
-precision, recall, thresholds_prec = precision_recall_curve(y_test, y_score)
-
-AP = sklearn.metrics.average_precision_score(y_test, y_score)
-area_roc = sklearn.metrics.auc(fpr, tpr)
-
-APs[i] = AP
-AAUROCs[i] = area_roc
-# -
-
-area_roc
+plot_accuracies_and_precisions(aacs, aps, suptitle="Diagonal Prior")
 
 # +
 # Dummy test for plotting accuracies and precisions
@@ -1161,35 +1127,30 @@ for i in range(n_samples):
 As = Samples(As)
 exp_test = SynthExper(A, A, nu, n, p, A, n_samples, key, As)
 accs_test, precs_test, ts, tps = get_accuracies_and_precisions(A, exp_test)
-plot_accuracies_and_precisions(accs_test, precs_test)
 # -
 
-accs.shape
-
-A
+plot_accuracies_and_precisions(accs_test, precs_test, suptitle="DEBUG")
 
 
-
-# ?plot_accuracies_and_precisions
-
-def plot_accuracies_and_precisions(aacs, precs):
+def plot_accuracies_and_precisions(aacs, precs, 
+                                   xlabel1="AUROC",
+                                   ylabel1="Frequency",
+                                   xlabel2="AUPRC",
+                                   suptitle=""):
     bins=20
 
     plt.subplot(121)
 
     plt.hist(aacs, bins=bins)
-    plt.xlabel("AUROC")
-    plt.ylabel("Frequency")
+    plt.xlabel(xlabel1)
+    plt.ylabel(ylabel1)
     plt.subplot(122)
     plt.hist(precs, bins=bins)
-    plt.xlabel("Average Precision")
-    plt.suptitle(f"Prior Accuracy and precision")
+    plt.xlabel(xlabel2)
+    plt.yticks([])
+    plt.suptitle(suptitle)
     plt.show()
 
-
-AAUROCs, APs = get_accuracies_and_precisions(exp)
-
-plot_accuracies_and_precisions(AAUROCs, APs)
 
 plt.figure()
 lw = 2
@@ -1218,7 +1179,9 @@ K0[np.diag_indices(p)] += 10
 V = K0 / (nu)
 #check_cov(V)
 
-plt.imshow(V, cmap=cmap)
+plt.imshow(np.log10(V), cmap=cmap)
+plt.title(f"log10 prior V")
+plt.colorbar()
 
 exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
 
@@ -1226,9 +1189,204 @@ do_gridplot(exp, decomposition="prec")
 
 do_gridplot(exp, decomposition="svd")
 
-accs, precs = get_accuracies_and_precisions(exp)
+accs, precs, t, tp = get_accuracies_and_precisions(A, exp)
+
+plot_accuracies_and_precisions(accs, precs, suptitle=f"Prior accuracy and precision misfit prior")
+
+# +
+# Same game but with imbalanced data
+
+
+
+# +
+# Generate the Ground Truth Network
+key = jax.random.PRNGKey(22)
+keys = jax.random.split(key, 10)
+A = jax.random.bernoulli(keys[0], p=0.01, shape=(p, p))
+diag_idx = np.diag_indices(p)
+A = np.array(A)
+A[5, 3] = 1
+A = np.tril(A) + np.tril(A).T
+
+A[diag_idx] = 0
+A = np.array(A, dtype=int)
+
+# Generate the K_theta, the simulate known precicion matrix
+del K_theta
+K_theta = jax.random.uniform(keys[1], minval=-1., maxval=1.,  shape=(p, p))
+K_theta = np.array(K_theta)
+K_theta /= factor
+
+K_theta[0:10] += 0.05
+K_theta[4:7] += 0.3
+K_theta[4, 3] = 1
+K_theta[9, 2] = -1
+K_theta[7:15, 7:15] -= 0.2
+K_theta[5:9, 5:9] += 0.1
+
+
+K_theta[np.where(A == 0)] = 0
+K_theta = np.tril(K_theta, k=-1) + np.tril(K_theta, k=-1).T
+K_theta[diag_idx] = 1 + jax.random.normal(keys[2], shape=(p,))/4
+
+
+K_theta[0, 0] = 10
+K_theta[1, 1] = 1
+K_theta[2, 2] = 2
+K_theta[3, 3] = 5
+K_theta[4, 4] = 12
+K_theta[5, 5] = 231
+K_theta[6, 6] = 10121
+K_theta[7, 7] = 100232
+K_theta[8, 8] = 999999
+K_theta[9, 9] = 1283828
+K_theta[10, 10] = 4
+K_theta[11, 11] = 4
+K_theta[12, 12] = 5
+K_theta[13, 13] = 9
+K_theta[14, 14] = 20
+K_theta[15, 15] = 40
+
+#K_theta = sp.linalg.inv(K_theta)
+
+
+#K_theta[10, 10] = 7
+K0 = K_theta
+diag = np.diag_indices(p)
+#diag_K0 = jax.random.uniform(keys[2], minval=0, maxval=0.01, shape=(p, ))
+
+check_cov(K0)
+n_samples = 1000
+
+V = K0 / p
+
+check_cov(V)
+
+nu = p - 1
+exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
+# -
+
+plt.imshow(np.log10(V), cmap=cmap)
+plt.title(f"log10 prior V")
+plt.colorbar()
+
+cmap = "twilight_shifted"
+cmap = "PuOr"
+cmap = "seismic"
+#cmap = "ocean" # "slategrey" # "steelblue" #whitesmoke
+cmap1 = matplotlib.colors.ListedColormap(['w', 'lightskyblue'])
+ground_truth_pair_plot(A, K_theta, title1="A", 
+                       title2="K" + u"\u03B8"
+                       ,cmap1=cmap1,
+                       cmap2 = cmap)
+
+npos = np.sum(np.tril(A, k=-1))
+nk = sp.special.binom(p, 2)
+nneg = nk - npos
+print(npos, nk, nneg)
+
+do_gridplot(exp, decomposition="prec")
+
+do_gridplot(exp, decomposition="svd")
+
+accs, precs, t, tp = get_accuracies_and_precisions(A, exp)
+
+plot_accuracies_and_precisions(accs, precs, suptitle=f"Prior accuracy and precision misfit prior")
+
+# +
+# Generate the Ground Truth Network
+key = jax.random.PRNGKey(22)
+keys = jax.random.split(key, 10)
+A = jax.random.bernoulli(keys[0], p=0.99, shape=(p, p))
+diag_idx = np.diag_indices(p)
+A = np.array(A)
+A[5, 3] = 1
+A = np.tril(A) + np.tril(A).T
+
+A[diag_idx] = 0
+A = np.array(A, dtype=int)
+
+# Generate the K_theta, the simulate known precicion matrix
+del K_theta
+K_theta = jax.random.uniform(keys[1], minval=-1., maxval=1.,  shape=(p, p))
+K_theta = np.array(K_theta)
+K_theta /= factor
+
+K_theta[0:10] += 0.05
+K_theta[4:7] += 0.3
+K_theta[4, 3] = 1
+K_theta[9, 2] = -1
+K_theta[7:15, 7:15] -= 0.2
+K_theta[5:9, 5:9] += 0.1
+
+
+K_theta[np.where(A == 0)] = 0
+K_theta = np.tril(K_theta, k=-1) + np.tril(K_theta, k=-1).T
+K_theta[diag_idx] = 1 + jax.random.normal(keys[2], shape=(p,))/4
+
+
+K_theta[0, 0] = 10
+K_theta[1, 1] = 1
+K_theta[2, 2] = 2
+K_theta[3, 3] = 5
+K_theta[4, 4] = 12
+K_theta[5, 5] = 231
+K_theta[6, 6] = 10121
+K_theta[7, 7] = 100232
+K_theta[8, 8] = 999999
+K_theta[9, 9] = 1283828
+K_theta[10, 10] = 4
+K_theta[11, 11] = 4
+K_theta[12, 12] = 5
+K_theta[13, 13] = 9
+K_theta[14, 14] = 20
+K_theta[15, 15] = 40
+
+#K_theta = sp.linalg.inv(K_theta)
+
+
+#K_theta[10, 10] = 7
+K0 = K_theta
+diag = np.diag_indices(p)
+#diag_K0 = jax.random.uniform(keys[2], minval=0, maxval=0.01, shape=(p, ))
+
+check_cov(K0)
+n_samples = 1000
+
+V = K0 / p
+
+check_cov(V)
+
+nu = p - 1
+exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
+# -
+
+cmap = "twilight_shifted"
+cmap = "PuOr"
+cmap = "seismic"
+#cmap = "ocean" # "slategrey" # "steelblue" #whitesmoke
+cmap1 = matplotlib.colors.ListedColormap(['w', 'lightskyblue'])
+ground_truth_pair_plot(A, K_theta, title1="A", 
+                       title2="K" + u"\u03B8"
+                       ,cmap1=cmap1,
+                       cmap2 = cmap)
+
+plt.imshow(np.log10(V), cmap=cmap)
+plt.title(f"log10 prior V")
+plt.colorbar()
+
+do_gridplot(exp, decomposition="prec")
+
+do_gridplot(exp, decomposition="svd")
+
+accs, precs, t, tp = get_accuracies_and_precisions(A, exp)
 
 plot_accuracies_and_precisions(accs, precs)
+
+# +
+# Lets Generate Data
+
+
 
 # +
 example_string = "A0B1C2D3E4F5G6H7I8J9"
