@@ -768,7 +768,10 @@ check_cov(K_theta)
 #assert np.sum(K_theta[diag_idx]) == p
 
 # +
-def ground_truth_pair_plot(A, K, title1="", title2="", cmap1="nipy_spectral", cmap2="CMRmap", factor=1.):
+def ground_truth_pair_plot(A, K, title1="", title2="", cmap1="nipy_spectral", cmap2="CMRmap", 
+                          factor=1.,
+                          vmin1=None, vmax1=None,
+                          vmin2=None, vmax2=None):
     font_rc = {"size": 14, "family": "sans-serif"}
 
     scale = 16
@@ -784,8 +787,12 @@ def ground_truth_pair_plot(A, K, title1="", title2="", cmap1="nipy_spectral", cm
     fig.set_figwidth(w)
     ax = axs[0]
 
-
-    covim = ax.imshow(A, vmin=np.min(A), vmax=2*np.median(A), cmap=cmap1)
+    if not vmin1:
+        vmin1 = np.min(A)
+    if not vmax1:
+        vmax1 = 2*np.median(A)
+        
+    covim = ax.imshow(A, vmin=vmin1, vmax=vmax1, cmap=cmap1)
     fig.colorbar(covim, ax=ax, location="left", shrink=cbar_scale)
     ax.set_title(title1)
     #ax.legend()
@@ -799,7 +806,11 @@ def ground_truth_pair_plot(A, K, title1="", title2="", cmap1="nipy_spectral", cm
     
     K_plot[np.diag_indices(len(K_plot))] = np.max(np.tril(K_plot, k=-1))
     
-    precim = ax.imshow(K_plot, vmin=np.min(K_plot), cmap=cmap2)
+    if not vmin2:
+        vmin2 = np.min(K_plot)
+    if not vmax2:
+        vmax2 = None
+    precim = ax.imshow(K_plot, vmin=vmin2, vmax=vmax2, cmap=cmap2)
     
     #bounds = [-1/factor, 1/factor]
     #cnorm = matplotlib.colors.BoundaryNorm(bounds, cmap2.N)
@@ -940,7 +951,7 @@ def get_accuracies_and_precisions(A, exp):
         LT = A[np.tril_indices(p, k=-1)]
         LTK = Ksamp[np.tril_indices(p, k=-1)]
         LT = np.array(LT)
-        LTK = np.array(LTK) 
+        LTK = np.array(np.abs(LTK)) # Use magnitude from 0 
 
         #assert np.all(LT == LTK)
         y_test = np.ravel(LT)
@@ -963,6 +974,20 @@ def get_accuracies_and_precisions(A, exp):
     
     return AUROC, AUPRC, thresholds, thresholds_prec
 
+
+# +
+def euclidian_off_diagonal_distance_squared(A, B):
+    Aeuc = A[np.tril_indices(len(A), k=-1)]
+    Beuc = B[np.tril_indices(len(B), k=-1)]
+    
+    Aeuc = np.ravel(Aeuc)
+    Beuc = np.ravel(Beuc)
+    
+    distance = np.sum((Aeuc**2 - Beuc**2))
+    return distance
+    
+    
+    
 
 # +
 # Generate the Ground Truth Network
@@ -1027,19 +1052,33 @@ V = K0 / p
 
 check_cov(V)
 
-nu = p - 1
-post_exp = get_exp(key, nu + 4, p, n, n_samples, V + data @ data.T, K_theta, K0, n_trial)
+
 
 # Data for fitting the posterior
 
-n_data_replicates = 100
+n_data_replicates = 4
 data = jax.random.multivariate_normal(keys[4], np.zeros(p), jsp.linalg.inv(K_theta), 
                                       shape=(n_data_replicates,))
 data = data.T
+U = np.zeros((p, p))
 
-Vpost = jsp.linalg.inv(jsp.linalg.inv(K0) + data @ data.T) / p
+for i in range(n_data_replicates):
+    assert data.shape == (p, n_data_replicates)
+    z = jnp.zeros((p, 1))
+    z = z.at[:, 0].set(data[:, i])
+    assert z.shape == ((p, 1))
+    adder = z @ z.T
+    assert adder.shape == (p, p)
+    U = U + adder
+    assert U.shape == (p, p)
+assert i==3
+
+Vpost = jsp.linalg.inv(jsp.linalg.inv(V) + data @ data.T)
 nupost = nu + n_data_replicates
 check_cov(Vpost)
+
+nu = p - 1
+post_exp = get_exp(key, nu + 4, p, n, n_samples, V + data @ data.T, K_theta, K0, n_trial)
 # -
 
 # Posterior, fitting to the data
@@ -1053,9 +1092,24 @@ do_gridplot(post_exp, decomposition="prec")
 
 accs, precs, t, tps = get_accuracies_and_precisions(A, post_exp)
 plot_accuracies_and_precisions(accs, precs, suptitle=f"Prior accuracy and precision for balanced data")
+
+# +
+from functools import partial
+
+get_eud = partial(euclidian_off_diagonal_distance_squared, B=np.array(K_theta))
+
+distance_squared = np.array(list(map(get_eud, exp.samples.samples)))
+logd = np.log10(distance_squared)
+
+plt.hist(logd, bins=100)
+plt.show()
 # -
 
-plt.imshow(data @ data.T, cmap=cmap)
+distance_squared = np.array(list(map(get_eud, post_exp.samples.samples)))
+logd = np.log10(distance_squared)
+
+plt.hist(logd, bins=100)
+plt.show()
 
 # +
 
@@ -1074,6 +1128,265 @@ ground_truth_pair_plot(A, K_theta, title1="A",
                        ,cmap1=cmap1,
                        cmap2 = cmap)
 
+
+
+assert np.allclose(jsp.linalg.inv(K_theta), sp.linalg.inv(K_theta))
+
+U = data @ data.T
+ground_truth_pair_plot(U, 
+                       K_theta,
+                       cmap1=cmap, 
+                       cmap2=cmap,
+                       vmin1=-3.5,
+                       vmax1=3.5,
+                       vmin2=np.min(K_theta))#,
+                      # vmax2=np.max(K_theta))
+
+ground_truth_pair_plot(U, sp.linalg.inv(K_theta), cmap1=cmap, cmap2=cmap,
+                       vmin1=-3.5,
+                       vmax1=3.5,
+                       vmin2=np.min(sp.linalg.inv(K_theta)),
+                       vmax2=0.06)
+
+data100 = jax.random.multivariate_normal(keys[5], jnp.zeros(p), sp.linalg.inv(K_theta), shape=(100,)).T
+U100 = data100 @ data100.T
+
+ground_truth_pair_plot(U100, sp.linalg.inv(K_theta), cmap1=cmap, cmap2=cmap,
+                       vmin1=-3.5,
+                       vmax1=3.5,
+                       vmin2=np.min(sp.linalg.inv(K_theta)),
+                       vmax2=0.06)
+
+# +
+key = jax.random.PRNGKey(13)
+key, k1 = jax.random.split(key)
+key, k1 = jax.random.split(k1)
+
+shift = 0
+data3 = jax.random.multivariate_normal(key, jnp.zeros(p), inv(K_theta), shape=(3, )).T + shift
+
+
+
+U3 = (data3 @ data3.T)
+assert U3.shape == (p, p)
+
+key, k1 = jax.random.split(k1)
+data9 = jax.random.multivariate_normal(key, jnp.zeros(p), inv(K_theta), shape=(9, )).T + shift
+U9 = (data9 @ data9.T)
+assert U9.shape == (p, p)
+
+key, k1 = jax.random.split(k1)
+data16 = jax.random.multivariate_normal(key, jnp.zeros(p), inv(K_theta), shape=(16, )).T + shift
+U16 = (data16 @ data16.T)
+assert U16.shape == (p, p)
+
+key, k1 = jax.random.split(k1)
+data50 = jax.random.multivariate_normal(key, jnp.zeros(p), inv(K_theta), shape=(50, )).T + shift
+U50 = (data50 @ data50.T)
+assert U16.shape == (p, p)
+
+cs = ['r', 'g', 'b', 'k']
+l = [3, 9, 16, 50]
+for i, U in enumerate([U3 / 3, U9 / 9, U16 / 16, U50 / 50]):
+    
+    plt.plot(inv(K_theta)[diag], U[diag], f"{cs[i]}.", label=l[i])
+plt.legend()
+plt.show()
+# -
+
+for i, U in enumerate([inv(U3/3), inv(U9/9), inv(U16/16), inv(U50/50 )]):
+    U = np.log10(U)
+    plt.plot(np.log10(K_theta[diag]), U[diag], f"{cs[i]}.", label=l[i])
+plt.legend()
+plt.show()
+
+ground_truth_pair_plot(U3, np.array(U9), cmap1=cmap, cmap2=cmap)
+
+
+# +
+def minmax(U):
+    return np.min(U), np.max(U)
+
+def rrange(U):
+    return np.max(U) - np.min(U)
+
+
+# +
+myl = [U3 / 3, U9 / 9, U16 / 16, U50 / 50, U100 / 100]
+for U in myl:
+    print(minmax(U), rrange(U))
+
+print('\n')
+
+for U in myl:
+    U = inv(U)
+    print(minmax(U), np.log10(rrange(U)))
+# -
+
+print(minmax(K_theta), np.log10(rrange(K_theta)))
+
+# +
+key = jax.random.PRNGKey(13)
+nu = 15
+n_samples = 1000
+Ks = sample_from_prior(key, nu, p=16, n_samples=n_samples, K_0=K_theta / nu)
+
+average1000 = np.mean(Ks.samples, axis=0)
+variances1000 = np.var(Ks.samples, axis=0)
+# -
+
+plotting_vscale = 2
+
+cmap = "seismic"
+scale1 = plotting_vscale
+scale2 = scale1
+ground_truth_pair_plot(average1000, K_theta, cmap1=cmap, cmap2=cmap,
+                       vmin1=-scale1, vmax1=scale1,
+                       vmin2=-scale2, vmax2=scale2
+                       )
+s = '{:,}'.format(n_samples)
+print(f"{s}")
+# Not scaling K_theta is bad
+
+# Simple test of the Wishart Distribution
+key = jax.random.PRNGKey(13)
+nu = 15
+n_samples = 100000000
+Ks100mil = sample_from_prior(key, nu, p=16, n_samples=100000, K_0=K_theta / nu)
+
+average100mil = np.mean(Ks100mil.samples, axis=0)
+variances100mil = np.var(Ks100mil.samples, axis=0)
+
+scale1 = plotting_vscale
+scale2 = scale1
+ground_truth_pair_plot(np.array(average100mil), np.array(average1000), cmap1=cmap, cmap2=cmap,
+                       vmin1=-scale1, vmax1=scale1,
+                       vmin2=-scale2, vmax2=scale2
+                       )
+s = '{:,}'.format(n_samples)
+print(f"{s}")
+# Not scaling K_theta is bad
+
+'{:,}'.format(10000)
+
+scale1 = 10
+scale2 = scale1
+cmap = "gnuplot2"
+ground_truth_pair_plot(np.log10(variances100mil), np.log10(np.array(variances1000)), cmap1=cmap, cmap2=cmap,
+                      vmin1=0, vmax1=scale1, vmin2=0, vmax2=scale2)
+
+
+
+ground_truth_pair_plot(Ks.samples[9], K_theta, cmap1=cmap, cmap2=cmap,
+                      vmin1=-1, vmax1=1, vmin2=-1, vmax2=1)
+
+# +
+# Simple test of the Wishart Distribution
+key = jax.random.PRNGKey(13)
+Ks = sample_from_prior(key, 100, p=16, n_samples=1000, K_0=K_theta / (64**2))
+
+average = np.mean(Ks.samples, axis=0)
+variances = np.var(Ks.samples, axis=0)
+
+ground_truth_pair_plot(average, K_theta, cmap1=cmap, cmap2=cmap,
+                       )
+# -
+
+ground_truth_pair_plot(variances, K_theta, cmap1=cmap, cmap2=cmap)
+
+ground_truth_pair_plot(Ks.samples[6], K_theta, cmap1=cmap, cmap2=cmap)
+
+# +
+x = sp.linalg.inv(K_theta)[diag]
+U4 = U
+data50 = jax.random.multivariate_normal(keys[10], jnp.zeros(p), cov=sp.linalg.inv(K_theta), shape=(50, )).T
+
+U50 = data50 @ data50.T
+y = U4[np.diag_indices(len(U4))] / 4
+rho, _ = sp.stats.pearsonr(x, y)
+rho = np.round(rho, decimals=3)
+
+plt.plot(x, y, 'r.', label=f"U4 rho {rho}")
+y = U50[np.diag_indices(len(U50))] / 50
+
+rho, _ = sp.stats.pearsonr(x, y)
+rho = np.round(rho, decimals=3)
+
+plt.plot(x, y, 'b.', label=f"U50 rho {rho}")
+plt.plot(x, U100[np.diag_indices(len(U100))] / 100, 'k.', label="U100")
+plt.legend()
+plt.ylabel("U diagonal elements")
+plt.xlabel('COV diagonal elements')
+plt.show()
+# -
+
+inv = sp.linalg.inv
+invA = inv(A)
+
+diag
+
+np.allclose(inv(A * 2), invA / 2)
+
+np.allclose(inv(A / 9.3), invA * 9.3)
+
+# +
+assert K_theta.shape == (p, p)
+diag = np.diag_indices(p)
+x = np.log10(K_theta[diag])
+
+assert data.shape == (p, 4)
+y = inv((data @ data.T))
+assert y.shape == (p, p)
+y = np.log10(y[diag] * 4)
+
+plt.plot(x, y, 'r.', label=f"U4 rho")
+
+data7 = jax.random.multivariate_normal(keys[7], jnp.zeros(p), cov=jsp.linalg.inv(K_theta), shape=(7, )).T
+U7 = (data7 @ data7.T)
+U7 = np.array(U7)
+
+assert U7.shape == (p, p)
+y = inv(U7)[np.diag_indices(len(U7))] * 7
+y = np.log10(y)
+
+plt.plot(x, y, 'kx', label=f"U7 rho")
+
+
+y = inv(U50)[np.diag_indices(len(U50))] * 50
+
+rho, _ = sp.stats.pearsonr(x, y)
+rho = np.round(rho, decimals=3)
+
+y = np.log10(y)
+
+plt.plot(x, y, 'b.', label=f"U50 rho {rho}")
+y =  inv(U100)[np.diag_indices(len(U100))] * 100
+y = np.log10(y)
+
+plt.plot(x, y, 'k.', label="U100")
+plt.legend()
+plt.ylabel("log inv U diagonal elements")
+plt.xlabel('log inv COV diagonal elements')
+plt.show()
+# -
+
+
+
+U50[diag]
+
+ground_truth_pair_plot(np.log10(K_theta), np.array(data @ data.T),
+                      cmap1=cmap,
+                      cmap2=cmap,
+                      vmin1=np.min(K_theta),
+                      vmax1=np.max(K_theta),
+                      )
+
+np.min(U), np.max(U), (np.max(U) - np.min(U)) / 2
+
+ground_truth_pair_plot(K_theta, np.array(Vpost), cmap1=cmap, cmap2=cmap)
+
+(data @ data.T).shape
+
 do_gridplot(exp, decomposition="prec")
 
 do_gridplot(exp, decomposition="svd")
@@ -1083,6 +1396,8 @@ assert np.sum(A[diag]) == 0
 accs, aps, t, tp = get_accuracies_and_precisions(A, exp)
 
 plot_accuracies_and_precisions(accs, aps, suptitle=f"Prior accuracy and precision for balanced data")
+
+
 
 # +
 # Diagonal Elements
@@ -1097,7 +1412,26 @@ check_cov(V)
 
 nu = p - 1
 exp = get_exp(key, nu, p, n, n_samples, V, K_theta, K0, n_trial)
+
+assert (data @ data.T).shape == (p, p)
+
+Vpost = jsp.linalg.inv(jsp.linalg.inv(K0) + data @ data.T) / p
+nupost = nu + n_data_replicates
+check_cov(Vpost)
+
+nu = p - 1
+post_exp = get_exp(key, nu, p, n, n_samples, Vpost, K_theta, K0, n_trial)
 # -
+
+cmap = "twilight_shifted"
+cmap = "PuOr"
+cmap = "seismic"
+#cmap = "ocean" # "slategrey" # "steelblue" #whitesmoke
+cmap1 = matplotlib.colors.ListedColormap(['w', 'lightskyblue'])
+ground_truth_pair_plot(A, K_theta, title1="A", 
+                       title2="K" + u"\u03B8"
+                       ,cmap1=cmap1,
+                       cmap2 = cmap)
 
 plt.imshow(np.log10(V), cmap=cmap)
 plt.title(f"log10 prior V")
@@ -1106,6 +1440,63 @@ plt.colorbar()
 do_gridplot(exp, decomposition="prec")
 
 do_gridplot(exp, decomposition="svd")
+
+do_gridplot(post_exp, decomposition="prec")
+
+do_gridplot(post_exp, decomposition="svd")
+
+
+# +
+def flatten_tril_from_M(A, k=-1):
+    Atril = np.array(A[np.tril_indices(len(A), k=k)])
+    return np.ravel(Atril)
+    
+
+def mean_squared_error_lt(A, B):
+    Amse = flatten_tril_from_M(A)
+    Bmse = flatten_tril_from_M(B)
+    
+    error = Amse - Bmse
+    error2 = error**2
+    mse = (1/len(Amse)) * np.sum(error2)
+    return mse
+
+
+# +
+from functools import partial
+
+f = mean_squared_error_lt
+f = partial(f, B=np.array(K_theta))
+
+o = np.array(list(map(f, exp.samples.samples)))
+logd = np.log10(o)
+
+plt.hist(logd, bins=100)
+print(np.median(logd), np.var(logd))
+plt.show()
+
+# +
+f = mean_squared_error_lt
+f = partial(f, B=np.array(K_theta))
+
+o = np.array(list(map(f, post_exp.samples.samples)))
+logd = np.log10(o)
+
+plt.hist(logd, bins=100)
+print(np.median(logd), np.var(logd))
+plt.show()
+
+# +
+get_eud = partial(euclidian_off_diagonal_distance_squared, B=np.array(K_theta))
+
+distance_squared = np.array(list(map(get_eud, post_exp.samples.samples)))
+logd = np.log10(distance_squared)
+print(np.median(logd), np.var(logd))
+plt.hist(logd, bins=100)
+plt.show()
+# -
+
+
 
 assert A.shape == (p, p)
 assert np.sum(A[diag]) == 0
