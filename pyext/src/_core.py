@@ -14,8 +14,6 @@ Objects
   
 variables = update_fun(key, variables)
 
-
-
 Library
   rng
   pdf
@@ -65,17 +63,168 @@ Functions the model may need
 """
 
 
-
-
 import numpy as np
 import numpy.typing as npt
 from collections import namedtuple
 from abc import ABC, abstractmethod
+from typing import TypeAlias, Union
 
+# Define classes 
 Attribute = namedtuple("Attribute", "name val")
 
+# Define types
+NodeIndex: TypeAlias = int
+NodeIndices: TypeAlias = npt.ArrayLike
+
+
+# Some helper funcitons
+
+def safe_update(key, val, d):
+    """
+    Safely update a dictionary
+    """
+    assert key not in d
+    d[key] = val
+    return d
+
+def list_to_string(l: list):
+    """
+    Returns a string "a b c" from a list [a, b, c]
+    """
+    l = [str(i) for i in l]
+    return " ".join(l)
+
+def dict_asnamedtuple(d: dict, name: str = "MyTuple"):
+    """
+    converts python dictionary to namedtuple
+    """
+    MyTuple = namedtuple(name, d)
+    return MyTuple(**d)  # namedtuple("Name", d)(**d)
+
+def namedtuple_asdict(t: namedtuple):
+    return t._asdict() 
+
+
+def _add_to_namedtuple(key, val, t: tuple, name="MyTuple"):
+    """
+    Make a new named tuple with an added key, value pair
+    do runtime checks
+    """
+    assert isinstance(t, tuple), f"t {t} is not a tuple"
+    assert key not in t, f"key {key} already in tuple"
+    d = t._asdict()
+    d[key] = val
+    t = dict_asnamedtuple(d, name=name)
+    return t
 
     
+
+# End helper functions
+
+
+# Abstract classes
+
+class VectorSpace(ABC):
+    def __add__(self, o):
+        """vector addition"""
+        assert False, f"Must override base class"
+
+    def __radd__(self, o):
+        """right vector addition"""
+        assert False, f"Must override base class"
+
+    def __mul__(self, o):
+        """scalar multiplication"""
+        assert False, f"Must override base class"
+
+    def __rmul__(self, o):
+        """right scalar multiplication"""
+        assert False, f"Must override base class"
+
+
+class CompositionSpace(VectorSpace):
+    def __matmul__(self, o):
+    
+        assert False, f"Must override base class"
+
+    def __rmatmul__(self, o):
+        assert False, f"Must override base class"
+
+
+class Function(CompositionSpace):
+    """
+    The composition space has the following operations defined
+      - addition
+      - scalar multiplication
+      - composition
+    """
+
+    def __init__(self, f):
+        assert isinstance(f, type(lambda x: None)) , f"f is not a python function"# make sure the inputs are python functions 
+        self.f = f
+
+    def __call__(self, *args, **kwargs):
+        assert False, "Functions should not be called directly, use .f"
+
+    def __add__(self, o):
+        assert type(o) == Function, f"tried to add a Function to a python function"
+        def h(*args, **kwargs):
+            return self.f(*args, **kwargs) + o.f(*args, **kwargs) 
+        return Function(h)
+
+
+
+class Model:
+    """
+    Object oriented
+    --------------------------------------
+    1. Model definition
+       a. Define input information
+       b. Define representaiton
+       c. Define scoring
+       d. Define sampling scheme
+          i. Define step
+          ii. Define sampling method
+          iii. Define sampling paramters
+
+    2. Decompose model into a (model_state, {functions}, meta_data) triple
+       a. autograd
+    --------------------------------------
+    Functional
+
+    3. Optionally apply optimizations
+       pmap for multiple processors
+       vmap to vectorize functions
+    4.
+    4.
+
+    A python run time environment is used to define the model
+    model instance attributes are defined in this environment
+    """
+
+    # ModelState = namedtuple("ModelState", "consts variables scores")
+
+
+    def __init__(self, model_state : dict =  {}, functions : dict = {}):
+        assert isinstance(model_state, dict), f"model state {model_state} is not a python dictionary"
+        assert isinstance(functions, dict), f"functions {functions} is not a python dictionary"
+
+        self.model_state = dict_asnamedtuple(model_state, name="ModelState")
+        self.functions = dict_asnamedtuple(functions, name="Functions")
+
+    def add_to_model_state(self, key, val):
+        ...
+
+    def add_to_functions(self, key, val):
+        ...
+
+    def _to_functional(self):
+        """
+        The model state is a PyTree of data
+        The Functions are a PyTree of pure functions that know how to read the model state
+        """
+        return self.model_state, self.functions
+
 
 
 class Restraint:
@@ -100,23 +249,18 @@ class Restraint:
       name : a unique str identifier
     """
 
-
-
-    def __init__(self, name : str, idxs : NodeIndices, model : Model):
+    def __init__(self, name: str, idxs: NodeIndices, model: Model):
         self.name = name
-        self.idxs = idxs 
+        self.idxs = idxs
 
 
-
-def _check_restraint_name(restraint : Restraint, model : Model):
+def _check_restraint_name(restraint: Restraint, model: Model):
     assert restraint.name not in model.restraints
 
-def add_restraint(restraint : Restraint, model : Model, do_checks=True):
+
+def add_restraint(restraint: Restraint, model: Model, do_checks=True):
 
     _check_restraint_name(restraint, model) if do_checks else None
-
-
-
 
 
 class RestraintAdder:
@@ -126,101 +270,11 @@ class RestraintAdder:
     Does some checking
     """
 
-    def __init__(self, restraint : Restraint, model : Model):
+    def __init__(self, restraint: Restraint, model: Model):
         self.restraint = restraint
         self.model = model
 
     def check_name_is_unique(self):
         assert self.model
-
-
-
-
-
-        
-
-class NodeIndex(int): ...
-
-class NodeIndices(npt.ArrayLike): ...
-
-class Node:
-    """
-    Attributes should have a unique hashable name.
-    """
-
-    idx : NodeIndex
-    attributes : namedtuple # An unordered collection
-    group_attributes : namedtuple # A collection of group attributes
-
-
-    
-
-    def __init__(self, idx : NodeIndex, attributes : Attributes):
-        ...
-
-class Nodes(dict): ...
-class RestraintName(str): ...
-
-ModelState = namedtuple("ModelState", "consts variables scores")
-
-class Model:
-    """
-    Object oriented
-    --------------------------------------
-    1. Model definition
-       a. Define input information 
-       b. Define representaiton 
-       c. Define scoring
-       d. Define sampling scheme
-          i. Define step
-          ii. Define sampling method
-          iii. Define sampling paramters
-
-    2. Decompose model into a (model_state, {functions}, meta_data) triple
-       a. autograd
-    --------------------------------------
-    Functional
-
-    3. Optionally apply optimizations
-       pmap for multiple processors
-       vmap to vectorize functions
-    4.  
-    4.
-
-    A python run time environment is used to define the model
-    model instance attributes are defined in this environment
-
-    
-
-    """
-
-    def __init__(self, nodes : Nodes, restraints: dict[RestraintName, Restraint] = {}): 
-        self.restraints = restraints  #restraint.name : restraint
-
-    node_attributes : dict[NodeIndex : Attribute] 
-    node_group_attributes : dict[OrderedNodeSet : Attribute]
-    nodes : dict[NodeIndex : Node]
-
-    def add_attribute_to_node(self, idx: NodeIndex, attribute : Attribute):
-
-        node_attributes : dict = self.nodes[idx].attributes._asdict()
-        assert attribute.name not in node_attributes, f"{attribute.name} already in node {idx}"
-        node_attributes = node_attributes | attribute._as_dict() 
-        assert attribute.name in node_attributes, f"{attribute.name} should be in node {idx}"
-
-
-
-    def add_n_nodes(n):
-        self.node_index = np.arange(0, n)
-
-    def add_node_properties(node_index, prop):
-        ...
-
-    def add_data(node_indices):
-        ...
-
-
-    def add_restraint():
-        ...
 
 
