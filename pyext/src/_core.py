@@ -69,7 +69,9 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 from typing import TypeAlias, Union
 
-# Define classes 
+from inspect import getmembers
+
+# Define classes
 Attribute = namedtuple("Attribute", "name val")
 
 # Define types
@@ -79,6 +81,7 @@ NodeIndices: TypeAlias = npt.ArrayLike
 
 # Some helper funcitons
 
+
 def safe_update(key, val, d):
     """
     Safely update a dictionary
@@ -87,12 +90,14 @@ def safe_update(key, val, d):
     d[key] = val
     return d
 
+
 def list_to_string(l: list):
     """
     Returns a string "a b c" from a list [a, b, c]
     """
     l = [str(i) for i in l]
     return " ".join(l)
+
 
 def dict_asnamedtuple(d: dict, name: str = "MyTuple"):
     """
@@ -101,8 +106,9 @@ def dict_asnamedtuple(d: dict, name: str = "MyTuple"):
     MyTuple = namedtuple(name, d)
     return MyTuple(**d)  # namedtuple("Name", d)(**d)
 
+
 def namedtuple_asdict(t: namedtuple):
-    return t._asdict() 
+    return t._asdict()
 
 
 def _add_to_namedtuple(key, val, t: tuple, name="MyTuple"):
@@ -117,12 +123,18 @@ def _add_to_namedtuple(key, val, t: tuple, name="MyTuple"):
     t = dict_asnamedtuple(d, name=name)
     return t
 
-    
+
+def get_visiblemembers(obj) -> iter:
+    members = iter(getmembers(obj))
+    visible = filter(lambda x: x[0][0] != "_", members)
+    return visible
+
 
 # End helper functions
 
 
 # Abstract classes
+
 
 class VectorSpace(ABC):
     def __add__(self, o):
@@ -144,7 +156,7 @@ class VectorSpace(ABC):
 
 class CompositionSpace(VectorSpace):
     def __matmul__(self, o):
-    
+
         assert False, f"Must override base class"
 
     def __rmatmul__(self, o):
@@ -160,7 +172,9 @@ class Function(CompositionSpace):
     """
 
     def __init__(self, f):
-        assert isinstance(f, type(lambda x: None)) , f"f is not a python function"# make sure the inputs are python functions 
+        assert isinstance(
+            f, type(lambda x: None)
+        ), f"f is not a python function"  # make sure the inputs are python functions
         self.f = f
 
     def __call__(self, *args, **kwargs):
@@ -168,10 +182,38 @@ class Function(CompositionSpace):
 
     def __add__(self, o):
         assert type(o) == Function, f"tried to add a Function to a python function"
+
         def h(*args, **kwargs):
-            return self.f(*args, **kwargs) + o.f(*args, **kwargs) 
+            return self.f(*args, **kwargs) + o.f(*args, **kwargs)
+
         return Function(h)
 
+
+class DataStruct:
+    def __init__(self, namespace_dict={}):
+        for key, val in namespace_dict.items():
+            setattr(self, key, val)
+
+
+
+
+
+class ModelState(DataStruct):
+    """
+    A container for model state attributes
+    Do not place attributes that begin with an underscore
+    """
+
+    pass
+
+
+class Functions(DataStruct):
+    """
+    A container for model state attributes
+    Do not place attributes that begin with an underscore
+    """
+
+    pass
 
 
 class Model:
@@ -204,16 +246,52 @@ class Model:
 
     # ModelState = namedtuple("ModelState", "consts variables scores")
 
+    def __init__(self):
 
-    def __init__(self, model_state : dict =  {}, functions : dict = {}):
-        assert isinstance(model_state, dict), f"model state {model_state} is not a python dictionary"
-        assert isinstance(functions, dict), f"functions {functions} is not a python dictionary"
+        # assert isinstance(model_state, dict), f"model state {model_state} is not a python dictionary"
+        # assert isinstance(functions, dict), f"functions {functions} is not a python dictionary"
 
-        self.model_state = dict_asnamedtuple(model_state, name="ModelState")
-        self.functions = dict_asnamedtuple(functions, name="Functions")
+        # self.model_state = dict_asnamedtuple(model_state, name="ModelState")
+        # self.functions = dict_asnamedtuple(functions, name="Functions")
 
-    def add_to_model_state(self, key, val):
-        ...
+        self.model_state = ModelState()
+        self.functions = Functions()  # Overwriting a key will be silent
+
+    def _scope_to_dict(self, scope) -> dict:
+        scope_dict = {key: val for key, val in get_visiblemembers(scope)}
+        return scope_dict
+
+    def _add_to_model_state_from_pair(self, key, val):
+        attr_dict = self._scope_to_dict(self.model_state)
+        assert key not in attr_dict, f"{key} already in model_state"
+        self.model_state = ModelState(attr_dict | {key: val})
+
+    def _add_to_model_state_from_dict(self, d):
+        attr_dict = self._scope_to_dict(self.model_state)
+        assert (
+            len(set(d).intersection(attr_dict)) == 0
+        ), f"d already shares keys with model_state"
+        self.model_state = ModelState(attr_dict | d)
+
+    def add_to_model_state(self, keyval: Union[tuple, dict]):
+        """
+        Adds something to the model state
+
+
+        Args: keyval is either a tuple (key, value) pair or
+              a dictionary of {key1: val1, ..., keyn: valn}
+              The model_state cannot already have key
+        """
+
+        if isinstance(keyval, tuple):
+            assert len(keyval) == 2, f"keyval needs exactly two entires"
+            self._add_to_model_state_from_pair(keyval[0], keyval[1])
+        elif isinstance(keyval, dict):
+            assert len(keyval) > 0
+            self._add_to_model_state_from_dict(keyval)
+        else:
+            assert False, f"keyval type {type(keyval)} is neither a dict nor a tuple"
+
 
     def add_to_functions(self, key, val):
         ...
@@ -224,7 +302,6 @@ class Model:
         The Functions are a PyTree of pure functions that know how to read the model state
         """
         return self.model_state, self.functions
-
 
 
 class Restraint:
@@ -276,5 +353,54 @@ class RestraintAdder:
 
     def check_name_is_unique(self):
         assert self.model
+        
+def update_datastruct(ds: DataStruct, keyval: Union[tuple, dict]):
+    """
+    Adds something to the model state
+
+
+    Args: keyval is either a tuple (key, value) pair or
+          a dictionary of {key1: val1, ..., keyn: valn}
+          The model_state cannot already have key
+    """
+    if isinstance(keyval, tuple):
+        assert len(keyval) == 2, f"keyval needs exactly two entires"
+        return update_datastruct_from_pair(keyval[0], keyval[1])
+    elif isinstance(keyval, dict):
+        assert len(keyval) > 0
+        return update_datastruct_from_dict(ds, keyval)
+    else:
+        assert False, f"keyval type {type(keyval)} is neither a dict nor a tuple"
+
+def update_datastruct_from_pair(ds: DataStruct, key, val) -> DataStruct:
+    attr_dict = datastruct_to_dict(ds) 
+    assert key not in attr_dict, f"{key} already in datastruct"
+    return DataStruct(attr_dict | {key: val})
+
+def update_datastruct_from_dict(ds: DataStruct, d: dict):
+    attr_dict = datastruct_to_dict(ds) 
+    assert (
+        len(set(d).intersection(attr_dict)) == 0
+    ), f"d already shares keys with data struct"
+    return DataStruct(attr_dict | d)
+
+def datastruct_to_dict(ds : DataStruct):
+    return dict(get_visiblemembers(ds))
+
+def datastruct_to_tuple(ds: DataStruct, typename: str="MyTuple") -> tuple:
+    """
+    Converts a datastruct to a namedtuple
+    """
+
+    attr_dict = datastruct_to_tuple(ds)
+    MyTuple = namedtuple(typename, attr_dict) 
+    return MyTuple(**attr_dict)
+
+def tuple_to_datastruct(t: tuple) -> DataStruct:
+    """
+    Converts a (named)tuple into a datastruct
+    """
+    tdict = namedtuple_asdict(t)
+    return DataStruct(tdict)
 
 
