@@ -9,16 +9,13 @@ Such functions are compatible with jax transforms
 
 import jax.numpy as jnp
 import jax.scipy as jsp
+import jax.scipy.stats as stats
 from jax.scipy.linalg import inv, det
 from jax.scipy.special import multigammaln
 from typing import TypeAlias, Callable
 from functools import partial
 
 Inner: TypeAlias = Callable
-
-
-def norm(x, my, sigma):
-    return jnp.exp
 
 
 def wishart(p: int) -> Inner:
@@ -33,7 +30,7 @@ def wishart(p: int) -> Inner:
         a = ((df - p - 1) / 2) * jnp.log(det(X))
         b = -jnp.trace(jnp.matmul(inv(V), X)) / 2
         c = (df * p / 2) * jnp.log(2)
-        d = (df / 2) * jnp.log(det(V))
+        d = -(df / 2) * jnp.log(det(V))
         e = multigammaln(df / 2, p)
 
         return a + b - c - d - e
@@ -61,3 +58,4 @@ def wishart(p: int) -> Inner:
     lpdf.__doc__ = inner_docstring
 
     return lpdf 
+
