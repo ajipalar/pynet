@@ -77,8 +77,8 @@ Attribute = namedtuple("Attribute", "name val")
 # Define types
 NodeIndex: TypeAlias = int
 NodeIndices: TypeAlias = npt.ArrayLike
-Jittable: TypeAlias = Callable # A jittiable funciton
-PyTree: TypeAlias = Any # A jax PyTree
+Jittable: TypeAlias = Callable  # A jittiable funciton
+PyTree: TypeAlias = Any  # A jax PyTree
 
 
 # Some helper funcitons
@@ -190,18 +190,23 @@ class Function(CompositionSpace):
 
         return Function(h)
 
+
 class UID(str):
     """
     A globally (to the model) unique id.
     The unique id is used to specific getters and setters for the model attributes in a functional style
     """
 
+
 class GID(str):
     """A group id for a group of node indices"""
+
     ...
+
 
 class CGID(GID):
     """A groupd of ordered contiguous node indices in ascending order"""
+
     ...
 
 
@@ -212,13 +217,13 @@ class DataStruct:
 
 
 class ModelTemplate:
-
     def __init__(self, position: dict = {}):
-        self.position = position # the keys of integer numbers are reserved for node ids
+        self.position = (
+            position  # the keys of integer numbers are reserved for node ids
+        )
 
     def build(self, build_options: dict = {"position_as_dict": True}, do_checks=True):
-        return _build_model(self, do_checks=do_checks, **build_options) 
-
+        return _build_model(self, do_checks=do_checks, **build_options)
 
 
 # Functions that add things to the model template
@@ -226,18 +231,70 @@ def add_point(model_template, point_name: str, init_value=0, do_checks=True):
     """Adds a point to the model position"""
     _add_attribute_to_model_template(model_template, point_name, init_value, do_checks)
 
-def add_node_index(model_template, index:NodeIndex, init_value: dict={}, do_checks=True):
+
+def add_node_index(
+    model_template, index: NodeIndex, init_value: dict = {}, do_checks=True
+):
     """Adds a node to the model position"""
     _add_attribute_to_model_template(model_template, index, init_value, do_checks)
 
-def add_node_group(model_template, indices:NodeIndices, init_value: dict={}, do_checks=True):
+
+def add_node_group(
+    model_template, indices: NodeIndices, init_value: dict = {}, do_checks=True
+):
     """Adds a group of nodes to the model"""
     _add_node_group(model_template, indices, init_value, do_checks=True)
 
 
+def add_node_indices(
+    model_template, indices: NodeIndices, init_values: list, do_checks=True
+):
+    """
+    Adds multiple node indices to the model which are not already present
+    """
+    _assert_fun(len(init_values) == len(indices), f"unequal lengths", do_checks)
+    _assert_fun(isinstance(indices, tuple), f"indices are not a tuple", do_checks)
+    for j, idx in enumerate(indices):
+        _assert_fun(isinstance(idx, int), f"index {idx} is not an int", do_checks)
+        _add_attribute_to_model_template(model_template, idx, init_values[j], do_checks)
 
-class ModelData: ...
 
+# A node is analgous to an IMP particle
+# A vertex has to do with a graph
+
+def add_node_indices_and_group(
+    model_template,
+    indices: NodeIndices,
+    init_values: list,
+    group_init_val={},
+    do_checks=True,
+):
+    add_node_indices(model_template, indices, init_values, do_checks=do_checks)
+    add_node_group(
+        model_template, indices, group_init_val, do_checks=do_checks
+    )
+
+
+def add_singleton_restraint(model_template, idx: NodeId):
+    """
+    A singleton restraint depends only on the properties of a single node
+    """
+    ...
+
+def add_pair_restraint(model_template):
+    """
+    A pair restraint depends only on the properties of a pair of nodes
+    """
+
+def add_group_restraint(model_template):
+    """
+    A group restraint depends only on the attributes of a group of nodes.
+    A group consists of more than two nodes
+    """
+
+
+class ModelData:
+    ...
 
 
 class ModelState(DataStruct):
@@ -269,6 +326,7 @@ class Functions(DataStruct):
 
     pass
 
+
 class ContiguousGroupAttribute:
     """
 
@@ -282,12 +340,13 @@ class ContiguousGroupAttribute:
         self.offset = offset
         self.attribute = attribute
 
+
 def get_value_from_nodeidxs(model_state, idxs: NodeIndices, uid: UID):
     """
-    
+
     For a given model, get the value of the unique id at the node indices
     """
-    return model_state.getters['uid'](idxs) 
+    return model_state.getters["uid"](idxs)
 
 
 class Model:
@@ -320,9 +379,9 @@ class Model:
 
     # ModelState = namedtuple("ModelState", "consts variables scores")
 
-    def __init__(self, 
-                getters: dict[UID, Jittable] = {}, 
-                setters: dict[UID, Jittable] = {}):
+    def __init__(
+        self, getters: dict[UID, Jittable] = {}, setters: dict[UID, Jittable] = {}
+    ):
 
         # assert isinstance(model_state, dict), f"model state {model_state} is not a python dictionary"
         # assert isinstance(functions, dict), f"functions {functions} is not a python dictionary"
@@ -370,7 +429,6 @@ class Model:
         else:
             assert False, f"keyval type {type(keyval)} is neither a dict nor a tuple"
 
-
     def add_to_functions(self, key, val):
         ...
 
@@ -408,8 +466,6 @@ class Restraint:
         self.name = name
         self.idxs = idxs
 
-    
-
 
 def _check_restraint_name(restraint: Restraint, model: Model):
     assert restraint.name not in model.restraints
@@ -433,7 +489,8 @@ class RestraintAdder:
 
     def check_name_is_unique(self):
         assert self.model
-        
+
+
 def update_datastruct(ds: DataStruct, keyval: Union[tuple, dict]):
     """
     Adds something to the model state
@@ -452,29 +509,34 @@ def update_datastruct(ds: DataStruct, keyval: Union[tuple, dict]):
     else:
         assert False, f"keyval type {type(keyval)} is neither a dict nor a tuple"
 
+
 def update_datastruct_from_pair(ds: DataStruct, key, val) -> DataStruct:
-    attr_dict = datastruct_to_dict(ds) 
+    attr_dict = datastruct_to_dict(ds)
     assert key not in attr_dict, f"{key} already in datastruct"
     return DataStruct(attr_dict | {key: val})
 
+
 def update_datastruct_from_dict(ds: DataStruct, d: dict):
-    attr_dict = datastruct_to_dict(ds) 
+    attr_dict = datastruct_to_dict(ds)
     assert (
         len(set(d).intersection(attr_dict)) == 0
     ), f"d already shares keys with data struct"
     return DataStruct(attr_dict | d)
 
-def datastruct_to_dict(ds : DataStruct):
+
+def datastruct_to_dict(ds: DataStruct):
     return dict(get_visiblemembers(ds))
 
-def datastruct_to_tuple(ds: DataStruct, typename: str="MyTuple") -> tuple:
+
+def datastruct_to_tuple(ds: DataStruct, typename: str = "MyTuple") -> tuple:
     """
     Converts a datastruct to a namedtuple
     """
 
     attr_dict = datastruct_to_tuple(ds)
-    MyTuple = namedtuple(typename, attr_dict) 
+    MyTuple = namedtuple(typename, attr_dict)
     return MyTuple(**attr_dict)
+
 
 def tuple_to_datastruct(t: tuple) -> DataStruct:
     """
@@ -484,26 +546,48 @@ def tuple_to_datastruct(t: tuple) -> DataStruct:
     return DataStruct(tdict)
 
 
-def _assert_fun(pred, msg: str,  do_checks=True):
-    assert pred, msg
+def _assert_fun(pred, msg: str, do_checks=True):
+    if do_checks:
+        assert pred, msg
+
 
 def _build_model(model_template, do_checks, position_as_dict):
     if position_as_dict:
-        _assert_fun(isinstance(model_template.position, dict), "position is not a dict", do_checks=do_checks)
+        _assert_fun(
+            isinstance(model_template.position, dict),
+            "position is not a dict",
+            do_checks=do_checks,
+        )
         return model_template.position
     else:
         assert False, "Model failed to build"
 
-def _add_attribute_to_model_template(model_template, attribute, init_value, do_checks=True):
+
+def _add_attribute_to_model_template(
+    model_template, attribute, init_value, do_checks=True
+):
     """Abstract function for adding pattern"""
     if do_checks:
-        _assert_fun(attribute not in model_template.position, f"{attribute} already in model_template.position")
+        _assert_fun(
+            attribute not in model_template.position,
+            f"{attribute} already in model_template.position",
+        )
     model_template.position[attribute] = init_value
 
-def _add_node_group(model_template, indices:NodeIndices, init_value: dict={}, do_checks=True):
-    _assert_fun(indices not in model_template.position, f"The index group is already in the model position", do_checks)
+
+def _add_node_group(
+    model_template, indices: NodeIndices, init_value: dict = {}, do_checks=True
+):
+    _assert_fun(isinstance(indices, tuple), f"indices are not a tuple", do_checks)
+    _assert_fun(
+        indices not in model_template.position,
+        f"The index group is already in the model position",
+        do_checks,
+    )
     if do_checks:
         for idx in indices:
-            _assert_fun(idx in model_template.position, f"node {idx} node in model", do_checks)
+            _assert_fun(
+                idx in model_template.position, f"node {idx} node in model", do_checks
+            )
 
     _add_attribute_to_model_template(model_template, indices, init_value, do_checks)
