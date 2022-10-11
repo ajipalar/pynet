@@ -75,10 +75,15 @@ from inspect import getmembers
 Attribute = namedtuple("Attribute", "name val")
 
 # Define types
-NodeIndex: TypeAlias = int
+VertexIndex: TypeAlias = int
+NodeId: TypeAlias = (
+    Any  # some hashable identifer, for vertices the node index is the vertex index
+)
 NodeIndices: TypeAlias = npt.ArrayLike
 Jittable: TypeAlias = Callable  # A jittiable funciton
 PyTree: TypeAlias = Any  # A jax PyTree
+NodeAttributes: TypeAlias = dict
+Node: TypeAlias = tuple[NodeId, NodeAttributes]
 
 
 # Some helper funcitons
@@ -233,7 +238,7 @@ def add_point(model_template, point_name: str, init_value=0, do_checks=True):
 
 
 def add_node_index(
-    model_template, index: NodeIndex, init_value: dict = {}, do_checks=True
+    model_template, index: VertexIndex, init_value: dict = {}, do_checks=True
 ):
     """Adds a node to the model position"""
     _add_attribute_to_model_template(model_template, index, init_value, do_checks)
@@ -262,6 +267,55 @@ def add_node_indices(
 # A node is analgous to an IMP particle
 # A vertex has to do with a graph
 
+
+def build_mapping_fn(keysA, keysB) -> Jittable:
+    """
+    Build a function that maps from A to B
+
+    1. Capture the ordering by closure
+
+    (A -> X)
+    (X -> B) namedtuple
+    (B -> C)
+    
+    """
+    A: TypeAlias = Any
+    B: TypeAlias = Any
+    C: TypeAlias = Any
+    X: TypeAlias = Any
+
+    Atup = namedtuple("A", keysA)
+    Btup = namedtuple("B", keysB)
+
+    Mapp = namedtuple("Mapp", keysB)  # the keys are in Y
+
+    def mapping_fn(a: tuple[A]) -> tuple[B]:
+        a = Atup(**a) 
+        b = Btup(*a)
+        return b
+
+    return mapping_fn
+
+
+def example_logprob_fn(a, b):
+    return jnp.log(a) + jnp.log(b)
+
+def build_example_mapped(idx):
+    def example_mapped(position):
+        return example_logprob_fn(position[idx].a, position[idx].b)
+
+    return example_mapped
+
+def add_restraint_to_model(model_template, idxs: NodeIndices, log_prob):
+    """
+    Args:
+      node_attributes :: A
+      mapping :: A -> B
+      logprob_fn :: (B) -> float
+      restraintId
+    """
+    ...
+
 def add_node_indices_and_group(
     model_template,
     indices: NodeIndices,
@@ -270,21 +324,29 @@ def add_node_indices_and_group(
     do_checks=True,
 ):
     add_node_indices(model_template, indices, init_values, do_checks=do_checks)
-    add_node_group(
-        model_template, indices, group_init_val, do_checks=do_checks
-    )
+    add_node_group(model_template, indices, group_init_val, do_checks=do_checks)
 
 
-def add_singleton_restraint(model_template, idx: NodeId):
+def add_singleton_log_density(model_template, idx: NodeId, log_pdf):
     """
     A singleton restraint depends only on the properties of a single node
     """
+    # must ascociate the log_pdf with the  idx
+    def restraint(position):
+        return log_pdf(**position[idx])
+
     ...
+
+
+# have log_pdf(args, kwargs):
+#      log_pdf(**position)
+
 
 def add_pair_restraint(model_template):
     """
     A pair restraint depends only on the properties of a pair of nodes
     """
+
 
 def add_group_restraint(model_template):
     """
