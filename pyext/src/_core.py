@@ -69,7 +69,7 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 from typing import TypeAlias, Union, Callable, Any
 
-from inspect import getmembers
+from inspect import getmembers, signature
 
 # Define classes
 Attribute = namedtuple("Attribute", "name val")
@@ -268,7 +268,7 @@ def add_node_indices(
 # A vertex has to do with a graph
 
 
-def build_mapping_fn(keysA, keysB) -> Jittable:
+def _build_mapping_fn(keysA, keysB) -> Jittable:
     """
     Build a function that maps from A to B
 
@@ -277,7 +277,7 @@ def build_mapping_fn(keysA, keysB) -> Jittable:
     (A -> X)
     (X -> B) namedtuple
     (B -> C)
-    
+
     """
     A: TypeAlias = Any
     B: TypeAlias = Any
@@ -290,15 +290,47 @@ def build_mapping_fn(keysA, keysB) -> Jittable:
     Mapp = namedtuple("Mapp", keysB)  # the keys are in Y
 
     def mapping_fn(a: tuple[A]) -> tuple[B]:
-        a = Atup(**a) 
-        b = Btup(*a)
+        a: tuple = Atup(**a)
+        b: tuple = Btup(*a)
         return b
 
     return mapping_fn
 
 
-def example_logprob_fn(a, b):
-    return jnp.log(a) + jnp.log(b)
+def get_key_positions(selected_keys: list, d: dict) -> npt.ArrayLike:
+    """Return the postion array of selected keys from a dictionary d"""
+    key_positions = []
+    for i, key in enumerate(d):
+        if key in selected_keys:
+            key_positions.append(i)
+    return np.array(key_positions)
+
+
+def build_select_dict(selected_keys, d):
+    key_positions = get_key_positions(selected_keys, d)
+    key_list = list(d.keys())
+
+    selected_dict_def = {key_list[i]: d[key_list[i]] for i in key_positions}
+
+
+
+def _build_restraint(keysA, keysB, logprob_fn):
+    """
+    Maps from
+      (B -> C) to (A -> C)
+    Args:
+      The keysB must match the type signature of the logprob_fn
+    """
+
+    mapping_fn = _build_mapping_fn(keysA, keysB)
+
+    def restraint_logprob_fn(A):
+        b = mapping_fn(A)  # map A to a tuple with the keys of logprob_fn
+        b = b._asdict()  # get the dictionary
+        return logprob_fn(**b)  # evaluate the logdensity at the defined parameters
+
+    return restraint_logprob_fn
+
 
 def build_example_mapped(idx):
     def example_mapped(position):
@@ -306,15 +338,23 @@ def build_example_mapped(idx):
 
     return example_mapped
 
-def add_restraint_to_model(model_template, idxs: NodeIndices, log_prob):
+
+def add_restraint_to_model(model_template, idxs: NodeIndices, keysA, logprob_fn):
     """
     Args:
       node_attributes :: A
       mapping :: A -> B
       logprob_fn :: (B) -> float
       restraintId
+
+    Here the logprob_fn is a Jittable function that is only
+    a function of the position
     """
-    ...
+
+    keysB = dict(signature(logprob_fn).parameters)
+    logprob_fn = _build_restraint(keysA, keysB, logprob_fn)
+    restraint = lambda position: logprob_fn(position[idx])
+
 
 def add_node_indices_and_group(
     model_template,
