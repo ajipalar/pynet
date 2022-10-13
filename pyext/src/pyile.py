@@ -86,10 +86,21 @@ def position_only_params_from_f(f):
     return a(b(f))
 
 
-def smap(mapping: dict, f):
+def smap(mapping: dict, f, do_checks=True):
     """
-    Map from A to B
-    f::B -> C
+    signature map
+
+    if f::S -> Y
+    and mapping is dict[a:s]
+    get the string representation of g
+    g::A -> Y
+
+    g accepts arguments in A by keyword defined in mapping
+    g passes arguments to f by position
+
+    do_checks:
+      check_all arguments are mapped
+    
     """
     inverse_mapping = {param: key for key, param in mapping.items()}
     fname = f.__name__
@@ -99,6 +110,12 @@ def smap(mapping: dict, f):
 
     positional_only = list(position_only_params_from_f(f))
     positional_only_names = [x.name for x in positional_only]
+
+    if do_checks:
+        assert len(mapping) == len(inverse_mapping), "the map and inverse map are not one-to-one"
+        assert len(mapping) == len(positional_only_names), f"mapping and pos params don't match {mapping, positional_only_names}"
+        assert len(inverse_mapping) == len(positional_only_names), "inv mapping and pos params don't match"
+        assert set(positional_only_names) == set(inverse_mapping), f"inv mapping and params don't match"
 
     new_ordering = [inverse_mapping[param] for param in positional_only_names]
 
@@ -113,6 +130,9 @@ def smap(mapping: dict, f):
     return code
 
 def build_mapped_fn(mapping, f):
+    """
+    
+    """
     code = smap(mapping, f)
     g = {f.__name__: f}
     l = dict()
