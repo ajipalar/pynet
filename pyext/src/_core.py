@@ -71,6 +71,8 @@ from typing import TypeAlias, Union, Callable, Any
 
 from inspect import getmembers, signature
 
+import pyile
+
 # Define classes
 Attribute = namedtuple("Attribute", "name val")
 
@@ -222,13 +224,32 @@ class DataStruct:
 
 
 class ModelTemplate:
-    def __init__(self, position: dict = {}):
+    """
+    1. Define the model position PyTree
+      - Define the keys in the position dict
+      - The shapes of the leaf types don't matter because that's defined at run time by the initial position
+
+
+    """
+
+    def __init__(
+        self, position: dict = {}, proposal: dict = {}, logprob_list=[], do_checks=True
+    ):
         self.position = (
             position  # the keys of integer numbers are reserved for node ids
         )
+        self.proposal = proposal
+        self.logprob_list = logprob_list
+        self.do_checks = do_checks
 
     def build(self, build_options: dict = {"position_as_dict": True}, do_checks=True):
         return _build_model(self, do_checks=do_checks, **build_options)
+
+    def add_restraint(self, scope_key, mapping: dict, logprob_fn):
+        _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks)
+
+    def help_restraint(self, index):
+        help(self.logprob_list[index])
 
 
 # Functions that add things to the model template
@@ -313,23 +334,27 @@ def build_select_dict(selected_keys, d):
     selected_dict_def = {key_list[i]: d[key_list[i]] for i in key_positions}
 
 
-
-def _build_restraint(keysA, keysB, logprob_fn):
+def _map_context_to_kwds(context_to_signature, do_checks=True) -> tuple[str, str]:
     """
-    Maps from
-      (B -> C) to (A -> C)
-    Args:
-      The keysB must match the type signature of the logprob_fn
+    Given a dictionary {'a':'b', 'c':'d'}
+    build the parital function signature
+
+    'b=a,d=c'
     """
+    s = ""
+    context_str = ""
+    for key, val in context_to_signature.items():
+        _assert_fun(isinstance(key, str), "", do_checks)
+        _assert_fun(isinstance(val, str), "", do_checks)
+        _assert_fun(key.isalnum(), "", do_checks)
+        _assert_fun(val.isalnum(), "", do_checks)
+        context_str += f"{key},"
 
-    mapping_fn = _build_mapping_fn(keysA, keysB)
-
-    def restraint_logprob_fn(A):
-        b = mapping_fn(A)  # map A to a tuple with the keys of logprob_fn
-        b = b._asdict()  # get the dictionary
-        return logprob_fn(**b)  # evaluate the logdensity at the defined parameters
-
-    return restraint_logprob_fn
+        s += f"{val}={key},"
+    s = s.strip(",")
+    context_str = context_str.strip(",")
+    mapping_str = s
+    return context_str, mapping_str
 
 
 def build_example_mapped(idx):
@@ -339,7 +364,9 @@ def build_example_mapped(idx):
     return example_mapped
 
 
-def add_restraint_to_model(model_template, idxs: NodeIndices, keysA, logprob_fn):
+def _add_group_restraint_to_model(
+    model_template, mapping, idxs: NodeIndices, logprob_fn, do_checks=True
+):
     """
     Args:
       node_attributes :: A
@@ -351,9 +378,10 @@ def add_restraint_to_model(model_template, idxs: NodeIndices, keysA, logprob_fn)
     a function of the position
     """
 
-    keysB = dict(signature(logprob_fn).parameters)
-    logprob_fn = _build_restraint(keysA, keysB, logprob_fn)
-    restraint = lambda position: logprob_fn(position[idx])
+    # 1 where should the restraint be defined?
+    # 2 Add the necassary parameters to the input context based on the log_density signature
+    # 3 Compile the restraint using pyile
+    #
 
 
 def add_node_indices_and_group(
@@ -573,26 +601,6 @@ def _check_restraint_name(restraint: Restraint, model: Model):
     assert restraint.name not in model.restraints
 
 
-def add_restraint(restraint: Restraint, model: Model, do_checks=True):
-
-    _check_restraint_name(restraint, model) if do_checks else None
-
-
-class RestraintAdder:
-    """
-    Adds a restraint to a model
-
-    Does some checking
-    """
-
-    def __init__(self, restraint: Restraint, model: Model):
-        self.restraint = restraint
-        self.model = model
-
-    def check_name_is_unique(self):
-        assert self.model
-
-
 def update_datastruct(ds: DataStruct, keyval: Union[tuple, dict]):
     """
     Adds something to the model state
@@ -693,3 +701,93 @@ def _add_node_group(
             )
 
     _add_attribute_to_model_template(model_template, indices, init_value, do_checks)
+
+
+def _unscoped_log_density(logprob_fn, default_proposal):
+
+    ...
+
+
+def update_proposal(model_template, scope_key, param_key, proposal_fn, do_checks=True):
+    """
+    update the proposal funciton in the proposal dictionary
+    """
+
+    if scope_key not in model_template.proposal:
+        model_template.proposal[scope_key] = {}
+
+    current = model_template.proposal[scope_key][param_key]
+
+    _assert_fun(
+        isinstance(current, type(lambda: ...)),
+        "current_fn is not a function type",
+        do_checks,
+    )
+    _assert_fun(
+        isinstance(proposal_fn, type(lambda: ...)),
+        "proposal_fn is not a function type",
+        do_checks,
+    )
+
+    model_template.proposal[scope_key][param_key] = proposal_fn
+
+
+def _add_restraint(
+    model_template, scope_key, mapping: dict, logprob_fn, do_checks=True
+):
+    """
+    Add a restraint to the model template
+    Add a default mover
+
+    Args:
+      scope_key : key for the position dict
+      mapping :
+        scope_name : parameter_name
+      restraint : Restraint
+
+    Define the restraint
+    append the restraint to the restraint_list
+    """
+    # 1. If the scope_key in mapping is not in the position dict then the key is added with value 0
+    for key in mapping:
+        if key not in model_template.position[scope_key]:
+            model_template.position[scope_key][key] = 0
+
+    # 2. Build the scoped restraint
+    scope_restraint = pyile.build_mapped_fn(mapping, logprob_fn)
+
+    # 3. capture the scope_key by closure
+    def restraint(position) -> float:
+        return scope_restraint(**position[scope_key])
+
+    mapped_params_doc = ""
+    sig = []
+    scope_elements = []
+    for scope_element, param_element in mapping.items():
+        mapped_params_doc += f"  {scope_element} -> {param_element}\n"
+        sig.append(param_element)
+        scope_elements.append(scope_element)
+
+    docstring = gen_dynamic_docstring(**locals())
+
+    if restraint.__doc__:
+        restraint.__doc__ += docstring
+    else:
+        restraint.__doc__ = docstring
+
+    # Update the model template
+    model_template.logprob_list.append(restraint)
+
+
+def gen_dynamic_docstring(
+    logprob_fn, sig, scope_elements, scope_key, mapped_params_doc, ndashes=26, **kwargs
+) -> str:
+
+    docstring = "Dynamic docstring by PyNet\n"
+    docstring += "-" * ndashes + "\n"
+    docstring += f"""log density : {logprob_fn.__name__}
+{scope_key} -> {tuple(scope_elements)} -> {tuple(sig)} -> log_prob\n"""
+    docstring += mapped_params_doc
+    docstring += f"{logprob_fn.__name__}{signature(logprob_fn)}\n"
+    docstring += "-" * ndashes
+    return docstring
