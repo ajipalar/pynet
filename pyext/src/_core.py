@@ -233,27 +233,102 @@ class ModelTemplate:
     """
 
     def __init__(
-        self, position: dict = {}, proposal: dict = {}, logprob_list=[], do_checks=True
+        self, 
+        position: dict = None, 
+        proposal: dict = None, 
+        logprob_list= None, 
+        group_ids = None,
+        do_checks=True
     ):
-        self.position = (
-            position  # the keys of integer numbers are reserved for node ids
-        )
-        self.proposal = proposal
-        self.logprob_list = logprob_list
+        if position:
+            self.position = position  # the keys of integer numbers are reserved for node ids
+        else:
+            self.position = {}
+
+        if proposal:
+            self.proposal = proposal
+        else:
+            self.proposal = {}
+
+        self.logprob_list = logprob_list if logprob_list else []
+      
         self.do_checks = do_checks
+        self.group_ids = group_ids if group_ids else [] # the gid is g{index}
 
     def build(self, build_options: dict = {"position_as_dict": True}, do_checks=True):
+        self.validate_nodes()
+        self.validate_params()
         return _build_model(self, do_checks=do_checks, **build_options)
 
+    def add_contiguous_nodes(self, start, stop):
+        _assert_fun(start < stop, self.do_checks)
+        for i in range(start, stop):
+            add_point(self, i, do_checks=self.do_checks)
+
     def add_restraint(self, scope_key, mapping: dict, logprob_fn):
-        _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks)
+        updated_list = _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks)
+        self.logprob_list = updated_list
+
+    def add_node_group(self, indices, init_values):
+        add_node_group(self, indices, init_values, self.do_checks)
+        self.group_ids.append(indices)
 
     def help_restraint(self, index):
         help(self.logprob_list[index])
 
+    def add_point(self, point_name: str, init_value = {}):
+        add_point(self, point_name, init_value, self.do_checks)
+
+
+    def validate_nodes(self):
+        for node in self.position:
+            int_t = isinstance(node, int)
+            tup_t = isinstance(node, tuple)
+            if tup_t:
+                for j in node:
+                    assert isinstance(j, int)
+            assert (int_t or tup_t), f"{node} failed"
+    def validate_params(self):
+        for node in self.position:
+            for param in self.position[node]:
+                assert isinstance(param, str), f"{param} not str"
+
+
+class ModFileWriter:
+    def __init__(self, model_template):
+        self.mt = model_template
+
+    def to_modfile(self):
+        keys = list(self.mt.position.keys())
+        nodes = filter(lambda key: isinstance(key, int), keys)
+        nnodes = len(list(nodes))
+        _assert_fun((nnodes + len(self.mt.group_ids)) == len(keys), "nodes and groups don't match keys", self.mt.do_checks)
+
+        l1 = f"N    nodes    {nnodes}\n"
+        l2 = f"N    group    {len(self.mt.group_ids)}\n"
+        l3 = f"N    restr    {len(self.mt.logprob_list)}\n"
+        l4 = f"N    param      \n"
+        rlines = self.to_restraint_lines()
+
+        return l1 + l2 + l3 + l4 + rlines
+
+    def to_restraint_lines(self):
+        lines = ""
+        for r in self.mt.logprob_list: 
+            lines += f"R    {r.__name__}\n"    
+        return lines
+        
+
+
+
+
+
+
+
+
 
 # Functions that add things to the model template
-def add_point(model_template, point_name: str, init_value=0, do_checks=True):
+def add_point(model_template, point_name: str, init_value={}, do_checks=True):
     """Adds a point to the model position"""
     _add_attribute_to_model_template(model_template, point_name, init_value, do_checks)
 
@@ -674,15 +749,15 @@ def _build_model(model_template, do_checks, position_as_dict):
 
 
 def _add_attribute_to_model_template(
-    model_template, attribute, init_value, do_checks=True
+    x, attribute, init_value, do_checks=True
 ):
     """Abstract function for adding pattern"""
     if do_checks:
         _assert_fun(
-            attribute not in model_template.position,
-            f"{attribute} already in model_template.position",
+            attribute not in x.position,
+            f"{attribute} already in x.position",
         )
-    model_template.position[attribute] = init_value
+    x.position[attribute] = init_value
 
 
 def _add_node_group(
@@ -697,7 +772,7 @@ def _add_node_group(
     if do_checks:
         for idx in indices:
             _assert_fun(
-                idx in model_template.position, f"node {idx} node in model", do_checks
+                idx in model_template.position, f"node {idx} not in model", do_checks
             )
 
     _add_attribute_to_model_template(model_template, indices, init_value, do_checks)
@@ -748,6 +823,7 @@ def _add_restraint(
     Define the restraint
     append the restraint to the restraint_list
     """
+    print("enter add")
     # 1. If the scope_key in mapping is not in the position dict then the key is added with value 0
     for key in mapping:
         if key not in model_template.position[scope_key]:
@@ -776,7 +852,11 @@ def _add_restraint(
         restraint.__doc__ = docstring
 
     # Update the model template
-    model_template.logprob_list.append(restraint)
+    print(model_template, f"model template")
+    #model_template.logprob_list.append(restraint)
+    updated_list = model_template.logprob_list
+    updated_list.append(restraint)
+    return updated_list
 
 
 def gen_dynamic_docstring(
