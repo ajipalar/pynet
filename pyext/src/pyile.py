@@ -136,15 +136,25 @@ def smap(mapping: dict, f, do_checks=True):
 
     return code
 
-def build_mapped_fn(mapping, f):
+
+def build_mapped_fn(mapping, f, return_code=False):
     """
-    
+     
     """
     code = smap(mapping, f)
     g = {f.__name__: f}
     l = dict()
     exec(code, g, l)
-    return l['pyile_anon']
+    local_key = 'pyile_anon'
+    anon_f = l[local_key]
+    if anon_f.__doc__:
+        anon_f.__doc__ += "\n" + code
+    else:
+        anon_f.__doc__ = "\n" + code
+    if return_code:
+        return anon_f, code
+    else:
+        return anon_f
 
 
 """

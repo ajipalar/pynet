@@ -240,7 +240,7 @@ class ModelTemplate:
         self, 
         position: dict = mutable, 
         proposal: dict = mutable, 
-        logprob_list= mutable, 
+        restraints: dict = mutable,
         group_ids: list = mutable,
         do_checks=True
     ):
@@ -248,14 +248,14 @@ class ModelTemplate:
             position = {}
         if proposal is mutable:
             proposal = {}
-        if logprob_list is mutable:
-            logprob_list = []
+        if restraints is mutable:
+            restraints = {}
         if group_ids is mutable:
             group_ids = []
 
         self.position = position  # the keys of integer numbers are reserved for node ids
         self.proposal = proposal
-        self.logprob_list = logprob_list
+        self.restraints = restraints
         self.group_ids = group_ids
         self.do_checks = do_checks
 
@@ -273,17 +273,35 @@ class ModelTemplate:
             add_point(self, i, do_checks=self.do_checks)
 
     def add_restraint(self, scope_key, mapping: dict, logprob_fn):
-        updated_list = _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks)
-        self.logprob_list = updated_list
+        """
+        Add a restraint to the model template
+
+        Args:
+          scope_key : key for the position dict
+          mapping :
+            scope_name : parameter_name
+          restraint : Restraint
+
+        Define the restraint
+        append the restraint to the restraint_list
+        """
+        _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks)
 
     def add_node_group(self, indices, init_values):
         add_node_group(self, indices, init_values, self.do_checks)
         self.group_ids.append(indices)
 
-    def help_restraint(self, index):
-        help(self.logprob_list[index])
+    def help_restraint(self, scope_key):
+        help(self.logprob_dict[scope_key])
 
     def add_point(self, point_name: str, init_value: dict = mutable):
+        """
+        Add a 'point' to the model position
+        Args:
+          point_name: str
+          init_value: dict
+
+        """
         if init_value is mutable:
             init_value = {}
         add_point(self, point_name, init_value, self.do_checks)
@@ -297,11 +315,11 @@ class ModelTemplate:
                 for j in node:
                     assert isinstance(j, int)
             assert (int_t or tup_t), f"{node} failed"
+
     def validate_params(self):
         for node in self.position:
             for param in self.position[node]:
                 assert isinstance(param, str), f"{param} not str"
-
 
 class ModFileWriter:
     def __init__(self, model_template):
@@ -315,7 +333,7 @@ class ModFileWriter:
 
         l1 = f"N    nodes    {nnodes}\n"
         l2 = f"N    group    {len(self.mt.group_ids)}\n"
-        l3 = f"N    restr    {len(self.mt.logprob_list)}\n"
+        l3 = f"N    restr    {len(self.mt.logprob_dict)}\n"
         l4 = f"N    param      \n"
         rlines = self.to_restraint_lines()
 
@@ -323,8 +341,9 @@ class ModFileWriter:
 
     def to_restraint_lines(self):
         lines = ""
-        for r in self.mt.logprob_list: 
-            lines += f"R    {r.__name__}\n"    
+        for scope_key, scope in self.mt.logprob_dict.items(): 
+            for name, r in scope.items():
+                lines += f"R    {scope_key}    {name}    {r.__name__}\n"    
         return lines
         
 
@@ -706,7 +725,14 @@ def update_proposal(model_template, scope_key, param_key, proposal_fn, do_checks
 
 
 def _add_restraint(
-    model_template, scope_key, mapping: dict, logprob_fn, do_checks=True
+    model_template, 
+    scope_key, 
+    mapping: dict, 
+    logprob_fn, 
+    do_checks=True,
+    init_position = 1.,
+    restraint_base_name="anon",
+    auto_rename= False
 ):
     """
     Add a restraint to the model template
@@ -722,10 +748,10 @@ def _add_restraint(
     append the restraint to the restraint_list
     """
     print("enter add")
-    # 1. If the scope_key in mapping is not in the position dict then the key is added with value 0
+    # 1. If the scope_key in mapping is not in the position dict then the key is added with value init_position 
     for key in mapping:
         if key not in model_template.position[scope_key]:
-            model_template.position[scope_key][key] = 0
+            model_template.position[scope_key][key] = init_position
 
     # 2. Build the scoped restraint
     scope_restraint = pyile.build_mapped_fn(mapping, logprob_fn)
@@ -752,9 +778,24 @@ def _add_restraint(
     # Update the model template
     print(model_template, f"model template")
     #model_template.logprob_list.append(restraint)
-    updated_list = model_template.logprob_list
-    updated_list.append(restraint)
-    return updated_list
+    updated_dict = model_template.restraints
+    if scope_key not in updated_dict:
+        updated_dict[scope_key] = {}
+
+
+    if restraint_base_name in updated_dict[scope_key]:
+        if auto_rename:
+            b = 1
+            newname = restraint_base_name
+            while newname in updated_dict:
+                newname = f"{restrain_base_name}_{b}"
+                b += 1
+        else:
+            assert False, "{restraint_base_name} already in scope. Change name or set auto_rename=True"
+        restraint_base_name = newname
+    
+    
+    updated_dict[scope_key][restraint_base_name] = restraint 
 
 
 def gen_dynamic_docstring(
