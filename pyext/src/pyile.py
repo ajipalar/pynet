@@ -5,12 +5,15 @@ Pyile:
 import numpy as np
 from inspect import signature
 
+mutable = object()
 
 def deff(fname):
     return f"def {fname}("
 
 
-def siglist(l=[], code=""):
+def siglist(l=mutable, code=""):
+    if l is mutable:
+        l = []
     for j, i in enumerate(l):
         if j > 0:
             code += f" {i},"
@@ -27,11 +30,15 @@ def varargs(code="", stargs="*args"):
     return code + stargs + ","
 
 
-def kw_or_pos(code="", kw_or_pos: list[str] = []):
+def kw_or_pos(code="", kw_or_pos: list[str] = mutable):
+    if kw_or_pos is mutable:
+        kw_or_pos = []
     return siglist(l=kw_or_pos, code=code)
 
 
-def kw_only(code="", kwds_only: list[str] = []):
+def kw_only(code="", kwds_only: list[str] = mutable):
+    if kwds_only is mutable:
+        kwds_only = []
     return siglist(l=kwds_only, code=code)
 
 

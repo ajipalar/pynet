@@ -1,6 +1,5 @@
 """
 The core design of the pynet module 
-
 Objects
 
   Model
@@ -72,6 +71,9 @@ from typing import TypeAlias, Union, Callable, Any
 from inspect import getmembers, signature
 
 import pyile
+
+# Mutable default args and kwargs
+mutable = object()
 
 # Define classes
 Attribute = namedtuple("Attribute", "name val")
@@ -218,7 +220,9 @@ class CGID(GID):
 
 
 class DataStruct:
-    def __init__(self, namespace_dict={}):
+    def __init__(self, namespace_dict=None):
+        if namespace_dict is None:
+            namespace_dict = {}
         for key, val in namespace_dict.items():
             setattr(self, key, val)
 
@@ -234,28 +238,31 @@ class ModelTemplate:
 
     def __init__(
         self, 
-        position: dict = None, 
-        proposal: dict = None, 
-        logprob_list= None, 
-        group_ids = None,
+        position: dict = mutable, 
+        proposal: dict = mutable, 
+        logprob_list= mutable, 
+        group_ids: list = mutable,
         do_checks=True
     ):
-        if position:
-            self.position = position  # the keys of integer numbers are reserved for node ids
-        else:
-            self.position = {}
+        if position is mutable:
+            position = {}
+        if proposal is mutable:
+            proposal = {}
+        if logprob_list is mutable:
+            logprob_list = []
+        if group_ids is mutable:
+            group_ids = []
 
-        if proposal:
-            self.proposal = proposal
-        else:
-            self.proposal = {}
-
-        self.logprob_list = logprob_list if logprob_list else []
-      
+        self.position = position  # the keys of integer numbers are reserved for node ids
+        self.proposal = proposal
+        self.logprob_list = logprob_list
+        self.group_ids = group_ids
         self.do_checks = do_checks
-        self.group_ids = group_ids if group_ids else [] # the gid is g{index}
 
-    def build(self, build_options: dict = {"position_as_dict": True}, do_checks=True):
+    def build(self, build_options: dict = mutable, do_checks=True):
+        if build_options is mutable:
+            build_options = {"position_as_dict": True}
+
         self.validate_nodes()
         self.validate_params()
         return _build_model(self, do_checks=do_checks, **build_options)
@@ -276,7 +283,9 @@ class ModelTemplate:
     def help_restraint(self, index):
         help(self.logprob_list[index])
 
-    def add_point(self, point_name: str, init_value = {}):
+    def add_point(self, point_name: str, init_value: dict = mutable):
+        if init_value is mutable:
+            init_value = {}
         add_point(self, point_name, init_value, self.do_checks)
 
 
@@ -328,31 +337,39 @@ class ModFileWriter:
 
 
 # Functions that add things to the model template
-def add_point(model_template, point_name: str, init_value={}, do_checks=True):
+def add_point(model_template, point_name: str, init_value: dict=mutable, do_checks=True):
     """Adds a point to the model position"""
+    if init_value is mutable:
+        init_value = {}
     _add_attribute_to_model_template(model_template, point_name, init_value, do_checks)
 
 
 def add_node_index(
-    model_template, index: VertexIndex, init_value: dict = {}, do_checks=True
+    model_template, index: VertexIndex, init_value: dict = mutable, do_checks=True
 ):
     """Adds a node to the model position"""
+    if init_value is mutable:
+        init_value = {}
     _add_attribute_to_model_template(model_template, index, init_value, do_checks)
 
 
 def add_node_group(
-    model_template, indices: NodeIndices, init_value: dict = {}, do_checks=True
+    model_template, indices: NodeIndices, init_value: dict = mutable, do_checks=True
 ):
     """Adds a group of nodes to the model"""
+    if init_value is mutable:
+        init_value = {}
     _add_node_group(model_template, indices, init_value, do_checks=True)
 
 
 def add_node_indices(
-    model_template, indices: NodeIndices, init_values: list, do_checks=True
+    model_template, indices: NodeIndices, init_values: list = mutable, do_checks=True
 ):
     """
     Adds multiple node indices to the model which are not already present
     """
+    if init_values is mutable:
+        init_values = []
     _assert_fun(len(init_values) == len(indices), f"unequal lengths", do_checks)
     _assert_fun(isinstance(indices, tuple), f"indices are not a tuple", do_checks)
     for j, idx in enumerate(indices):
@@ -463,9 +480,11 @@ def add_node_indices_and_group(
     model_template,
     indices: NodeIndices,
     init_values: list,
-    group_init_val={},
+    group_init_val: dict=mutable,
     do_checks=True,
 ):
+    if group_init_val is mutable:
+        group_init_val = {}
     add_node_indices(model_template, indices, init_values, do_checks=do_checks)
     add_node_group(model_template, indices, group_init_val, do_checks=do_checks)
 
@@ -553,129 +572,6 @@ def get_value_from_nodeidxs(model_state, idxs: NodeIndices, uid: UID):
     """
     return model_state.getters["uid"](idxs)
 
-
-class Model:
-    """
-    Object oriented
-    --------------------------------------
-    1. Model definition
-       a. Define input information
-       b. Define representaiton
-       c. Define scoring
-       d. Define sampling scheme
-          i. Define step
-          ii. Define sampling method
-          iii. Define sampling paramters
-
-    2. Decompose model into a (model_state, {functions}, meta_data) triple
-       a. autograd
-    --------------------------------------
-    Functional
-
-    3. Optionally apply optimizations
-       pmap for multiple processors
-       vmap to vectorize functions
-    4.
-    4.
-
-    A python run time environment is used to define the model
-    model instance attributes are defined in this environment
-    """
-
-    # ModelState = namedtuple("ModelState", "consts variables scores")
-
-    def __init__(
-        self, getters: dict[UID, Jittable] = {}, setters: dict[UID, Jittable] = {}
-    ):
-
-        # assert isinstance(model_state, dict), f"model state {model_state} is not a python dictionary"
-        # assert isinstance(functions, dict), f"functions {functions} is not a python dictionary"
-
-        # self.model_state = dict_asnamedtuple(model_state, name="ModelState")
-        # self.functions = dict_asnamedtuple(functions, name="Functions")
-
-        self.model_state = ModelState()
-        self.getters = getters
-        self.setters = setters
-        self.functions = Functions()  # Overwriting a key will be silent
-
-    def _scope_to_dict(self, scope) -> dict:
-        scope_dict = {key: val for key, val in get_visiblemembers(scope)}
-        return scope_dict
-
-    def _add_to_model_state_from_pair(self, key, val):
-        attr_dict = self._scope_to_dict(self.model_state)
-        assert key not in attr_dict, f"{key} already in model_state"
-        self.model_state = ModelState(attr_dict | {key: val})
-
-    def _add_to_model_state_from_dict(self, d):
-        attr_dict = self._scope_to_dict(self.model_state)
-        assert (
-            len(set(d).intersection(attr_dict)) == 0
-        ), f"d already shares keys with model_state"
-        self.model_state = ModelState(attr_dict | d)
-
-    def add_to_model_state(self, keyval: Union[tuple, dict]):
-        """
-        Adds something to the model state
-
-
-        Args: keyval is either a tuple (key, value) pair or
-              a dictionary of {key1: val1, ..., keyn: valn}
-              The model_state cannot already have key
-        """
-
-        if isinstance(keyval, tuple):
-            assert len(keyval) == 2, f"keyval needs exactly two entires"
-            self._add_to_model_state_from_pair(keyval[0], keyval[1])
-        elif isinstance(keyval, dict):
-            assert len(keyval) > 0
-            self._add_to_model_state_from_dict(keyval)
-        else:
-            assert False, f"keyval type {type(keyval)} is neither a dict nor a tuple"
-
-    def add_to_functions(self, key, val):
-        ...
-
-    def _to_functional(self):
-        """
-        The model state is a PyTree of data
-        The Functions are a PyTree of pure functions that know how to read the model state
-        """
-        return self.model_state, self.functions
-
-
-class Restraint:
-    """
-    Restraint is a template interface that all restraints must follow
-    Every Restraint is defined over certain group of node indices, for a certain model
-
-    Evaluating a restraint requires
-      - reading parameters and data from the model_state
-      - passing those parameters to a scoring function
-      - computing the result
-      - placing the result in the model_state.scores
-
-    Building a restraint requires
-      - naming the restraint with a unique identifier
-      - checking that the unique name doesn't already exist
-      - defining the node indeces ascociated with the restraint
-      - defining the variables  ascociated with the restraint
-      - defining the scoring container ascociated with the restraint
-
-    Args:
-      name : a unique str identifier
-    """
-
-    def __init__(self, name: str, idxs: NodeIndices, model: Model):
-        self.name = name
-        self.idxs = idxs
-
-
-def _check_restraint_name(restraint: Restraint, model: Model):
-    assert restraint.name not in model.restraints
-
-
 def update_datastruct(ds: DataStruct, keyval: Union[tuple, dict]):
     """
     Adds something to the model state
@@ -761,8 +657,10 @@ def _add_attribute_to_model_template(
 
 
 def _add_node_group(
-    model_template, indices: NodeIndices, init_value: dict = {}, do_checks=True
+    model_template, indices: NodeIndices, init_value: dict = mutable, do_checks=True
 ):
+    if init_value is mutable:
+        init_value = {}
     _assert_fun(isinstance(indices, tuple), f"indices are not a tuple", do_checks)
     _assert_fun(
         indices not in model_template.position,
