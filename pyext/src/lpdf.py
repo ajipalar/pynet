@@ -32,8 +32,8 @@ def laplace(x, loc=0, scale=1, /):
 def logistic(x, /):
     return stats.logistic.logpdf(x)
 
-def multivariate_normal(x, mean, cov, allow_singular=None, /):
-    return stats.multivariate_normal.logpdf(x, mean, cov, allow_singular)
+def multivariate_normal(x, mean, cov, /):
+    return stats.multivariate_normal.logpdf(x, mean, cov)
 
 def norm(x, loc=0, scale=1, /):
     return stats.norm.logpdf(x, loc, scale)
