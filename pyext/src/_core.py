@@ -272,7 +272,7 @@ class ModelTemplate:
         for i in range(start, stop):
             add_point(self, i, do_checks=self.do_checks)
 
-    def add_restraint(self, scope_key, mapping: dict, logprob_fn):
+    def add_restraint(self, scope_key, mapping: dict, logprob_fn, options: dict = mutable):
         """
         Add a restraint to the model template
 
@@ -285,14 +285,20 @@ class ModelTemplate:
         Define the restraint
         append the restraint to the restraint_list
         """
-        _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks)
+        if options is mutable:
+            options = {}
+        _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks, **options)
 
     def add_node_group(self, indices, init_values):
         add_node_group(self, indices, init_values, self.do_checks)
         self.group_ids.append(indices)
 
-    def help_restraint(self, scope_key):
-        help(self.logprob_dict[scope_key])
+    def help_restraint(self, scope, name="anon"):
+        """
+        Get help on a restraint specified in a scope 
+        """
+        #print(f"scope {scope} name {name}")
+        help(self.restraints[scope][name])
 
     def add_point(self, point_name: str, init_value: dict = mutable):
         """
@@ -333,7 +339,7 @@ class ModFileWriter:
 
         l1 = f"N    nodes    {nnodes}\n"
         l2 = f"N    group    {len(self.mt.group_ids)}\n"
-        l3 = f"N    restr    {len(self.mt.logprob_dict)}\n"
+        l3 = f"N    restr    {len(self.mt.restraints)}\n"
         l4 = f"N    param      \n"
         rlines = self.to_restraint_lines()
 
@@ -341,7 +347,7 @@ class ModFileWriter:
 
     def to_restraint_lines(self):
         lines = ""
-        for scope_key, scope in self.mt.logprob_dict.items(): 
+        for scope_key, scope in self.mt.restraints.items(): 
             for name, r in scope.items():
                 lines += f"R    {scope_key}    {name}    {r.__name__}\n"    
         return lines

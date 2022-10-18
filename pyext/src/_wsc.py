@@ -31,7 +31,8 @@ def example1():
     model_template.build()
     
     model_template.add_restraint(group, context_to_signature, logprob_example)
-    model_template.help_restraint(0)
+    model_template.help_restraint(group)
+    return model_template
 
 def example2():
 
@@ -55,7 +56,7 @@ def example2():
     print('built')
     mod_writer = ModFileWriter(mt)
     print(mod_writer.to_modfile())
-    print(mt.logprob_list)
+    print(mt.restraints)
      
 def example3():
     print('Example 3')
