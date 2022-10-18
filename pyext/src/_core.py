@@ -71,6 +71,7 @@ from typing import TypeAlias, Union, Callable, Any
 from inspect import getmembers, signature
 
 import pyile
+import lpdf
 
 # Mutable default args and kwargs
 mutable = object()
@@ -226,6 +227,17 @@ class DataStruct:
         for key, val in namespace_dict.items():
             setattr(self, key, val)
 
+class ModelParam:
+    def __init__(self, s:str, is_variable=False):
+        self.s = s
+        self.is_variable = is_variable
+
+    def __hash__(self):
+        return hash(self.s)
+
+    def __repr__(self):
+        return self.s
+
 
 class ModelTemplate:
     """
@@ -234,6 +246,20 @@ class ModelTemplate:
       - The shapes of the leaf types don't matter because that's defined at run time by the initial position
 
 
+
+    Instance Attribute
+
+    position : dict
+      scope : str, int, tuple
+        param_name
+
+    is_variable : dict
+      scope : str, int, tuple
+        param_name : bool
+
+    restraints : dict
+      scope : str, int, tuple
+        param_name : restraint :: (position) -> float
     """
 
     def __init__(
@@ -241,6 +267,7 @@ class ModelTemplate:
         position: dict = mutable, 
         proposal: dict = mutable, 
         restraints: dict = mutable,
+        is_variable: dict = mutable,
         group_ids: list = mutable,
         do_checks=True
     ):
@@ -252,10 +279,13 @@ class ModelTemplate:
             restraints = {}
         if group_ids is mutable:
             group_ids = []
+        if is_variable is mutable:
+            is_variable = {}
 
         self.position = position  # the keys of integer numbers are reserved for node ids
         self.proposal = proposal
         self.restraints = restraints
+        self.is_variable = is_variable
         self.group_ids = group_ids
         self.do_checks = do_checks
 
@@ -288,6 +318,9 @@ class ModelTemplate:
         if options is mutable:
             options = {}
         _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks, **options)
+
+    def add_multivariate_normal(self, scope_key, mapping, options: dict = mutable):
+        _add_restraint(self, scope_key, mapping, lpdf.multivariate_normal, self.do_checks, init_position, restraint_base_name="mvn", auto_rename=auto_rename)
 
     def add_node_group(self, indices, init_values):
         add_node_group(self, indices, init_values, self.do_checks)
@@ -352,13 +385,6 @@ class ModFileWriter:
                 lines += f"R    {scope_key}    {name}    {r.__name__}\n"    
         return lines
         
-
-
-
-
-
-
-
 
 
 # Functions that add things to the model template
@@ -729,6 +755,40 @@ def update_proposal(model_template, scope_key, param_key, proposal_fn, do_checks
 
     model_template.proposal[scope_key][param_key] = proposal_fn
 
+def _add_model_parameter(mt, scope: str, param_name: str, 
+                         is_variable = False, 
+                         init_position = 1.,
+                         do_checks=True):
+    """
+    Adds a parameter to the model
+    """
+
+    if scope not in mt.position:
+        mt.position[scope] = {}
+    if scope not in mt.is_variable:
+        mt.is_variable[scope] = {}
+
+    mt.position[scope][param_name] = init_position
+    mt.is_variable[scope][param_name] = is_variable
+
+
+
+def _add_restraint_to_restraintsdict(mt, scope, key, logprob_fn, do_checks=True):
+    if scope not in mt.restraints:
+        mt.restraints[scope] = {}
+
+    _assert_fun(key not in mt.restraints[scope], f"restraint {key} already in scope", do_checks)
+    mt.restraints[scope][key] = logprob_fn
+
+def _add_restraints_key(mt, scope, key, logprob_fn, do_checks=True):
+    """
+    Add a key to the restraints dict. Set the corresponding value to an empty str
+    """
+    _assert_fun(scope in mt.restraints, f"scope {scope} not in restraints", do_checks)
+    _assert_fun(key not in mt.restraints[scope], f"restraint {key} already in scope", do_checks)
+    mt.restraints[scope][key] = ""
+
+    
 
 def _add_restraint(
     model_template, 
@@ -736,9 +796,10 @@ def _add_restraint(
     mapping: dict, 
     logprob_fn, 
     do_checks=True,
-    init_position = 1.,
+    init_positions: dict = mutable,
     restraint_base_name="anon",
-    auto_rename= False
+    auto_rename= False,
+    is_variable: dict = mutable
 ):
     """
     Add a restraint to the model template
@@ -755,9 +816,26 @@ def _add_restraint(
     """
     print("enter add")
     # 1. If the scope_key in mapping is not in the position dict then the key is added with value init_position 
+
+    if init_positions is mutable:
+        init_positions = {}
+        for key in mapping:
+            init_positions[key] = 1.
+
+    if is_variable is mutable:
+        is_variable = {}
+        for key in mapping:
+            is_variable[key] = False
+
     for key in mapping:
-        if key not in model_template.position[scope_key]:
-            model_template.position[scope_key][key] = init_position
+        _add_model_parameter(model_template, scope_key, key, 
+                             is_variable=is_variable[key],
+                             init_position= init_positions[key], 
+                             do_checks=do_checks) 
+
+
+#        if key not in model_template.position[scope_key]:
+#            model_template.position[scope_key][key] = init_position
 
     # 2. Build the scoped restraint
     scope_restraint = pyile.build_mapped_fn(mapping, logprob_fn)
@@ -766,24 +844,14 @@ def _add_restraint(
     def restraint(position) -> float:
         return scope_restraint(**position[scope_key])
 
-    mapped_params_doc = ""
-    sig = []
-    scope_elements = []
-    for scope_element, param_element in mapping.items():
-        mapped_params_doc += f"  {scope_element} -> {param_element}\n"
-        sig.append(param_element)
-        scope_elements.append(scope_element)
+    docstring = _create_docstring_from_mapping(**locals())
+    restraint = _update_function_docstring(restraint, docstring)
 
-    docstring = gen_dynamic_docstring(**locals())
-
-    if restraint.__doc__:
-        restraint.__doc__ += docstring
-    else:
-        restraint.__doc__ = docstring
 
     # Update the model template
     print(model_template, f"model template")
     #model_template.logprob_list.append(restraint)
+
     updated_dict = model_template.restraints
     if scope_key not in updated_dict:
         updated_dict[scope_key] = {}
@@ -794,14 +862,37 @@ def _add_restraint(
             b = 1
             newname = restraint_base_name
             while newname in updated_dict:
-                newname = f"{restrain_base_name}_{b}"
+                newname = f"{restraint_base_name}_{b}"
                 b += 1
         else:
             assert False, "{restraint_base_name} already in scope. Change name or set auto_rename=True"
         restraint_base_name = newname
+    _add_restraint_to_restraintsdict(model_template, scope_key, restraint_base_name, restraint, do_checks)
     
+
+def _create_docstring_from_mapping(mapping, logprob_fn, scope_key, **kwargs) -> str:
+    """
+    mapping
+      ModelParamName : ParamValue
+    """
+    mapped_params_doc = ""
+    sig = []
+    scope_elements = []
+    for scope_element, param_element in mapping.items():
+        mapped_params_doc += f"  {scope_element} -> {param_element}\n"
+        sig.append(param_element)
+        scope_elements.append(scope_element)
+
+    docstring = gen_dynamic_docstring(**locals())
+    return docstring
+
+def _update_function_docstring(f, docstring) -> Callable:
     
-    updated_dict[scope_key][restraint_base_name] = restraint 
+    if f.__doc__:
+        f.__doc__ += docstring
+    else:
+        f.__doc__ = docstring
+    return f
 
 
 def gen_dynamic_docstring(
