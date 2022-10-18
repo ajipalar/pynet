@@ -67,6 +67,8 @@ import numpy.typing as npt
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from typing import TypeAlias, Union, Callable, Any
+from functools import partial
+from enum import Enum, unique
 
 from inspect import getmembers, signature
 
@@ -90,6 +92,24 @@ PyTree: TypeAlias = Any  # A jax PyTree
 NodeAttributes: TypeAlias = dict
 Node: TypeAlias = tuple[NodeId, NodeAttributes]
 
+@unique
+class R(Enum):
+    """
+    Defines a controlled set of restraints, ascociating names with
+    a restraints form number
+    """
+    mvn = 0 # x, mean, cov params
+
+class RParams(Enum):
+    """
+    The members of the Enum have parameter names
+    that match the signatures of the parameters in the lpdf and lpmf modules
+    They are ordered identically
+    """
+    mvn = ('x', 'mean', 'cov')
+
+RestraintNumberToBaseName = {form.value:name for name, form in R.__members__.items()} 
+RestraintBaseNameToNumber = {name:form.value for name, form in R.__module__.items()}
 
 # Some helper funcitons
 
@@ -245,8 +265,6 @@ class ModelTemplate:
       - Define the keys in the position dict
       - The shapes of the leaf types don't matter because that's defined at run time by the initial position
 
-
-
     Instance Attribute
 
     position : dict
@@ -319,12 +337,46 @@ class ModelTemplate:
             options = {}
         _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks, **options)
 
-    def add_multivariate_normal(self, scope_key, mapping, options: dict = mutable):
-        _add_restraint(self, scope_key, mapping, lpdf.multivariate_normal, self.do_checks, init_position, restraint_base_name="mvn", auto_rename=auto_rename)
+    def add_multivariate_normal_restraint(self, 
+                                          scope_key, 
+                                          x: str,
+                                          mean: str,
+                                          cov: str,
+                                          x_is_variable = False,
+                                          mean_is_variable = True,
+                                          cov_is_variable = True,
+                                          init_positions=mutable,
+                                          auto_rename=False,
+                                          allow_singular = None,
+                                          restraint_base_name=R.mvn.name):
+        model_template = self
+        do_checks = self.do_checks
+        _assert_fun(isinstance(x, str), f'x is not a string', self.do_checks)
+        _assert_fun(isinstance(mean, str), f'mean is not a string', self.do_checks)
+        _assert_fun(isinstance(cov, str), f'cov is not a string', self.do_checks)
+        mapping = {x: 'x', mean : 'mean', cov: 'cov'}
+        is_variable = {x: x_is_variable, mean: mean_is_variable, cov: cov_is_variable}
 
-    def add_node_group(self, indices, init_values):
-        add_node_group(self, indices, init_values, self.do_checks)
+        _add_restraint(model_template=self,
+                       scope_key=scope_key,
+                       mapping=mapping,
+                       logprob_fn=lpdf.multivariate_normal,
+                       do_checks=self.do_checks,
+                       init_positions=init_positions,
+                       restraint_base_name=restraint_base_name,
+                       auto_rename=auto_rename,
+                       is_variable=is_variable)
+                       
+
+    def add_node_group(self, indices, init_params: dict = mutable):
+        if init_params is mutable:
+            init_params = {}
+        _assert_fun(isinstance(init_params, dict), f"init params not a dict", self.do_checks)
+
+        add_node_group(self, indices, init_params, self.do_checks)
         self.group_ids.append(indices)
+    def getgroup(self, groupidx: int):
+        return self.group_ids[groupidx]
 
     def help_restraint(self, scope, name="anon"):
         """
@@ -345,7 +397,6 @@ class ModelTemplate:
             init_value = {}
         add_point(self, point_name, init_value, self.do_checks)
 
-
     def validate_nodes(self):
         for node in self.position:
             int_t = isinstance(node, int)
@@ -363,6 +414,7 @@ class ModelTemplate:
 class ModFileWriter:
     def __init__(self, model_template):
         self.mt = model_template
+        self.rcolumns = columns = ["R", "scope", "name", "form", "*mparams", "*rparams", "*vparams"]
 
     def to_modfile(self):
         keys = list(self.mt.position.keys())
@@ -377,6 +429,13 @@ class ModFileWriter:
         rlines = self.to_restraint_lines()
 
         return l1 + l2 + l3 + l4 + rlines
+
+    @staticmethod
+    def parse_rkey(rkey):
+        basename, n = rkey.split("_")
+        form = RestraintBaseNameToNumber[basename]
+        return basename, form
+        
 
     def to_restraint_lines(self):
         lines = ""
@@ -462,7 +521,7 @@ def _build_mapping_fn(keysA, keysB) -> Jittable:
 
 
 def get_key_positions(selected_keys: list, d: dict) -> npt.ArrayLike:
-    """Return the postion array of selected keys from a dictionary d"""
+    """Return the position array of selected keys from a dictionary d"""
     key_positions = []
     for i, key in enumerate(d):
         if key in selected_keys:
@@ -814,7 +873,7 @@ def _add_restraint(
     Define the restraint
     append the restraint to the restraint_list
     """
-    print("enter add")
+    #print("enter add")
     # 1. If the scope_key in mapping is not in the position dict then the key is added with value init_position 
 
     if init_positions is mutable:
@@ -849,7 +908,7 @@ def _add_restraint(
 
 
     # Update the model template
-    print(model_template, f"model template")
+    #print(model_template, f"model template")
     #model_template.logprob_list.append(restraint)
 
     updated_dict = model_template.restraints
@@ -857,17 +916,23 @@ def _add_restraint(
         updated_dict[scope_key] = {}
 
 
-    if restraint_base_name in updated_dict[scope_key]:
+    restraint_key = _create_restraint_key(**locals())
+    _add_restraint_to_restraintsdict(model_template, scope_key, restraint_key, restraint, do_checks)
+
+def _create_restraint_key(restraint_base_name, updated_dict, scope_key, auto_rename: bool = False, **kwargs) -> str:
+    fullname = restraint_base_name + "_0"
+    if fullname in updated_dict[scope_key]:
+        new_name = fullname
         if auto_rename:
             b = 1
-            newname = restraint_base_name
-            while newname in updated_dict:
-                newname = f"{restraint_base_name}_{b}"
+            while new_name in updated_dict[scope_key]:
+                new_name = f"{restraint_base_name}_{b}"
                 b += 1
         else:
             assert False, "{restraint_base_name} already in scope. Change name or set auto_rename=True"
-        restraint_base_name = newname
-    _add_restraint_to_restraintsdict(model_template, scope_key, restraint_base_name, restraint, do_checks)
+        return new_name
+    else:
+        return fullname 
     
 
 def _create_docstring_from_mapping(mapping, logprob_fn, scope_key, **kwargs) -> str:
