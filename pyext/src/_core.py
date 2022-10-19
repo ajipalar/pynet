@@ -108,8 +108,16 @@ class RParams(Enum):
     """
     mvn = ('x', 'mean', 'cov')
 
+@unique
+class Rinfo(Enum):
+    """
+    name numeric n_params *r_params
+    """
+    mvn = (R.mvn.value, len(RParams.mvn.value), RParams.mvn.value) 
+
+
 RestraintNumberToBaseName = {form.value:name for name, form in R.__members__.items()} 
-RestraintBaseNameToNumber = {name:form.value for name, form in R.__module__.items()}
+RestraintBaseNameToNumber = {val: key for key, val in RestraintNumberToBaseName.items()} 
 
 # Some helper funcitons
 
@@ -278,6 +286,7 @@ class ModelTemplate:
     restraints : dict
       scope : str, int, tuple
         param_name : restraint :: (position) -> float
+    mover_domain : the default domain of the movers
     """
 
     def __init__(
@@ -285,7 +294,9 @@ class ModelTemplate:
         position: dict = mutable, 
         proposal: dict = mutable, 
         restraints: dict = mutable,
+        restraints_metadata: dict = mutable,
         is_variable: dict = mutable,
+        mover_domain
         group_ids: list = mutable,
         do_checks=True
     ):
@@ -299,13 +310,20 @@ class ModelTemplate:
             group_ids = []
         if is_variable is mutable:
             is_variable = {}
+        if restraints_metadata is mutable:
+            restraints_metadata = {}
+        if mover_domain is mutable:
+            self.mover_domain = {}
 
         self.position = position  # the keys of integer numbers are reserved for node ids
         self.proposal = proposal
         self.restraints = restraints
         self.is_variable = is_variable
+        self.mover_domain = mover_domain
         self.group_ids = group_ids
         self.do_checks = do_checks
+        self.restraints_metadata = restraints_metadata
+        
 
     def build(self, build_options: dict = mutable, do_checks=True):
         if build_options is mutable:
@@ -314,6 +332,7 @@ class ModelTemplate:
         self.validate_nodes()
         self.validate_params()
         return _build_model(self, do_checks=do_checks, **build_options)
+
 
     def add_contiguous_nodes(self, start, stop):
         _assert_fun(start < stop, self.do_checks)
@@ -335,7 +354,8 @@ class ModelTemplate:
         """
         if options is mutable:
             options = {}
-        _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks, **options)
+        restraint_key  = _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks, **options)
+        self.add_metadata_to_restraints_metadata(scope_key, restraint_key, 'mapping', mapping)
 
     def add_multivariate_normal_restraint(self, 
                                           scope_key, 
@@ -357,7 +377,7 @@ class ModelTemplate:
         mapping = {x: 'x', mean : 'mean', cov: 'cov'}
         is_variable = {x: x_is_variable, mean: mean_is_variable, cov: cov_is_variable}
 
-        _add_restraint(model_template=self,
+        restraint_key = _add_restraint(model_template=self,
                        scope_key=scope_key,
                        mapping=mapping,
                        logprob_fn=lpdf.multivariate_normal,
@@ -366,24 +386,33 @@ class ModelTemplate:
                        restraint_base_name=restraint_base_name,
                        auto_rename=auto_rename,
                        is_variable=is_variable)
-                       
+        self.add_metadata_to_restraints_metadata(scope_key, restraint_key, 'mapping', mapping)
 
+                       
     def add_node_group(self, indices, init_params: dict = mutable):
         if init_params is mutable:
             init_params = {}
         _assert_fun(isinstance(init_params, dict), f"init params not a dict", self.do_checks)
 
-        add_node_group(self, indices, init_params, self.do_checks)
+        _add_node_group(self, 
+                        indices=indices, 
+                        init_value=init_params, 
+                        do_checks=self.do_checks)
         self.group_ids.append(indices)
+
     def getgroup(self, groupidx: int):
         return self.group_ids[groupidx]
 
-    def help_restraint(self, scope, name="anon"):
+    def get_pid_dict(self):
         """
-        Get help on a restraint specified in a scope 
+        Get a dictionary of key, position ids.
+        The key is the scope_key in the position dictionary
+        The posiiton id (pid) is the base 0 order of the keys
         """
-        #print(f"scope {scope} name {name}")
-        help(self.restraints[scope][name])
+        pid_dict = {}
+        for i, key in enumerate(self.position.keys()):
+            pid_dict[key] = i
+        return pid_dict
 
     def add_point(self, point_name: str, init_value: dict = mutable):
         """
@@ -411,6 +440,25 @@ class ModelTemplate:
             for param in self.position[node]:
                 assert isinstance(param, str), f"{param} not str"
 
+    def get_pid(self, scope_key):
+        _assert_fun(scope_key in self.position.keys(), f"scope key not in position dict", self.do_checks)
+        pid = 0
+        for i, key in enumerate(self.position.keys()):
+            if key == scope_key:
+                break
+            pid +=1
+        return pid
+
+    def add_metadata_to_restraints_metadata(self, scope_key, restraint_key, meta_key, value):
+        if scope_key not in self.restraints_metadata:
+            self.restraints_metadata[scope_key] = {}
+        if restraint_key not in self.restraints_metadata[scope_key]:
+            self.restraints_metadata[scope_key][restraint_key] = {}
+
+        _assert_fun(meta_key not in self.restraints_metadata[scope_key][restraint_key], self.do_checks)
+        self.restraints_metadata[scope_key][restraint_key][meta_key] = value
+
+    
 class ModFileWriter:
     def __init__(self, model_template):
         self.mt = model_template
@@ -430,18 +478,57 @@ class ModFileWriter:
 
         return l1 + l2 + l3 + l4 + rlines
 
+    def to_positionid(self):
+        pids = ""
+        for scope_key in self.mt:
+            pids += f"{scope_key}\n"
+        return pids
+
+    def get_pid(self, scope_key):
+        pid=0
+        found = False
+        for key in self.mt.position:
+            if key == scope_key:
+                found = True
+                break
+            pid +=1
+
+        assert found, f"scope_key not in position dict"
+        return pid
+
     @staticmethod
     def parse_rkey(rkey):
         basename, n = rkey.split("_")
         form = RestraintBaseNameToNumber[basename]
         return basename, form
-        
+
+    @staticmethod
+    def rinfo(basename: str):
+        form, n_params, rparams = Rinfo[basename].value
+        return form, n_params, rparams
+
+    def Rheader(self):
+        return "R    scope    name    form    rparams"
+
+    @staticmethod
+    def to_rparam_line(rparams: tuple):
+        l = ""
+        for param in rparams:
+            l += f"{param}    "
+        return l
 
     def to_restraint_lines(self):
         lines = ""
-        for scope_key, scope in self.mt.restraints.items(): 
-            for name, r in scope.items():
-                lines += f"R    {scope_key}    {name}    {r.__name__}\n"    
+        pid_dict = self.mt.get_pid_dict()
+        for scope_key, scope_dict in self.mt.restraints.items(): 
+            for name, r in scope_dict.items():
+                basename, form = self.parse_rkey(name)
+                form_, _ , rparams = self.rinfo(basename)
+                pid = self.mt.get_pid(scope_key)
+                assert form_ == form
+                pid = pid_dict[scope_key]
+                rparam_line = self.to_rparam_line(rparams)
+                lines += f"R    {pid}    {name}    {form}    {rparam_line}\n"
         return lines
         
 
@@ -461,15 +548,6 @@ def add_node_index(
     if init_value is mutable:
         init_value = {}
     _add_attribute_to_model_template(model_template, index, init_value, do_checks)
-
-
-def add_node_group(
-    model_template, indices: NodeIndices, init_value: dict = mutable, do_checks=True
-):
-    """Adds a group of nodes to the model"""
-    if init_value is mutable:
-        init_value = {}
-    _add_node_group(model_template, indices, init_value, do_checks=True)
 
 
 def add_node_indices(
@@ -741,6 +819,23 @@ def _assert_fun(pred, msg: str, do_checks=True):
     if do_checks:
         assert pred, msg
 
+def _build_model_score_fn(flist):
+    assert len(flist) > 1, f"have more than one restraint before building"
+    f0 = flist[0]
+    for i in range(1, len(flist)):
+        f0 = f0 + flist[i]
+
+    f = f0.f
+    s = f"model log density built from {len(flist)} restraints"
+
+    if f.__doc__ is None:
+        f.__doc__ = s
+    else:
+        f.__doc__ += s
+    return f
+
+
+    
 
 def _build_model(model_template, do_checks, position_as_dict):
     if position_as_dict:
@@ -749,10 +844,18 @@ def _build_model(model_template, do_checks, position_as_dict):
             "position is not a dict",
             do_checks=do_checks,
         )
-        return model_template.position
+
+        flist = []
+
+        for scope_key, rdict in model_template.restraints.items():
+            for rkey, restraint in rdict.items():
+                flist.append(Function(restraint))
+
+        model_score = _build_model_score_fn(flist)
+
+        return model_template.position, model_score
     else:
         assert False, "Model failed to build"
-
 
 def _add_attribute_to_model_template(
     x, attribute, init_value, do_checks=True
@@ -764,7 +867,6 @@ def _add_attribute_to_model_template(
             f"{attribute} already in x.position",
         )
     x.position[attribute] = init_value
-
 
 def _add_node_group(
     model_template, indices: NodeIndices, init_value: dict = mutable, do_checks=True
@@ -785,11 +887,8 @@ def _add_node_group(
 
     _add_attribute_to_model_template(model_template, indices, init_value, do_checks)
 
-
 def _unscoped_log_density(logprob_fn, default_proposal):
-
     ...
-
 
 def update_proposal(model_template, scope_key, param_key, proposal_fn, do_checks=True):
     """
@@ -830,8 +929,6 @@ def _add_model_parameter(mt, scope: str, param_name: str,
     mt.position[scope][param_name] = init_position
     mt.is_variable[scope][param_name] = is_variable
 
-
-
 def _add_restraint_to_restraintsdict(mt, scope, key, logprob_fn, do_checks=True):
     if scope not in mt.restraints:
         mt.restraints[scope] = {}
@@ -846,7 +943,6 @@ def _add_restraints_key(mt, scope, key, logprob_fn, do_checks=True):
     _assert_fun(scope in mt.restraints, f"scope {scope} not in restraints", do_checks)
     _assert_fun(key not in mt.restraints[scope], f"restraint {key} already in scope", do_checks)
     mt.restraints[scope][key] = ""
-
     
 
 def _add_restraint(
@@ -918,6 +1014,7 @@ def _add_restraint(
 
     restraint_key = _create_restraint_key(**locals())
     _add_restraint_to_restraintsdict(model_template, scope_key, restraint_key, restraint, do_checks)
+    return restraint_key
 
 def _create_restraint_key(restraint_base_name, updated_dict, scope_key, auto_rename: bool = False, **kwargs) -> str:
     fullname = restraint_base_name + "_0"

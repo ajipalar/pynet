@@ -27,11 +27,10 @@ def example1():
     add_point(model_template, point_name)
     #add_node_index(model_template, 0)
     
-    add_node_group(model_template, group)
-    model_template.build()
+    model_template.add_node_group(group)
+    #model_template.build()
     
     model_template.add_restraint(group, context_to_signature, logprob_example)
-    model_template.help_restraint(group)
     return model_template
 
 def example2():
@@ -85,11 +84,38 @@ def example5():
     m.add_point(scope_key)
     return m, mapping, scope_key
 
+def example6():
+    """
+    ModelParam Class
+    """
+
+    p = ModelParam('p', True)
+    d = {p: 0}
+    return d
+
+def example7():
+    m = ModelTemplate()
+    m.add_contiguous_nodes(0, 100)
+    m.add_node_group(tuple(range(0, 100)))
+    m.add_multivariate_normal_restraint(m.group_ids[0], x="y", mean="muy", cov="covy")
+    #m.add_multivariate_normal_restraint(m.group_ids[0], x="y", mean="muy", cov="covy")  # this throws an error to user as it should
+    m.add_multivariate_normal_restraint(m.group_ids[0], x="y", mean="muy", cov="covy", auto_rename=True)
+
+    return m
+
+def example8():
+    m = example7()
+    w = ModFileWriter(m)
+    s = w.to_restraint_lines()
+    h = w.Rheader()
+
+    return m, w, s, h
+
 
 def run_examples():
-    to_run = [example1, example2, example3]
-    
-    for example in to_run:
-        example()
+    start=1
+    stop = 8
+    for i in range(start, stop):
+        exec(f"example{i}()")
     
 
