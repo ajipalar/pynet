@@ -294,7 +294,7 @@ class ModelTemplate:
 
     def __init__(
         self, 
-        mover_domain, 
+        mover_domain,
         position: dict = mutable, 
         proposal: dict = mutable, 
         restraints: dict = mutable,
