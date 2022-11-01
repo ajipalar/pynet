@@ -294,12 +294,12 @@ class ModelTemplate:
 
     def __init__(
         self, 
+        mover_domain, 
         position: dict = mutable, 
         proposal: dict = mutable, 
         restraints: dict = mutable,
         restraints_metadata: dict = mutable,
         is_variable: dict = mutable,
-        mover_domain: dict = mutable, 
         group_ids: list = mutable,
         group_names: list = mutable,
         do_checks=True
