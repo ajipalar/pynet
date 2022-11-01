@@ -71,9 +71,9 @@ from functools import partial
 from enum import Enum, unique
 
 from inspect import getmembers, signature
-
 import pyile
 import lpdf
+import ulpdf
 
 # Mutable default args and kwargs
 mutable = object()
@@ -99,6 +99,7 @@ class R(Enum):
     a restraints form number
     """
     mvn = 0 # x, mean, cov params
+    wsh = 1 # S, nu, V
 
 class RParams(Enum):
     """
@@ -107,6 +108,7 @@ class RParams(Enum):
     They are ordered identically
     """
     mvn = ('x', 'mean', 'cov')
+    wsh = ('S', 'nu'  , 'V'  )
 
 @unique
 class Rinfo(Enum):
@@ -114,6 +116,7 @@ class Rinfo(Enum):
     name numeric n_params *r_params
     """
     mvn = (R.mvn.value, len(RParams.mvn.value), RParams.mvn.value) 
+    wsh = (R.wsh.value, len(RParams.wsh.value), RParams.wsh.value)
 
 
 RestraintNumberToBaseName = {form.value:name for name, form in R.__members__.items()} 
@@ -296,8 +299,9 @@ class ModelTemplate:
         restraints: dict = mutable,
         restraints_metadata: dict = mutable,
         is_variable: dict = mutable,
-        mover_domain
+        mover_domain: dict = mutable, 
         group_ids: list = mutable,
+        group_names: list = mutable,
         do_checks=True
     ):
         if position is mutable:
@@ -315,6 +319,8 @@ class ModelTemplate:
         if mover_domain is mutable:
             self.mover_domain = {}
 
+        # TODO: asociate names with groups - a unique group identifier
+
         self.position = position  # the keys of integer numbers are reserved for node ids
         self.proposal = proposal
         self.restraints = restraints
@@ -324,7 +330,6 @@ class ModelTemplate:
         self.do_checks = do_checks
         self.restraints_metadata = restraints_metadata
         
-
     def build(self, build_options: dict = mutable, do_checks=True):
         if build_options is mutable:
             build_options = {"position_as_dict": True}
@@ -332,7 +337,6 @@ class ModelTemplate:
         self.validate_nodes()
         self.validate_params()
         return _build_model(self, do_checks=do_checks, **build_options)
-
 
     def add_contiguous_nodes(self, start, stop):
         _assert_fun(start < stop, self.do_checks)
@@ -357,6 +361,10 @@ class ModelTemplate:
         restraint_key  = _add_restraint(self, scope_key, mapping, logprob_fn, self.do_checks, **options)
         self.add_metadata_to_restraints_metadata(scope_key, restraint_key, 'mapping', mapping)
 
+    def add_dof(self, scope_key, dof_name : str, init_value):
+        _assert_fun(dof_name not in self.position[scope_key], f"{dof_name} already in scope", self.do_checks)
+        self.position[scope_key][dof_name] = init_value  
+
     def add_multivariate_normal_restraint(self, 
                                           scope_key, 
                                           x: str,
@@ -368,7 +376,7 @@ class ModelTemplate:
                                           init_positions=mutable,
                                           auto_rename=False,
                                           allow_singular = None,
-                                          restraint_base_name=R.mvn.name):
+                                          restraint_base_name=R.wsh.name):
         model_template = self
         do_checks = self.do_checks
         _assert_fun(isinstance(x, str), f'x is not a string', self.do_checks)
@@ -388,7 +396,47 @@ class ModelTemplate:
                        is_variable=is_variable)
         self.add_metadata_to_restraints_metadata(scope_key, restraint_key, 'mapping', mapping)
 
-                       
+    def add_wishart_mvn_prior(self,
+                              scope_key,
+                              cov,  # scatter matrix
+                              nu: int, # dof
+                              L,  # scale matrix
+                              p: int,  # dimensionality
+                              cov_is_variable=True,
+                              nu_is_variable=False,
+                              L_is_variable=False,
+                              init_positions=mutable,
+                              auto_rename=False,
+                              restraint_base_name=R.wsh.name):
+        """
+        Params :
+          scope_key : keys position dict
+          cov : covariance matrix
+          nu  : dof
+          L   : lower cholesky of V scale matrix
+          p   : V is (p, p) matrix
+
+
+        """
+        _assert_fun(isinstance(cov, str), f'cov is not a string', self.do_checks)
+        _assert_fun(isinstance(nu, str), f'nu is not a string', self.do_checks)
+        _assert_fun(isinstance(L, str), f'L is not a string', self.do_checks)
+
+        mapping = {cov:'cov' , nu:'nu' , L:'L' }
+        f = partial(ulpdf.wishart_mvn_prior, p=p)
+        f.__name__ = "wsh"
+        is_variable = {'cov': cov_is_variable, 'nu': nu_is_variable, 'L': L_is_variable}
+
+        restraint_key = _add_restraint(self,
+                                       scope_key=scope_key,
+                                       mapping=mapping,
+                                       logprob_fn=f,
+                                       do_checks=self.do_checks,
+                                       init_positions=init_positions,
+                                       restraint_base_name=restraint_base_name,
+                                       auto_rename=auto_rename,
+                                       is_variable=is_variable)
+
     def add_node_group(self, indices, init_params: dict = mutable):
         if init_params is mutable:
             init_params = {}
@@ -1026,7 +1074,7 @@ def _create_restraint_key(restraint_base_name, updated_dict, scope_key, auto_ren
                 new_name = f"{restraint_base_name}_{b}"
                 b += 1
         else:
-            assert False, "{restraint_base_name} already in scope. Change name or set auto_rename=True"
+            assert False, f"{restraint_base_name} already in scope. Change name or set auto_rename=True"
         return new_name
     else:
         return fullname 

@@ -19,6 +19,18 @@ def mvn_bart_inv(x, mu, A, L):
     The unormalized log-pdf of the multivariate normal distribution using the precision matrix parameterizations 
     """
 
+def wishart_mvn_prior(cov, nu, L, /, p):
+    """
+    cov - the covariance matrix of a mvn
+    nu  - degrees of freedom
+    L   - the cholesky factor of V
+    p   - the rank
+    """
+
+    cov_inv = inv(cov)
+    return wish_bart_from_S(cov_inv, nu, L, p) 
+    
+
 def wish_bart(A, nu, L, p):
     """
     The unormalized log pdf of the wishart distribution using bartlett decomposition
@@ -45,9 +57,8 @@ def wish_bart(A, nu, L, p):
     inv(LL^T) @ LA(LA)^T
     inv(L^T)inv(L) @ LA @ (LA)^T
     int(L^T) @ A @ A^T @ L^T
-    
-
     """
+
     log_det_V = 2 * _log_det_tri(L)
     log_det_S = 2 * _log_det_tri(A) + log_det_V 
     trace_term = - _trace_term(L, A)
