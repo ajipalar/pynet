@@ -14,8 +14,6 @@ from jax.random import (
         normal
 )
 
-
-
 def chi2(key, k, shape=None, dtype=None):
     """
     Sample a chi2 distributed random variate
@@ -194,11 +192,3 @@ def GWishart(key, K_star, A, J):
     W = jax.lax.fori_loop(1, J, body_fun, W)
     K = inv(W) # 4.
     return K
-
-
-
-
-
-
-    
-

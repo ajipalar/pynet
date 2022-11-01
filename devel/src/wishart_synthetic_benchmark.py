@@ -19,6 +19,11 @@ import pyext.src.stats as stats
 # Flags
 
 
+def check_cov(m):
+    assert np.alltrue(m[np.diag_indices(len(m))] > 0), f"fail : diag"
+    assert mat.is_positive_definite(m), f"fail pos"
+
+
 def scatter_plot(x, y, title=None, N=1000, xy=None):
     assert len(x) == len(y)
     N = len(x)
@@ -102,6 +107,7 @@ def randPOSDEFMAT(key, p):
     A = A + jnp.eye(p) * p
     return A
 
+
 def quad_plot_prelude(prior_mat_stat_df, ground_truth, n, n_samples, font_rc, **kwargs):
     Kstats = get_precision_matrix_stats(ground_truth, n=n)
     names = ["rowsum", "medians", "vars", "means", "mins", "maxs", "absdets"]
@@ -111,18 +117,26 @@ def quad_plot_prelude(prior_mat_stat_df, ground_truth, n, n_samples, font_rc, **
 
     return Kstats, names, prior_mat_stat_df
 
-def helper_vline_hist(ax, vx, ymin, ymax, vals, vlabel, hlabel, vcolor, hcolor, bins,
-                      ylabel, xlabel):
+
+def helper_vline_hist(
+    ax, vx, ymin, ymax, vals, vlabel, hlabel, vcolor, hcolor, bins, ylabel, xlabel
+):
     ax.set_xlabel(xlabel)
     ax.hist(vals, bins=bins, label=hlabel, facecolor=hcolor)
     ax.set_ylabel(ylabel)
-    ax.vlines(
-        ymin=ymin, ymax=ymax, x=vx, color=vcolor, label=vlabel
-    )
+    ax.vlines(ymin=ymin, ymax=ymax, x=vx, color=vcolor, label=vlabel)
 
 
-
-def quad_plot(prior_mat_stat_df, ground_truth, n, n_samples, font_rc, p, suptitle: str =None, **kwargs):
+def quad_plot(
+    prior_mat_stat_df,
+    ground_truth,
+    n,
+    n_samples,
+    font_rc,
+    p,
+    suptitle: str = None,
+    **kwargs,
+):
     Kstats = get_precision_matrix_stats(ground_truth, n=n, p=p)
     names = ["rowsum", "medians", "vars", "means", "mins", "maxs", "absdets"]
 
@@ -260,3 +274,157 @@ def df_from_stats(stats, n):
     }
 
     return pd.DataFrame(data=data)
+
+
+def do_gridplot(
+    exp,
+    scale=6,
+    w=1.5,
+    h=1,
+    bins=30,
+    hcolor="steelblue",
+    vcolor="darkorange",
+    font_rc={"size": 16, "family": "sans-serif"},
+    check_finite=True,
+    decomposition="eigh",
+):
+
+    w = w * scale
+    h = h * scale
+
+    if decomposition == "eigh":
+
+        def decomp(x):
+            return sp.linalg.eigh(x, eigvals_only=True, check_finite=check_finite)
+
+    elif decomposition == "svd":
+
+        def decomp(x):
+            U, s, VH = sp.linalg.svd(x)
+            return s
+
+    elif decomposition == "prec":
+
+        def decomp(x):
+            return x[np.diag_indices(len(x))]
+
+    ground_truth = decomp(exp.cov_inv)
+
+    eigs = np.zeros((len(exp.samples.samples), exp.p))
+
+    for i in range(len(exp.samples.samples)):
+        eigs[i] = decomp(exp.samples.samples[i])
+
+    assert len(exp.cov) % 2 == 0, f"rank cov is odd"
+    m = int(np.sqrt(len(exp.cov)))
+    fig, axs = plt.subplots(m, m, layout="constrained")
+    fig.set_figheight(h)
+    fig.set_figwidth(w)
+
+    count = -1
+    axs[0, 0].set_ylabel("Frequency")
+
+    for i in range(m):
+        for j in range(m):
+            count += 1
+            ax = axs[i, j]
+            eigvals = eigs[:, count]
+            vx = ground_truth[count]
+            ymin = 0
+
+            vlabel = f"K eigenvalues" if count == m * m - 1 else None
+            hlabel = f"prior samples" if count == m * m - 1 else None
+
+            # helper_vline_hist(ax, vx, ymin, ymax, eigvals, vlabel, hlabel,
+            # vcolor, hcolor, bins, ylabel=None, xlabel=None)
+
+            truth = ground_truth[count]
+            ax.hist(eigvals, bins=bins, label=hlabel, facecolor=hcolor)
+            ymax = ax.get_ylim()[1]
+            ax.vlines(x=truth, ymin=0, ymax=ymax, color=vcolor)
+
+            if decomposition == "eigh":
+                s = "\u03BB"
+
+            elif decomposition == "svd":
+                s = "\u03C3"
+
+            elif decomposition == "prec":
+                s = f"p"
+
+            SUB = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+            s = s + str(count + 1)
+            s = s.translate(SUB)
+            ax.set_xlabel(s)
+            # ax.scatter(x, y)
+
+            plt.suptitle(f"N={n_samples}")
+    # plt.legend()
+    plt.show()
+
+
+def ground_truth_pair_plot(
+    A,
+    K,
+    title1="",
+    title2="",
+    cmap1="nipy_spectral",
+    cmap2="CMRmap",
+    factor=1.0,
+    vmin1=None,
+    vmax1=None,
+    vmin2=None,
+    vmax2=None,
+    overwrite_diags=True,
+):
+    font_rc = {"size": 14, "family": "sans-serif"}
+
+    scale = 16
+    w = 1 * scale
+    h = 1 * scale
+    cbar_scale = 0.35
+
+    fig, axs = plt.subplots(
+        1,
+        2,
+        gridspec_kw={"width_ratios": [1, 1], "height_ratios": [1]},
+        layout="constrained",
+    )
+
+    plt.rc("font", **font_rc)
+    fig.set_figheight(h)
+    fig.set_figwidth(w)
+    ax = axs[0]
+
+    if not vmin1:
+        vmin1 = np.min(A)
+    if not vmax1:
+        vmax1 = 2 * np.median(A)
+
+    covim = ax.imshow(A, vmin=vmin1, vmax=vmax1, cmap=cmap1)
+    fig.colorbar(covim, ax=ax, location="left", shrink=cbar_scale)
+    ax.set_title(title1)
+    # ax.legend()
+
+    ax = axs[1]
+    ax.set_title(title2)
+
+    # if type(cmap2) == str:
+    #     cmap2 = matplotlib.colors.Colormap(cmap2)
+    K_plot = K.copy()
+
+    if overwrite_diags:
+        K_plot[np.diag_indices(len(K_plot))] = np.max(np.tril(K_plot, k=-1))
+
+    if not vmin2:
+        vmin2 = np.min(K_plot)
+    if not vmax2:
+        vmax2 = None
+    precim = ax.imshow(K_plot, vmin=vmin2, vmax=vmax2, cmap=cmap2)
+
+    # bounds = [-1/factor, 1/factor]
+    # cnorm = matplotlib.colors.BoundaryNorm(bounds, cmap2.N)
+
+    fig.colorbar(precim, ax=ax, location="right", shrink=cbar_scale)
+    # plt.suptitle(, y=0.75)
+    return fig, axs

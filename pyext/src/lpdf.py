@@ -3,7 +3,7 @@ Jittable log probability density functions
 The log base is e
 """
 import jax.scipy.stats as stats
-from _lpdf import mvn_bart # TODO: implement this
+#from _lpdf import mvn_bart # TODO: implement this
 
 
 def beta(x, a, b, loc=0, scale=1, /):
@@ -41,7 +41,6 @@ def norm(x, loc=0, scale=1, /):
 
 def pareto(x, b, loc=0, scale=1, /):
     return stats.pareto.logpdf(x, b, loc, scale)
-
 
 def t(x, df, loc=0, scale=1, /):
     return stats.t.logpdf(x, df, loc, scale)

@@ -11,7 +11,9 @@ def list_to_string(l: list):
     l = [str(i) for i in l]
     return " ".join(l)
 
-
 def dict_to_namedtuple(d: dict, name: str = "MyTuple"):
     MyTuple = namedtuple(name, d)
     return MyTuple(**d)
+
+
+

@@ -202,17 +202,15 @@ def logfactorial(n: Union[int, float]):
         logfac += np.log(i)
     return logfac
 
+
 def logfactorial_dev(n: int) -> float:
     """
     returns ln(n!)
     n must be a positive integer
     """
 
-    logn = jax.lax.fori_loop(1, n+1, (lambda i, logn: logn + jnp.log(i)), 0.)
+    logn = jax.lax.fori_loop(1, n + 1, (lambda i, logn: logn + jnp.log(i)), 0.0)
     return logn
-
-
-
 
 
 def get_logfacx_lookuptable(x: Array1d):
@@ -228,7 +226,9 @@ def get_eta2__s(theta: Array1d, phi: ArraySquare, x: Array1d):
 
     def get_eta2__j(theta: Array1d, phi: ArraySquare, x: Array1d, i: Index):
         #         sa em                      mm
-        return theta[i] + 2 * (rm_i__j(arr=phi[:, i], i=i) @ jnp.sqrt(rm_i__j(arr=x, i=i)))
+        return theta[i] + 2 * (
+            rm_i__j(arr=phi[:, i], i=i) @ jnp.sqrt(rm_i__j(arr=x, i=i))
+        )
 
     return get_eta2__j
 
@@ -242,20 +242,22 @@ def get_exponent__s(theta: Array1d, phi: ArraySquare, x: Array1d) -> JitFunc:
         theta: Array1d, phi: ArraySquare, x: Array1d, i: Index, logfacx: Callable
     ) -> uLogScore:
         """Returns the log unormalized score for poisson sqr
-          
-           --eta1--  -xi-   -eta2-  -sqrt xi-   + (log base measure) 
-           phi[i,i] * x[i] + eta2 * sqrt(x[i])      - log x[i]!
 
-           params:
-             theta: d dimensional real array
-             phi: d x d dimensional real array
-             x: d dimensional non-negative integer array
-             i: float, index
-           returns:
-             u_log_score: float
+        --eta1--  -xi-   -eta2-  -sqrt xi-   + (log base measure)
+        phi[i,i] * x[i] + eta2 * sqrt(x[i])      - log x[i]!
+
+        params:
+          theta: d dimensional real array
+          phi: d x d dimensional real array
+          x: d dimensional non-negative integer array
+          i: float, index
+        returns:
+          u_log_score: float
         """
         return (
-            phi[i, i] * x[i] + eta2__j(theta=theta, phi=phi, x=x, i=i) * jnp.sqrt(x[i]) - logfacx[i]
+            phi[i, i] * x[i]
+            + eta2__j(theta=theta, phi=phi, x=x, i=i) * jnp.sqrt(x[i])
+            - logfacx[i]
         )
 
     get_exponent__j = partial(get_exponent__j, logfacx=logfacx)
@@ -390,7 +392,7 @@ def T1__j(
         The number of steps the Metropolis Hastings algorithm should take
       d:
         The dimensionality of the problem
-      rgen_theta : (K, SHAPE) -> 
+      rgen_theta : (K, SHAPE) ->
 
     Returns:
       theta:
@@ -450,12 +452,13 @@ def T1_nsteps_mh__s(f: Callable, nsteps: int, d: Dimension, T1__j=T1__j) -> JitF
 
     return T1_nsteps_mh__j
 
+
 def T_gibbs__s(theta, phi, x, n_gibbs_steps, get_eta2__j) -> Callable[Any, float]:
 
     """A gibbs sampler for the transition distribtuion within the AIS sampling algorithm
 
        params:
-         theta: 1dArray 
+         theta: 1dArray
            A paramter array implementing a vector
          Phi: 2dArray
            A 2d parameter array implementing a square symmetric matrix
@@ -498,9 +501,8 @@ def T_gibbs__s(theta, phi, x, n_gibbs_steps, get_eta2__j) -> Callable[Any, float
     """
 
     def gibbs_loop_body__s(key, y, theta, phi, get_eta2__j: Callable, d) -> Callable:
-
         def body(s, params) -> tuple:
-            keys, y, theta, phi, spec_counts_array  = params
+            keys, y, theta, phi, spec_counts_array = params
             natural_rate = get_eta2__j(theta, phi, y, s)
             lam = jnp.exp(nartual_rate)
             xs = jax.random.poisson(keys[s], lam)
@@ -519,12 +521,15 @@ def T_gibbs__s(theta, phi, x, n_gibbs_steps, get_eta2__j) -> Callable[Any, float
 
         init_params = ...
 
-        gibbs_loop_body__j = partial(gibbs_loop_body__s, get_eta2__j=get_eta2__j, d=d, body=body)
+        gibbs_loop_body__j = partial(
+            gibbs_loop_body__s, get_eta2__j=get_eta2__j, d=d, body=body
+        )
 
-        T_gibss__j = jax.lax.fori_loop(0, n_gibbs_steps, gibbs_loop_body__j, init_params)
+        T_gibss__j = jax.lax.fori_loop(
+            0, n_gibbs_steps, gibbs_loop_body__j, init_params
+        )
 
         return gibbs_loop_body__j
-
 
     gibbs_loop_body__j = gibbs_loop_body__s(key, y, theta, phi, get_eta2__j, d, body)
     return gibbs_loop_body__j
@@ -534,83 +539,80 @@ def T__j(key, theta, phi, x_prime, n_gibbs_steps) -> float:
     """Generate a sample x ~ T(x | x')"""
 
     # Do Gibbs Sampling n_steps times
-      
-      # Slice sample
-    
-      # Slice sample
 
+    # Slice sample
 
+    # Slice sample
 
     # Evaluate the score function f(theta, phi, x)
-    
 
     return x
-    
 
 
 #### Helper Functions for the Gibbs sampling Alagorithm of the Poisson SQR Model ###
 
+
 def get_poisson_sqr_node_conditional_rv__s(key, theta, phi, x, i, get_eta2__j):
     """The node conditional distributions are proportional to
-       the univariate poisson distribution with respect to eta1 and eta2
+    the univariate poisson distribution with respect to eta1 and eta2
 
-       Meaning that if we hold theta, phi, and all x_minus s not xs constant
+    Meaning that if we hold theta, phi, and all x_minus s not xs constant
 
-       then xs is distrbuted according to some exponential family distribution (poisson or base exponential) and can be sampled
-       Performing this sequentially should yield a gibbs sampler.
+    then xs is distrbuted according to some exponential family distribution (poisson or base exponential) and can be sampled
+    Performing this sequentially should yield a gibbs sampler.
 
-       Specifically begin
+    Specifically begin
 
-       (x0, x1, x2, x3, ..., xN) = x
+    (x0, x1, x2, x3, ..., xN) = x
 
-       x0' ~ p(x0 | theta, phi, x1...xN)
-       x1' ~ p(x1 | theta, phi, x0', x2,...xN)
-       ...
-       xN' ~ p(xN | theta, phi, x0',..., xN-1')
+    x0' ~ p(x0 | theta, phi, x1...xN)
+    x1' ~ p(x1 | theta, phi, x0', x2,...xN)
+    ...
+    xN' ~ p(xN | theta, phi, x0',..., xN-1')
 
-       x = (x0', x1', x2', x3', ..., xN')
-       repeat for N gibbs steps
-
-       
-       params:
-         key:
-           A jax.PRNGKeyArray
-         theta:
-           Parameter vector of length d
-         phi:
-           Parameter matrix of size d x d
-         x:
-           A data vector of length d
-         i:
-          an index from [0, d)
-         get_eta2__j:
-           a jittable function whose signature is (theta, phi, x, i) -> float
+    x = (x0', x1', x2', x3', ..., xN')
+    repeat for N gibbs steps
 
 
-       Proof
+    params:
+      key:
+        A jax.PRNGKeyArray
+      theta:
+        Parameter vector of length d
+      phi:
+        Parameter matrix of size d x d
+      x:
+        A data vector of length d
+      i:
+       an index from [0, d)
+      get_eta2__j:
+        a jittable function whose signature is (theta, phi, x, i) -> float
 
-       Pr(x| lambda) = lambda^x exp{-lambda) / x!
-                     = exp{ log(lambda ^x) - log(x!) -lambda}
-                     = exp{ x*log(lambda) + (- log(x!)) -lambda}
-                     = exp{ eta*x + B(x) -lambda}
 
-       Pr(x|eta) = exp(eta * x -log(x!) -exp(eta))
-         eta = log(lambda)
-         B(x) = -log(x!)
-         A(eta) = exp(eta)
+    Proof
 
-       
-       The Node Conditional Distribution for the Poisson Square Root Graphical Model
-       is given by equation 5)
-       
-         xs: x at s e.g., x[s]
-         x_s: x minus s
+    Pr(x| lambda) = lambda^x exp{-lambda) / x!
+                  = exp{ log(lambda ^x) - log(x!) -lambda}
+                  = exp{ x*log(lambda) + (- log(x!)) -lambda}
+                  = exp{ eta*x + B(x) -lambda}
 
-       5) Pr(xs| x_s, theta, phi) = exp(eta1*sqrt(xs) + eta2*sqrt(xs) + B(xs) - Anode(eta))
+    Pr(x|eta) = exp(eta * x -log(x!) -exp(eta))
+      eta = log(lambda)
+      B(x) = -log(x!)
+      A(eta) = exp(eta)
 
-       Or equivalently by equation 4)
 
-       If eta2 == 0 then the node conditionals are the base exponential family distribution
+    The Node Conditional Distribution for the Poisson Square Root Graphical Model
+    is given by equation 5)
+
+      xs: x at s e.g., x[s]
+      x_s: x minus s
+
+    5) Pr(xs| x_s, theta, phi) = exp(eta1*sqrt(xs) + eta2*sqrt(xs) + B(xs) - Anode(eta))
+
+    Or equivalently by equation 4)
+
+    If eta2 == 0 then the node conditionals are the base exponential family distribution
 
     """
 
@@ -622,50 +624,48 @@ def get_poisson_sqr_node_conditional_rv__s(key, theta, phi, x, i, get_eta2__j):
     # a = phi_ii * xi + (theta_i + 2*phi_i,-i * sqrt(x_-i)
 
 
-
 def ais__j(
     key: PRNGKeyArray, d: Dimension, nsamples: int, ninterpol: int, T: Callable
 ) -> tuple[Array]:
-    
 
     """Annealed Importance Sampling from Radford M Neal 1997
-       Indicies as defined in Neal 1997
+    Indicies as defined in Neal 1997
 
-       x: theta, phi, y
-       points 1...N where N=nsamples
-       i ranges from 1...N
-       
-       w(i) an importance weight = f(x(i))/g(x(i))
+    x: theta, phi, y
+    points 1...N where N=nsamples
+    i ranges from 1...N
 
-       0<j<n where pn = starting distribution
-       p0 = final distribtuion
+    w(i) an importance weight = f(x(i))/g(x(i))
 
-       pn is the Base independant exponential distribution
-       p0 is the Full Poisson SQR distribtuion
+    0<j<n where pn = starting distribution
+    p0 = final distribtuion
 
-       A0 = log Z0
+    pn is the Base independant exponential distribution
+    p0 is the Full Poisson SQR distribtuion
 
-       A0 = log 1/N Sum(weights) * Zn
+    A0 = log Z0
 
-       Zn -> Evaluate and implement using scipy (not jax yet)
-         for complex valued functions
+    A0 = log 1/N Sum(weights) * Zn
 
-       
-       Fixing theta and phi
+    Zn -> Evaluate and implement using scipy (not jax yet)
+      for complex valued functions
 
-         1. Generate a Spectral counts sample from Base Exp yn-1
 
-         2. Have yn-1, theta, phi 
+    Fixing theta and phi
 
-         3. Tn-1 - assign theta, phi, yn-1
-            
-            3a. Assign the sequence yn-2 according to n_gibbs_steps
+      1. Generate a Spectral counts sample from Base Exp yn-1
 
-        Parameters:
-          T:
-            A callable transition distribution with the signature T(key, x)
-            What is x? T(key, x) -> x. The scoring function is encoded in the distribution T
-                
+      2. Have yn-1, theta, phi
+
+      3. Tn-1 - assign theta, phi, yn-1
+
+         3a. Assign the sequence yn-2 according to n_gibbs_steps
+
+     Parameters:
+       T:
+         A callable transition distribution with the signature T(key, x)
+         What is x? T(key, x) -> x. The scoring function is encoded in the distribution T
+
 
     """
 
@@ -681,7 +681,6 @@ def ais__j(
     keys = jnp.zeros((ninterpol + 1, 2), dtype=jnp.uint32)
     keys = keys.at[0].set(key)
 
-
     def set_phi_diag(i, val):
         phi, phi_tilde = val
 
@@ -690,7 +689,6 @@ def ais__j(
         phi, phi_tilde = val
 
         return val
-
 
     for i in range(0, nsamples):
 
@@ -715,7 +713,7 @@ def ais__j(
             # It is a random number generator
 
             x = T(keys[j + 1], theta_tilde, phi_tilde, x)
-            
+
             # x' ~ T(x'| x)
             # MH scoref
             # gamma * theta, phi_off * gamma + phi_diag
@@ -749,18 +747,19 @@ def plot_surface(x, y, z, import_dependencies=False):
         from matplotlib.ticker import LinearLocator
         import numpy as np
 
-    fig, ax = plt.subplots(subplot_kw={'projection': "3d"})
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 
     surf = ax.plot_surface(x, y, z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
 
     # ax.set_zlim(-1.01, 1.01)
     ax.zaxis.set_major_locator(LinearLocator(10))
 
-    ax.zaxis.set_major_formatter('{x:.02f}')
+    ax.zaxis.set_major_formatter("{x:.02f}")
 
     fig.colorbar(surf, shrink=0.5, aspect=5)
 
     plt.show()
+
 
 def pstar(x, xarr, theta, phi, i, get_exponent__j) -> float:
     """
@@ -775,12 +774,13 @@ def pstar(x, xarr, theta, phi, i, get_exponent__j) -> float:
     xarr_internal = xarr.at[i].set(x)
     return jnp.exp(get_exponent__j(theta=theta, phi=phi, x=xarr_internal, i=i))
 
+
 def get_lambda(eta: float) -> float:
 
     """
     Inverse mapping for univariate poisson disitrbution
 
-    lambda is the 
+    lambda is the
 
     params:
       eta: float
@@ -793,26 +793,29 @@ def get_lambda(eta: float) -> float:
 
     return jnp.exp(eta)
 
+
 def get_node_conditional_interval() -> tuple:
     """
     Closed form solution to get the interval for
     the node conditional (univariate poisson) distribution.
 
-    
+
 
     """
 
     ...
 
-def slice_sweep_log__s(key, 
-        x: float, 
-        lpstar: Callable, 
-        w: float, 
-        lpstar_args: tuple = (), 
-        lpstar_kwargs: dict = {},
-        update_lpstar_args: Callable=(lambda pt: ()),
-        update_lpstar_kwargs: Callable=(lambda pt: {})
-        ) -> tuple:
+
+def slice_sweep_log__s(
+    key,
+    x: float,
+    lpstar: Callable,
+    w: float,
+    lpstar_args: tuple = (),
+    lpstar_kwargs: dict = {},
+    update_lpstar_args: Callable = (lambda pt: ()),
+    update_lpstar_kwargs: Callable = (lambda pt: {}),
+) -> tuple:
 
     """
 
@@ -822,39 +825,51 @@ def slice_sweep_log__s(key,
     p*(x) = e^f(x)
     f(x) = log(p*(x))
 
-    
+
     """
 
-    def create_interval_step_out(key, x, w, lpstar, u_prime, lpstar_args=(), lpstar_kwargs={}) -> tuple[float, float]:
+    def create_interval_step_out(
+        key, x, w, lpstar, u_prime, lpstar_args=(), lpstar_kwargs={}
+    ) -> tuple[float, float]:
         """Create the interval I=(L,R) using the stepping out method McKay 375"""
         r = jax.random.uniform(key, minval=0, maxval=1)
-        
+
         xl = x - r * w
         xr = x + (1 - r) * w
-        
-        xl = jax.lax.while_loop(lambda xl: lpstar(xl, *pstar_args, **pstar_kwargs) > u_prime, lambda xl: xl - w, xl)
-        xr = jax.lax.while_loop(lambda xr: lpstar(xr, *pstar_args, **pstar_kwargs) > u_prime, lambda xr: xr + w, xr)
+
+        xl = jax.lax.while_loop(
+            lambda xl: lpstar(xl, *pstar_args, **pstar_kwargs) > u_prime,
+            lambda xl: xl - w,
+            xl,
+        )
+        xr = jax.lax.while_loop(
+            lambda xr: lpstar(xr, *pstar_args, **pstar_kwargs) > u_prime,
+            lambda xr: xr + w,
+            xr,
+        )
         return xl, xr
 
-    def create_interval_large(key, x, w, pstar, pstar_args=(), pstar_kwargs={}) -> tuple[float, float]:
+    def create_interval_large(
+        key, x, w, pstar, pstar_args=(), pstar_kwargs={}
+    ) -> tuple[float, float]:
         """This method creates the interval by selecting the entire range of reasonable x values.
-           This method is not preffered because the probability mass of the poisson sqr model
-           node conditional distribution typically falls within a narrower region. """
+        This method is not preffered because the probability mass of the poisson sqr model
+        node conditional distribution typically falls within a narrower region."""
 
-        return 0., 1e4
+        return 0.0, 1e4
 
     def step4_loop_body(val):
-        
+
         # step 5 draw x'
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val 
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val
         key, subkey = jax.random.split(key)
         x_prime = jax.random.uniform(subkey, minval=xl, maxval=xr)
-        
+
         # step 6 evaluate pstar(x')
         t = pstar(x_prime)
-        
+
         # step 7
-        
+
         val = key, x, x_prime, xl, xr, u_prime, t, loop_break
         val = step7_and_8(val)
         return val
@@ -867,86 +882,103 @@ def slice_sweep_log__s(key,
 
     def step8(val):
         """Perform the shrinking method for step 8"""
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val       
-        
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val
+
         x_prime, x, xr, xl = jax.lax.cond(
-            x_prime > x, 
-            lambda x_prime, x, xr, xl: (x_prime, x, x_prime, xl),  # reduce the right side
-            lambda x_prime, x, xr, xl: (x_prime, x, xr, x_prime),  # reduce the left side
-            *(x_prime, x, xr, xl))
-        
+            x_prime > x,
+            lambda x_prime, x, xr, xl: (
+                x_prime,
+                x,
+                x_prime,
+                xl,
+            ),  # reduce the right side
+            lambda x_prime, x, xr, xl: (
+                x_prime,
+                x,
+                xr,
+                x_prime,
+            ),  # reduce the left side
+            *(x_prime, x, xr, xl)
+        )
+
         return key, x, x_prime, xl, xr, u_prime, t, loop_break
-    
+
     def step7_and_8(val):
         val = jax.lax.cond(
-            val[6] > val[5], # p*(x')>u'
-            step7_true_func, # do nothing. Break out of loop
-            step8, # step 8 modify the interval (xl, xr)
-            val)
-        
+            val[6] > val[5],  # p*(x')>u'
+            step7_true_func,  # do nothing. Break out of loop
+            step8,  # step 8 modify the interval (xl, xr)
+            val,
+        )
+
         return val
-    
+
     k1, k2, k3, k4 = jax.random.split(key, 4)
     # step 1 evaluate lpstar(x). -inf < u < inf
     u = lpstar(x, *lpstar_args, **lpstar_kwargs)
-    
+
     # step 2 draw a vertical coordinate
     # Because -inf is not a valid minval we truncate
     # u must be > -20
     u_prime = jax.random.uniform(k1, minval=-20, maxval=u)
-    
+
     # step 3 create a horizontal interval (xl, xr) enclosing x
-    xl, xr = create_interval_step_out(key=k2, x=x, w=w, pstar=pstar, 
-            u_prime=u_prime, pstar_args=pstar_args, pstar_kwargs=pstar_kwargs)
-    
+    xl, xr = create_interval_step_out(
+        key=k2,
+        x=x,
+        w=w,
+        pstar=pstar,
+        u_prime=u_prime,
+        pstar_args=pstar_args,
+        pstar_kwargs=pstar_kwargs,
+    )
+
     # step 4 loop 1st iteration
-    
+
     loop_break = False
-    
+
     # step 5 draw x'
     x_prime = jax.random.uniform(k3, minval=xl, maxval=xr)
 
-    #Optional update to pstar args and kwargs
+    # Optional update to pstar args and kwargs
 
     pstar_args = update_pstar_args((x_prime, pstar_args, pstar_kwargs))
     pstar_kwargs = update_pstar_kwargs((x_prime, pstar_args, pstar_kwargs))
-    
+
     # step 6 evaluate pstar(x')
     t = pstar(x_prime, *pstar_args, **pstar_kwargs)
-    
 
     # step 7 if pstar(x') > u' break out of loop. else modify interval
-    
+
     val = k4, x, x_prime, xl, xr, u_prime, t, loop_break
     val = step7_and_8(val)
 
-    
     # End 1st loop iteration
     # Continue the loop executing the while loop
-    
+
     def while_cond_func(val):
         """Check the loop break condition,
-           terminate the loop if True"""
+        terminate the loop if True"""
         key, x, x_prime, xl, xr, u_prime, t, loop_break = val
         return loop_break == False
-    
+
     val = jax.lax.while_loop(
-        while_cond_func, # check the loop break condition
-        step4_loop_body, 
-        val) # u_prime <= p*(x') i.e., t
-        
+        while_cond_func, step4_loop_body, val  # check the loop break condition
+    )  # u_prime <= p*(x') i.e., t
+
     return val
 
 
-def slice_sweep__s(key, 
-        x: float, 
-        pstar: Callable, 
-        w: float, 
-        pstar_args: tuple = (), 
-        pstar_kwargs: dict = {},
-        update_pstar_args: Callable=(lambda pt: ()),
-        update_pstar_kwargs: Callable=(lambda pt: {})
-        ) -> tuple:
+def slice_sweep__s(
+    key,
+    x: float,
+    pstar: Callable,
+    w: float,
+    pstar_args: tuple = (),
+    pstar_kwargs: dict = {},
+    update_pstar_args: Callable = (lambda pt: ()),
+    update_pstar_kwargs: Callable = (lambda pt: {}),
+) -> tuple:
 
     """
 
@@ -963,33 +995,33 @@ def slice_sweep__s(key,
     Out: (key, x, x_prime, xl, xr, u_prime, t, loop_break)
 
     Params:
-    
-      key: 
+
+      key:
         A jax.random.PRNGKeyArray
-      x: 
+      x:
         A starting coordinate for the sweep within the domain of pstar
-      pstar: 
+      pstar:
         A univariate (1-dimensional) probability mass or density function of one parameter.
         p(x)=1/Z*pstar(x). Thus pstar does not have to be normalized
 
         Siganture constraint
 
-      
-      
+
+
         pstar args and kwargs are specified so that pstar may be entirely generic.
         These pytrees may change value but not shape
         slice_sweep__s is jittable after specialization on pstar
-      
-      
+
+
       pstar_args[optional]: tuple (jax pytree)
         The *args to pstar that consist of fixed size arrays. Immutable.
 
       pstar_kwargs[optional]: dict (jax pytree)
-        The **kwargs to pstar. Immutable. 
+        The **kwargs to pstar. Immutable.
 
       w: A
         weight parameter for the stepping our algorithm in step 3.
-      
+
     Returns:
       x_prime, u_prime
                   _______          _______
@@ -998,14 +1030,14 @@ def slice_sweep__s(key,
 
     Constraints:
       pstar(x: float, *pstar_args, **pstar_kwargs)
-    
+
     Maps a point x, u under the density function pstar to x' u'
 
     This function is meant to be jit compiled to XLA using Jax.
     The default update functions update_pstar_args and update_pstar_kwargs
     return empty args and kwargs containers.
-    Therefore they do not effect the jaxpr representation. 
-    
+    Therefore they do not effect the jaxpr representation.
+
     Folowing David MacKay Book
 
     Advantages:
@@ -1014,14 +1046,14 @@ def slice_sweep__s(key,
     Automatically adjusts the step size to match the local shape
     of the density function.
     Easier to implement than gibbs.
-  
+
     Random variates exhibit seriel statistical dependance.
-  
+
     For P(x) = 1/Z * P*(x)
     Thus P*(x) \propto P(x)
-  
+
     MacKay Pseudocode
-  
+
     1. evaluate P*(x)
     2. draw a vertical coordinate u' ~ Uniform(0, P*(x))  Note 0 < u' < p*(x)
     3. create a horizontal interval (xl, xr) enclosing x
@@ -1031,39 +1063,51 @@ def slice_sweep__s(key,
     7.   if P*(x') > u' break out of loop 4-9
     8.   else modify the interval (xl, xr)
     }
-    
+
     """
 
-    def create_interval_step_out(key, x, w, pstar, pstar_args=(), pstar_kwargs={}) -> tuple[float, float]:
+    def create_interval_step_out(
+        key, x, w, pstar, pstar_args=(), pstar_kwargs={}
+    ) -> tuple[float, float]:
         """Create the interval I=(L,R) using the stepping out method McKay 375"""
         r = jax.random.uniform(key, minval=0, maxval=1)
-        
+
         xl = x - r * w
         xr = x + (1 - r) * w
-        
-        xl = jax.lax.while_loop(lambda xl: pstar(xl, *pstar_args, **pstar_kwargs) > u_prime, lambda xl: xl - w, xl)
-        xr = jax.lax.while_loop(lambda xr: pstar(xr, *pstar_args, **pstar_kwargs) > u_prime, lambda xr: xr + w, xr)
+
+        xl = jax.lax.while_loop(
+            lambda xl: pstar(xl, *pstar_args, **pstar_kwargs) > u_prime,
+            lambda xl: xl - w,
+            xl,
+        )
+        xr = jax.lax.while_loop(
+            lambda xr: pstar(xr, *pstar_args, **pstar_kwargs) > u_prime,
+            lambda xr: xr + w,
+            xr,
+        )
         return xl, xr
 
-    def create_interval_large(key, x, w, pstar, pstar_args=(), pstar_kwargs={}) -> tuple[float, float]:
+    def create_interval_large(
+        key, x, w, pstar, pstar_args=(), pstar_kwargs={}
+    ) -> tuple[float, float]:
         """This method creates the interval by selecting the entire range of reasonable x values.
-           This method is not preffered because the probability mass of the poisson sqr model
-           node conditional distribution typically falls within a narrower region. """
+        This method is not preffered because the probability mass of the poisson sqr model
+        node conditional distribution typically falls within a narrower region."""
 
-        return 0., 1e4
+        return 0.0, 1e4
 
     def step4_loop_body(val):
-        
+
         # step 5 draw x'
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val 
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val
         key, subkey = jax.random.split(key)
         x_prime = jax.random.uniform(subkey, minval=xl, maxval=xr)
-        
+
         # step 6 evaluate pstar(x')
         t = pstar(x_prime)
-        
+
         # step 7
-        
+
         val = key, x, x_prime, xl, xr, u_prime, t, loop_break
         val = step7_and_8(val)
         return val
@@ -1076,112 +1120,121 @@ def slice_sweep__s(key,
 
     def step8(val):
         """Perform the shrinking method for step 8"""
-        key, x, x_prime, xl, xr, u_prime, t, loop_break = val       
-        
+        key, x, x_prime, xl, xr, u_prime, t, loop_break = val
+
         x_prime, x, xr, xl = jax.lax.cond(
-            x_prime > x, 
-            lambda x_prime, x, xr, xl: (x_prime, x, x_prime, xl),  # reduce the right side
-            lambda x_prime, x, xr, xl: (x_prime, x, xr, x_prime),  # reduce the left side
-            *(x_prime, x, xr, xl))
-        
+            x_prime > x,
+            lambda x_prime, x, xr, xl: (
+                x_prime,
+                x,
+                x_prime,
+                xl,
+            ),  # reduce the right side
+            lambda x_prime, x, xr, xl: (
+                x_prime,
+                x,
+                xr,
+                x_prime,
+            ),  # reduce the left side
+            *(x_prime, x, xr, xl)
+        )
+
         return key, x, x_prime, xl, xr, u_prime, t, loop_break
-    
+
     def step7_and_8(val):
         val = jax.lax.cond(
-            val[6] > val[5], # p*(x')>u'
-            step7_true_func, # do nothing. Break out of loop
-            step8, # step 8 modify the interval (xl, xr)
-            val)
-        
+            val[6] > val[5],  # p*(x')>u'
+            step7_true_func,  # do nothing. Break out of loop
+            step8,  # step 8 modify the interval (xl, xr)
+            val,
+        )
+
         return val
-    
+
     k1, k2, k3, k4 = jax.random.split(key, 4)
     # step 1 evaluate pstar(x)
     u = pstar(x, *pstar_args, **pstar_kwargs)
-    
+
     # step 2 draw a vertical coordinate
     u_prime = jax.random.uniform(k1, minval=0, maxval=u)
-    
+
     # step 3 create a horizontal interval (xl, xr) enclosing x
-    xl, xr = create_interval_step_out(key=k2, x=x, w=w, pstar=pstar, pstar_args=pstar_args, pstar_kwargs=pstar_kwargs)
-    
+    xl, xr = create_interval_step_out(
+        key=k2, x=x, w=w, pstar=pstar, pstar_args=pstar_args, pstar_kwargs=pstar_kwargs
+    )
+
     # step 4 loop 1st iteration
-    
+
     loop_break = False
-    
+
     # step 5 draw x'
     x_prime = jax.random.uniform(k3, minval=xl, maxval=xr)
 
-    #Optional update to pstar args and kwargs
+    # Optional update to pstar args and kwargs
 
     pstar_args = update_pstar_args((x_prime, pstar_args, pstar_kwargs))
     pstar_kwargs = update_pstar_kwargs((x_prime, pstar_args, pstar_kwargs))
-    
+
     # step 6 evaluate pstar(x')
     t = pstar(x_prime, *pstar_args, **pstar_kwargs)
-    
 
     # step 7 if pstar(x') > u' break out of loop. else modify interval
-    
+
     val = k4, x, x_prime, xl, xr, u_prime, t, loop_break
     val = step7_and_8(val)
 
-    
     # End 1st loop iteration
     # Continue the loop executing the while loop
-    
+
     def while_cond_func(val):
         """Check the loop break condition,
-           terminate the loop if True"""
+        terminate the loop if True"""
         key, x, x_prime, xl, xr, u_prime, t, loop_break = val
         return loop_break == False
-    
+
     val = jax.lax.while_loop(
-        while_cond_func, # check the loop break condition
-        step4_loop_body, 
-        val) # u_prime <= p*(x') i.e., t
-        
+        while_cond_func, step4_loop_body, val  # check the loop break condition
+    )  # u_prime <= p*(x') i.e., t
+
     return val
 
+
 def gibbs__step__s(key, theta, phi, xarr, w):
-    
+
     # Make PRNGKeys
-    
+
     k0, k1 = jax.random.split(key)
-    
+
     # Generate from node conditional 0
-    
+
     pstar0 = partial(pstar, i=0, theta=theta, phi=phi, xarr=xarr)
     val = slice_sweep__s(key=k0, x=xarr[0], pstar=pstar0, w=w)
     old_key0, x0, x0_prime, xl, xr, u_prime, t, loop_break = val
-    
+
     # Update the joint independant variable
     xarr = xarr.at[0].set(x0_prime)
-    
+
     # Generate from node conditional 1
     pstar1 = partial(pstar, i=1, theta=theta, phi=phi, xarr=xarr)
     val = slice_sweep__s(key=k2, x=xarr[1], pstar=pstar1, w=w)
-    
-    
+
     val = slice_sweep__s(key=k1, x=x)
     old_key1, x1, x1_prime, xl, xr, u_prime, t, loop_break = val
-    
+
     return (x0_prime, x1_prime)
 
 
 def gibbs_step_d_dimensions__s(key, d, theta, phi, xarr):
     """Take a gibbs step for a d-dimensional poisson sqr model
-       generate the spectral counts vector xarr for given values of theta and phi"""
+    generate the spectral counts vector xarr for given values of theta and phi"""
 
     key_array = jax.random.split(key, d)
 
     get_ulog_target__j = get_exponent__s(theta, phi, xarr)
-    
 
     def body(i, val):
-        
-        key_array, theta, phi, xarr = val
 
+        key_array, theta, phi, xarr = val
 
     # Sample node conditional 0
 
@@ -1189,54 +1242,55 @@ def gibbs_step_d_dimensions__s(key, d, theta, phi, xarr):
 
     ...
 
-            
-def gibbs_step(key, xarr): 
-    
-    """Defines a single gibbs step for a bi-variate distribution.
-       
-       (K, T, F, F) -> T
-       
-       params:
-         key:
-         xarr:
-           A (2, ) dimensional DeviceArray
-         rv_cond0:
-           (key, Number) -> (key, Number, Number, ... )
-           A function to generate random variates from the first conditional distribution
-         rv_cond1:
-           (key, Number) -> (key, Number, Number, ... )
-           A function to generate random variates from the second conditional distribution
 
-       return:   
-         xarr:
-       
-       """
-    
+def gibbs_step(key, xarr):
+
+    """Defines a single gibbs step for a bi-variate distribution.
+
+    (K, T, F, F) -> T
+
+    params:
+      key:
+      xarr:
+        A (2, ) dimensional DeviceArray
+      rv_cond0:
+        (key, Number) -> (key, Number, Number, ... )
+        A function to generate random variates from the first conditional distribution
+      rv_cond1:
+        (key, Number) -> (key, Number, Number, ... )
+        A function to generate random variates from the second conditional distribution
+
+    return:
+      xarr:
+
+    """
+
     k1, k2 = jax.random.split(key)
-    
+
     # Sample node conditional 0
-    #val = slice_sweep(k1, x=xarr[0], pstar=npstar0, w=w)
-    
+    # val = slice_sweep(k1, x=xarr[0], pstar=npstar0, w=w)
+
     val = rv_cond0(k1, x=xarr[0])
     old_key0, x0, x0_prime, xl, xr, u_prime, t, loop_break = val
-    
+
     # Update slice
     xarr = xarr.at[0].set(x0_prime)
     # Sample Node conditional 1
-    
-    #val = slice_sweep(k2, x=xarr[1], pstar=npstar1, w=w)
+
+    # val = slice_sweep(k2, x=xarr[1], pstar=npstar1, w=w)
     val = rv_cond1(k2, x=xarr[1])
     old_key1, x1, x1_prime, xl, xr, u_prime, t, loop_break = val
     xarr = xarr.at[1].set(x1_prime)
-    
+
     return xarr
 
+
 def gibbs_sampler(key, n_steps: int, x_init, gibbs_step, d=2) -> DeviceArray:
-        
+
     """
     The Gibbs sampling algorithm for a bivariate score
 
-    (K, int, T, F) -> [T] 
+    (K, int, T, F) -> [T]
 
     Params:
       key: K
@@ -1244,7 +1298,7 @@ def gibbs_sampler(key, n_steps: int, x_init, gibbs_step, d=2) -> DeviceArray:
       n_steps: int
         The number of Gibbs steps to take
       x_init: T
-        The initial value of some type T      
+        The initial value of some type T
       gibbs_steps: Callable
         (K, T) -> T
 
@@ -1254,7 +1308,7 @@ def gibbs_sampler(key, n_steps: int, x_init, gibbs_step, d=2) -> DeviceArray:
         x_init = gibbs_step(keys[step], x_init)
         samples = samples.at[step].set(x_init)
     """
-    
+
     keys = jax.random.split(key, n_steps)
     samples = jnp.zeros((n_steps, d))
 
@@ -1264,17 +1318,17 @@ def gibbs_sampler(key, n_steps: int, x_init, gibbs_step, d=2) -> DeviceArray:
         samples = samples.at[i].set(x_init)
         val = keys, x_init, samples
         return val
-    
+
     val = keys, x_init, samples
     val = jax.lax.fori_loop(0, n_steps, gibbs_body_fun, val)
     keys, x_init, samples = val
 
-    
     return samples
 
 
-def get_Asqr__s(method,
-        ) -> Callable[Any, float]:
+def get_Asqr__s(
+    method,
+) -> Callable[Any, float]:
     """
     Yields a function that may be used to estimate the value of the normalizing
     constant of the poisson sqr scoring function.
@@ -1283,7 +1337,7 @@ def get_Asqr__s(method,
 
     get_Asqr__j(theta, phi, x) -> float
 
-    
+
     """
     ...
 

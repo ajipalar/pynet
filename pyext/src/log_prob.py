@@ -17,6 +17,14 @@ from functools import partial
 
 Inner: TypeAlias = Callable
 
+def _cholesky_logdet(scale):
+    """
+    Following the scipy implementation
+    """
+    c_decomp = jsp.linalg.cholesky(scale, lower=False)
+    logdet = 2 * jnp.sum(jnp.log(c_decomp.diagonal()))
+    return c_decomp, logdet
+
 
 def wishart(p: int) -> Inner:
     """
@@ -26,14 +34,20 @@ def wishart(p: int) -> Inner:
       p the degree of the scatter and scale matrices
     """
 
-    def lpdf(X, V, df) -> Inner:
-        a = ((df - p - 1) / 2) * jnp.log(det(X))
-        b = -jnp.trace(jnp.matmul(inv(V), X)) / 2
-        c = (df * p / 2) * jnp.log(2)
-        d = -(df / 2) * jnp.log(det(V))
-        e = multigammaln(df / 2, p)
+    _LOG2 = jnp.log(2)
 
-        return a + b - c - d - e
+    def lpdf(X, V, df, /) -> Inner:
+        C, log_det_scale = _cholesky_logdet(V) 
+        _, log_det_x = _cholesky_logdet(X) # 
+        scale_inv_x = jsp.linalg.cho_solve((C, True), X)
+        tr_scale_inv_x = scale_inv_x.trace() #jnp.trace(inv(V) @ X)  # could be faster with the cholesky from previous step
+
+        out = ((0.5 * (df - p -1) * log_det_x - 0.5 * tr_scale_inv_x) -
+               (0.5 * df * p *_LOG2 + 0.5 * df * log_det_scale + multigammaln(0.5*df, p)))
+        return out
+
+
+
     inner_docstring = f"""
         The log density function of the wishart distribution defined over the field of
         real numbers for p = {p}

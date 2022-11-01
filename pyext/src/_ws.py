@@ -16,6 +16,8 @@ import pandas as pd
 import scipy as sp
 import scipy.special
 import operator as op
+import pyile
+
 
 # Possibly unstable
 from tensorflow_probability.substrates import jax as tfp

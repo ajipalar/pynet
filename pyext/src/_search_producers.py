@@ -5,6 +5,17 @@ from jax.tree_util import tree_flatten, tree_unflatten
 from collections import namedtuple
 
 """
+The following factories produce search triplets 
+    All triplets have optional args and kwargs (a -> args -> kwargs -> b) which are ommited for readability
+    (search_init :: (key -> x -> ss)
+     search_update :: (step -> y -> ss)
+     get_x :: (ss -> x)
+    )
+
+    factories define the type ss
+    factories define the type y
+
+
 Provides search triplet producers. Not a public API. see search.py
 
  X: PyTree def for x
@@ -17,43 +28,37 @@ Provides search triplet producers. Not a public API. see search.py
 
  score = f(x, *args, **kwargs)
 
+ To be as general as possible searches require the following
+
+ - An initial configuration for x
+ - A random starting seed
+ - A scoring function f(x)
+ - The definition of the search scheme
+ - Some hyper parameters
+   - including the number of steps to take
+   - the transition distribution
+   - and others
+
+searches will consume the following function triplet
+- search_init
+  - initial configuration of x
+  - starting
+
+ search_init
+     - initial configuration for x
+     - a random seed
+     - 
+
 """
 
-
-class MetropolisHastings:
-
-    SearchState = namedtuple("SearchState", "x y key")
-
-    def __init__(self, f, g, rseed):
-        self.f = f
-        self.g = g
-        self.rseed = rseed
-        self.k_start = jax.random.PRNGKey(self.rseed)
-
-    def __call__(self):
-        def search_init(x):
-            return MetropolisHastings.SearchState(x, self.f(x), self.k_start)
-
-        def get_x(search_state):
-            return search_state.x
-
-        def search_update(step, y, search_state):
-            k_step, k1, k2 = jax.random.split(search_state.key, 3)
-            x = g(k1, get_x(search_state))
-            u = jax.random.uniform(k2)
-
-            x = jax.lax.cond(
-                pred=u < search_state.y,
-                true_fun=lambda x: x,
-                false_fun=lambda x: search_state.x,
-                operand=x,
-            )
-            return SearchState(x, f(x), k_step)
-
-        return search_init, search_update, get_x
-
-def metropolis_hastings(f, g, rseed):
+def metropolis_hastings(f, g):
     """
+    Metroplis Hasting triplet factory
+      - search_state = search_init(x)
+      - search_state = search_update(step, y, search_state)
+      - x = get_x(search_state)
+
+
     Get the triplet for the metropolis hastings algorithim.
 
     Args:
@@ -70,8 +75,9 @@ def metropolis_hastings(f, g, rseed):
     Examples
     """
     SearchState = namedtuple("SearchState", "x y key")
-    key = jax.random.PRNGKey(rseed)
-    def search_init(x):
+    def search_init(key, x):
+        """The initial configuration for x is given by x
+        key is always unconsumed"""
         return SearchState(x, f(x), key)
 
     def get_x(search_state):
@@ -79,28 +85,26 @@ def metropolis_hastings(f, g, rseed):
 
     def search_update(step, y, search_state):
             k_step, k1, k2 = jax.random.split(search_state.key, 3)
-            x = g(k1, get_x(search_state))
-            u = jax.random.uniform(k2)
+            x_step = g(k1, get_x(search_state))
+            y_step = f(x_step)
+            u_step = jax.random.uniform(k2)
 
-            x = jax.lax.cond(
-                pred=u < search_state.y,
-                true_fun=lambda x: x,
-                false_fun=lambda x: search_state.x,
-                operand=x,
+            search_state = jax.lax.cond(
+                pred=u_step < y_step,
+                true_fun=lambda : SearchState(x_step, y_step, k_step),
+                false_fun=lambda : SearchState(search_state.x, search_state.y, k_step),
             )
-            return SearchState(x, f(x), k_step)
+            return search_state
 
     return search_init, search_update, get_x
 
 
-
-class Gibbs:
+def gibbs(rseed, draw_conditional, n_conditionals : int):
     """
-    Perform Gibbs sampling on the model
+    A factory for gibbs sampling
+    
 
     Args:
-      x :: Tree
-        The dependant argument, some pytree
       f :: Tree -> int  -> score
         A conditional
       rseed :: int
@@ -141,41 +145,26 @@ class Gibbs:
 
     SearchState = namedtuple("SearchState", "x key")
 
-    def __init__(self, x, rseed, draw_conditional, n_conditionals=None, pre_split_keys=False):
-        self.x = x
-        self.rseed = rseed
-        self.draw_conditional = draw_conditional
-        self.k_start = jax.random.PRNGKey(self.rseed)
-
-        if not n_conditionals:
-            n_conditionals = len(x)
-
-        self.n_conditionals = n_conditionals
-
-    def __call__(self):
-        def search_init(x):
-            return Gibbs.SearchState(x, self.key)
+    def search_init(x):
+        return SearchState(x, key)
 
 
-        if self.pre_split_keys:
-            def search_update(step, y, search_state):
-                keys = jax.random.split(search_state.key, self.pre_split_keys + 1)
+    def search_update(step, y, search_state):
+        keys = jax.random.split(search_state.key, self.pre_split_keys + 1)
 
-                def body(i, val):
-                    x, keys = val
-                    x_i = self.draw_conditional(keys[i], x, i)
-                    x = set_x
-                    
-        def get_x(search_state):
-            return search_state.x
+        def body(i, val):
+            x, keys = val
+            x_i = self.draw_conditional(keys[i], x, i)
+            x = set_x
+                
+    def get_x(search_state):
+        return search_state.x
 
-        return search_init, search_update, get_x
+    return search_init, search_update, get_x
 
 
-def gibbs(x, f, rseed, draw_conditional):
-    return Gibbs(x, f, rseed, draw_conditional)()
+def log_monte_carlo(x):
 
-"""
-def metropolis_hastings(f, g, rseed):
-    return MetropolisHastings(f, g, rseed)()
-"""
+    SearchState = namedtuple("SearchState", "x key")
+
+    return search_init, search_update, get_x

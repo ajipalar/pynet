@@ -1,0 +1,724 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.13.8
+  kernelspec:
+    display_name: Python 3 (ipykernel)
+    language: python
+    name: python3
+---
+
+```{python}
+from collections import namedtuple
+import jax
+import jax.numpy as jnp
+import jax.scipy as jsp
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.transforms import Affine2D
+import mpl_toolkits.axisartist.floating_axes as floating_axes
+import pandas as pd
+from pathlib import Path
+from functools import partial
+import itertools
+from itertools import combinations
+import re
+import requests
+import json
+import scipy as sp
+import scipy.stats
+import sklearn
+import sys
+import time
+import pyext.src.pynet_rng as rng
+import timeit
+import pyext.src.matrix as mat
+import pyext.src.stats as stats
+
+from src.wishart_synthetic_benchmark import (
+    ccscatter,
+    check_cov,
+    df_from_stats,
+    get_precision_matrix_stats,
+    get_prior_pred,
+    helper_vline_hist,
+    margins_plot,
+    quad_plot,
+    randPOSDEFMAT,
+    rprior,
+    rprior_pred,
+    sample_from_prior,
+    scatter_plot,
+    simulate_from_prior,
+    try_sampling,
+    ground_truth_pair_plot
+)
+```
+
+```{python}
+# Global Convience Settings
+
+inv = sp.linalg.inv
+```
+
+```{python}
+# Global Experiment Settings
+n_samples = 1000000
+p = 16
+nu = 15
+Gkey = jax.random.PRNGKey(52)
+diag_idx = np.diag_indices(p)
+key, k1 = jax.random.split(Gkey, 2)
+edge_prob = 0.2
+A = jax.random.bernoulli(k1, p=edge_prob, shape=(p, p))
+A = np.array(A)
+A = np.tril(A, k=-1)
+A = A + A.T
+A[diag_idx] = 1
+
+K_theta_scale = 1.
+K_theta_diag = 1.9
+#K_theta_diag = K_theta_scale
+
+
+# Generate K_theta
+key, k1 = jax.random.split(key, 2)
+K_theta = jax.random.normal(k1, shape=(p, p))*2#0.1
+
+
+#K_theta = jax.random.beta(k1, 1, 2, shape=(p, p)) * K_theta_scale
+K_theta = np.array(K_theta)
+
+K_theta = np.tril(K_theta, k=-1)
+K_theta = K_theta + K_theta.T
+K_theta[np.where(A==0)] = 0
+K_theta[np.where(K_theta > 0)] = K_theta[np.where(K_theta > 0)] #*K_theta[np.where(K_theta < 0)]
+
+K_theta[diag_idx] = K_theta_diag
+
+
+# Overwrite with A
+K_theta = A*0.5 + np.eye(p)
+check_cov(K_theta)
+
+cov_theta = inv(K_theta)
+# Plotting global settings
+
+vscale = 1.5
+vmin1 = -vscale
+vmax1 = vscale
+
+# Plotting strings
+str_Sigma = "\N{greek capital letter sigma}"
+str_Omega = "\N{greek capital letter omega}"
+# divergent colormaps
+cmap = "seismic"
+
+# sequential colormaps
+cmap_seq = "gnuplot2"
+# Generate some data
+
+def generate_synthetic_data(key, n_trial, cov):
+    """
+    normally distributed with means of 0
+    """
+    xp = jax.random.multivariate_normal(k1, jnp.zeros(p), cov, shape=(n_trial, )).T
+    assert xp.shape == (len(cov), n_trial)
+    return xp
+
+def get_Un(key, n_trial, cov):
+    x = generate_synthetic_data(key, n_trial, cov)
+    Un = x @ x.T
+    assert Un.shape == (p, p)
+    Un = np.array(Un)
+    return Un, x
+
+def covaraince_data_plotter(cov, U, n_trials):
+    # Plotting Data
+    fig, axs = ground_truth_pair_plot(cov, U / n_trials,
+                          vmin1=-1.5, vmax1=1.5, vmin2=-1.5, vmax2=1.5, overwrite_diags=False)
+
+
+    axs[0].set_title(f"True population {str_Sigma}")
+    axs[1].set_title(f"{n_trials}-trial linear combination of data from N(0, {str_Sigma})")
+    plt.show()
+    
+def precision_data_plotter(K, Kdata, n_trials,
+                           vmin1=-1.5,
+                           vmax1=1.5,
+                           vmin2=-1.5,
+                           vmax2=1.5,
+                           cmap1="seismic",
+                           cmap2="seismic",
+                           title1=f"True population {str_Omega}",
+                           title2=None):
+    
+    if title2 is None:
+        title2 = f"scaled inverse {n_trials}-trial linear combination of data from N(0, {str_Sigma})"
+    # Plotting Data
+    fig, axs = ground_truth_pair_plot(K, Kdata,
+                          vmin1=vmin1, vmax1=vmax1, vmin2=vmin2, vmax2=vmax2, overwrite_diags=False,
+                          cmap1=cmap1,
+                          cmap2=cmap2)
+
+
+    axs[0].set_title(title1)
+    axs[1].set_title(title2)
+    plt.show()
+def lt(A):
+    return np.tril(A, k=-1)
+
+def magnorm(magmat):
+    return magmat / np.max(magmat)
+
+def absnorm(A):
+    return magnorm(np.absolute(lt(A)))
+
+def ravel_absnorm(A):
+    return np.ravel(absnorm(A))
+
+
+def degree_plot(A, B, label=None, log=False):
+    ysum = np.sum(np.absolute(np.tril(B, k=-1)), axis=1)
+    if log:
+        yval = np.log(ysum)
+    else:
+        yval = ysum
+        
+    plt.scatter(np.sum(np.tril(A, k=-1), axis=1), yval, cmap=cmap, label=label)
+    plt.xlabel("Degree (\N{greek small letter tau})")
+    plt.ylabel(f"{str_Sigma} |L(D)|")
+
+def get_sigma_var_prior(x, p, uncertainty):
+    SigmaVarPrior = np.eye(p)
+    SigmaVarPrior[diag_idx] = np.var(x, axis=1) * uncertainty
+    return SigmaVarPrior
+
+
+
+key, k1 = jax.random.split(key)
+
+U4, xp4 = get_Un(key, 4, cov_theta)
+key, k1 = jax.random.split(k1)
+U12, xp12 = get_Un(key, 12, cov_theta)
+key, k1 = jax.random.split(k1)
+U50, xp50 = get_Un(key, 50, cov_theta)
+U1000, xp1000 = get_Un(key, 1000, cov_theta)
+
+
+ground_truth_pair_plot = partial(ground_truth_pair_plot, vmin1=vmin1, vmax1=vmax1,
+                                 vmin2=vmin1, vmax2=vmax1, cmap1=cmap, cmap2=cmap)
+
+# Prior
+
+SigmaPrior = 2 * np.eye(p)
+Kprior = inv(SigmaPrior)
+Vprior = Kprior / p
+
+# Adding Information
+
+K4 = inv(inv(Kprior) + U4 / 4)
+
+nu4 = 4 + p
+V4 = K4 / (nu4)
+
+K12 = inv(inv(Kprior) + U12 / 12)
+nu12 = 12 + p
+V12 = K12 / (nu12)
+
+# Variance Prior
+
+sample_variance_uncertainty_factor = 1.1
+
+
+SigmaVarPrior4 = get_sigma_var_prior(xp4, p,  sample_variance_uncertainty_factor)
+
+Kvar4 = inv(SigmaVarPrior4 + U4 / 4)
+Vvar4 = K4 / p
+
+
+SigmaVarPrior12 = get_sigma_var_prior(xp12, p, sample_variance_uncertainty_factor)
+
+Kvar12 = inv(SigmaVarPrior12 + U12/12)
+Vvar12 = Kvar12 / p
+
+SigmaVarPrior50 = get_sigma_var_prior(xp50, p, sample_variance_uncertainty_factor)
+Kvar50 = inv(SigmaVarPrior50 + U50 / 50)
+Vvar50 = Kvar50 / p
+
+SigmaVarPrior1000 = get_sigma_var_prior(xp1000, p, sample_variance_uncertainty_factor)
+Kvar1000 = inv(SigmaVarPrior1000 + U1000 / 1000)
+Vvar1000 = Kvar1000 / p
+for i in [Kvar4, Kvar12, Kvar50, Kvar1000, Vvar4, Vvar12, Vvar50, Vvar1000]:
+    check_cov(i)
+
+```
+
+```{python}
+mat.is_positive_definite(A*0.5 + np.eye(p))
+```
+
+```{python}
+# Understanding Priors
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(A, cov_theta,
+                      vmin1=-1.5, vmax1=1.5, vmin2=-1.5, vmax2=1.5, overwrite_diags=False)
+
+axs[0].set_title(f"A true")
+axs[1].set_title(f"True population {str_Sigma}")
+plt.show()
+```
+
+```{python}
+v2scale=1.5
+fig, axs = ground_truth_pair_plot(A, K_theta,
+                      vmin1=-1, vmax1=1, vmin2=-v2scale, vmax2=v2scale, overwrite_diags=False)
+
+axs[0].set_title(f"A true")
+axs[1].set_title(f"True population {str_Omega}")
+plt.show()
+```
+
+```{python}
+scaler = 2
+ground_truth_pair_plot(U4 / 4, cov_theta, overwrite_diags=False,
+                      title2=f"True population {str_Sigma}",
+                      title1=f"4-replicate linear combination of data from N(0, {str_Sigma})",
+                      vmin1=-1.5 * scaler, vmax1=1.5 * scaler, vmin2=-1.5, vmax2=1.5)
+
+plt.show()
+```
+
+```{python}
+precision_data_plotter(A, inv(U4 / 4 + np.eye(p))**4, 4, cmap2="hot", vmin2=0, vmax2=0.0008,
+                      title2="squared scaled inverse linear combination of data n=4")
+```
+
+```{python}
+precision_data_plotter(K_theta, inv(U4 / 4 + np.eye(p))**4, 4, cmap2="hot", vmin2=0, vmax2=0.0008,
+                      title2="squared scaled inverse linear combination of data n=4")
+```
+
+```{python}
+vscale = 7.5
+
+precision_data_plotter(K_theta, inv(U4 / 4  + np.eye(p)*0.1), 4, cmap2=cmap, vmin2=-vscale, vmax2=vscale,
+                      title2="squared scaled inverse linear combination of data n=4")
+```
+
+```{python}
+precision_data_plotter(A, inv(U4 / 4 + np.eye(p)), 4, cmap2=cmap, vmin2=-1, vmax2=1,
+                      title2="squared scaled inverse linear combination of data n=4")
+```
+
+```{python}
+zdata = absnorm((inv(U4 / 4 + np.eye(p) * 0.1) / 10))
+zerodata = zdata[np.where(A==0)]
+onesdata = zdata[np.where(A==1)]
+```
+
+```{python}
+log_flag = True
+degree_plot(A, inv(U4 / 4 + np.eye(p) * 0.1) / 10, label="4-trial", log=log_flag)
+degree_plot(A, inv(U12 / 12 + np.eye(p) * 0.1) / 7, label="12-trial", log=log_flag)
+degree_plot(A, inv(U50 / 50 + np.eye(p) * 0.1) / 14, label="50-trial", log=log_flag)
+degree_plot(A, inv(U1000 / 1000 + np.eye(p) * 0.1)*14, label="1000-trial", log=log_flag)
+plt.legend()
+```
+
+```{python}
+ground_truth_pair_plot(K_theta, inv(U4 / 4 + np.eye(p))**2, 4, cmap2="hot", vmin2=0, vmax2=0.04,
+                      title2="squared scaled inverse linear combination of data n=4", overwrite_diags=False)
+```
+
+```{python}
+ground_truth_pair_plot(K_theta, inv(U12 / 12 + np.eye(p))**2, 12, cmap2="hot", vmin2=0, vmax2=0.04,
+                      title2="squared scaled inverse linear combination of data n=12", overwrite_diags=False)
+```
+
+```{python}
+precision_data_plotter(K_theta, inv(U50 / 50 + np.eye(p))**2, 50, cmap2="hot", vmin2=0, vmax2=0.01,
+                      title2="squared inverse linear combination of data n=50")
+```
+
+```{python}
+precision_data_plotter(K_theta, inv(U1000 / 12 + np.eye(p))**2, 1000, cmap2="hot", vmin2=0, vmax2=0.00008,
+                      title2="squared scaled inverse linear combination of data n=1000")
+```
+
+```{python}
+precision_data_plotter(K_theta, inv(U1000 / 1000 + np.eye(p) * 0.1), 1000)
+```
+
+```{python}
+precision_data_plotter(K_theta, np.absolute(inv(U4 / 4 + np.eye(p) * 0.1) / 7), 4, vmin2=0, vmax2=1.5,
+                      cmap2="Reds",
+                      title2="Magnitude of inverse data matrix")
+```
+
+```{python}
+plt.title("Normalized absolute values")
+
+#plt.scatter(ravel_absnorm(K_theta), ravel_absnorm(inv(U4 / 4 + np.eye(p) * 0.1)), label="4-replicates")
+#plt.scatter(ravel_absnorm(K_theta), ravel_absnorm(inv(U12 / 12 + np.eye(p) * 0.1)), label="12-replicates")
+#plt.scatter(ravel_absnorm(K_theta), ravel_absnorm(inv(U50 / 50 + np.eye(p) * 0.1)), label="50-replicates")
+plt.scatter(ravel_absnorm(K_theta), ravel_absnorm(inv(U1000 / 1000 + np.eye(p) * 0.1)), label="1000-replicates")
+plt.legend()
+plt.xlabel("Population")
+plt.ylabel("inverse data matrix")
+plt.show()
+```
+
+```{python}
+plt.title("Normalized absolute values")
+
+
+
+plt.scatter(ravel_absnorm(K_theta), ravel_absnorm(inv(U1000 / 1000 + np.eye(p) * 0.1)), label="1000-replicates")
+plt.scatter(ravel_absnorm(K_theta), ravel_absnorm(inv(U50 / 50 + np.eye(p) * 0.1)), label="50-replicates")
+plt.scatter(ravel_absnorm(K_theta), ravel_absnorm(inv(U12 / 12 + np.eye(p) * 0.1)), label="12-replicates")
+plt.scatter(ravel_absnorm(K_theta), ravel_absnorm(inv(U4 / 4 + np.eye(p) * 0.1)), label="4-replicates")
+
+
+plt.legend()
+plt.xlabel("Population")
+plt.ylabel("inverse data matrix")
+plt.show()
+```
+
+```{python}
+# What are the correlations for the different replicas?
+
+sp.stats.pearsonr
+```
+
+```{python}
+precision_data_plotter(K_theta, np.absolute(inv(U12 / 12 + np.eye(p) * 0.1) / 7), 12, vmin2=0, vmax2=1.5,
+                      cmap2="Reds",
+                      title2="Magnitude of inverse data matrix")
+```
+
+```{python}
+precision_data_plotter(inv(U4 / 4 + np.eye(p) * 0.1) / 10, inv(U4/4 + SigmaVarPrior4)/ 10, 4,
+                       title1=f"scaled inverse 4-trial linear combination of data",
+                       title2=f"4-trial inverse variance prior")
+```
+
+```{python}
+precision_data_plotter(K_theta, inv(U4/4 + SigmaVarPrior4)/ 8, 4,
+                       title2=f"4-trial variance prior")
+```
+
+```{python}
+precision_data_plotter(K_theta, inv(U50/50 + SigmaVarPrior50)*2, 50,
+                       title2=f"50-trial variance prior")
+```
+
+```{python}
+precision_data_plotter(inv(U1000/1000 + np.eye(p)*0.145)*2, inv(U1000/1000 + SigmaVarPrior1000)*8, 50,
+                       title1="Constant diagonals",
+                       title2=f"50-trial variance prior")
+```
+
+```{python}
+precision_data_plotter(A, inv(U1000/1000 + SigmaVarPrior1000)*3, 50,
+                       title1="Constant diagonals",
+                       title2=f"50-trial variance prior")
+```
+
+```{python}
+# Plotting Data
+fig, axs = ground_truth_pair_plot(cov_theta, U4 / 4,
+                      vmin1=-1.5, vmax1=1.5, vmin2=-1.5, vmax2=1.5, overwrite_diags=False)
+
+
+axs[0].set_title(f"True population {str_Sigma}")
+axs[1].set_title(f"4-replicate linear combination of data from N(0, {str_Sigma})")
+plt.show()
+```
+
+```{python}
+# Plotting Data
+n_trials = 50
+fig, axs = ground_truth_pair_plot(cov_theta, U50 / n_trials,
+                      vmin1=-1.5, vmax1=1.5, vmin2=-1.5, vmax2=1.5, overwrite_diags=False)
+
+
+axs[0].set_title(f"True population {str_Sigma}")
+axs[1].set_title(f"{n_trials}-trial linear combination of data from N(0, {str_Sigma})")
+plt.show()
+```
+
+```{python}
+np.min(cov_theta), np.max(cov_theta), np.min(U4 / (4)), np.max(U4 / (4))
+```
+
+```{python}
+np.min(cov_theta), np.max(cov_theta), np.min(U12 / (12)), np.max(U12 / (12))
+```
+
+```{python}
+np.min(cov_theta), np.max(cov_theta)
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(cov_theta, U12 / 12,
+                      vmin1=-1.5, vmax1=1.5, vmin2=-1.5, vmax2=1.5, overwrite_diags=False)
+
+
+axs[0].set_title(f"True population {str_Sigma}")
+axs[1].set_title(f"4-replicate linear combination of data from N(0, {str_Sigma})")
+plt.show()
+```
+
+```{python}
+
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(SigmaVarPrior4, SigmaVarPrior12,
+                      vmin1=-1.5, vmax1=1.5, vmin2=-1.5, vmax2=1.5, overwrite_diags=False)
+
+axs[0].set_title(f"scaled 4 replicate \N{greek capital letter sigma} prior")
+axs[1].set_title(f"scaled 12 replicate \N{greek capital letter sigma} prior")
+plt.show()
+```
+
+```{python}
+plt.scatter(np.var(xp4, axis=1), U4[diag_idx])
+plt.xlabel("Data variance across 4 replicates")
+plt.ylabel("Diagonal of scaled dot-product")
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(A, U12, cmap1=cmap, 
+                       cmap2=cmap, 
+                       vmin1=vmin1, vmin2=vmin1,
+                       vmax1=vmax1, vmax2=vmax1, overwrite_diags=False)
+
+axs[0].set_title("A")
+axs[1].set_title("Data Correlation U12")
+plt.show()
+```
+
+```{python}
+exp = sample_from_prior(key, nu, p, n_samples, Vprior)
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(np.array(np.var(exp.samples, axis=0)), np.array(np.mean(exp.samples, axis=0)), overwrite_diags=False,
+                                  cmap1="hot", vmin1=0, vmax1=0.05)
+axs[0].set_title("Ensemble variance")
+axs[1].set_title(f"Ensemble average over {'{:,}'.format(n_samples)} samples")
+plt.show()
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(Kprior, 
+                                  np.array(np.var(exp.samples, axis=0)), 
+                                  cmap2= "hot",#cmap_seq,
+                                  vmin2=0, vmax2=0.06,
+                                  overwrite_diags=False)
+axs[0].set_title("K_prior")
+axs[1].set_title(f"Ensemble average variance of {'{:,}'.format(n_samples)} samples")
+plt.show()
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(A, K4, cmap1=cmap, 
+                       cmap2=cmap, 
+                       vmin1=vmin1, vmin2=vmin1,
+                       vmax1=vmax1, vmax2=vmax1, overwrite_diags=False)
+
+axs[0].set_title("A")
+axs[1].set_title("K4")
+plt.show()
+```
+
+```{python}
+exp = sample_from_prior(key, nu4, p, n_samples, V4)
+```
+
+```{python}
+vscale2 = 0.2
+
+fig, axs = ground_truth_pair_plot(np.array(np.var(exp.samples, axis=0)), np.array(np.mean(exp.samples, axis=0)), 
+                                  overwrite_diags=False,
+                                  cmap1="hot", vmin1=0, vmax1=0.05,
+                                  vmin2=-vscale2, vmax2=vscale2
+                                  )
+axs[0].set_title("Ensemble variance")
+axs[1].set_title(f"Ensemble average over {'{:,}'.format(n_samples)} samples")
+plt.show()
+```
+
+```{python}
+vscale2 = 0.02
+fig, axs = ground_truth_pair_plot(K_theta, np.array(np.mean(exp.samples, axis=0))*np.absolute(np.mean(exp.samples, axis=0)),
+                                  vmin2=-vscale2, vmax2=vscale2,
+                                  cmap2=cmap,#"Reds",
+                                  overwrite_diags=False)
+axs[0].set_title("Ground truth")
+axs[1].set_title(f"Ensemble average over {'{:,}'.format(n_samples)} samples")
+plt.show()
+```
+
+```{python}
+mean_values = np.mean(exp.samples, axis=0)
+assert mean_values.shape == (p, p)
+
+zeros_values = mean_values[np.where(A==0)]
+ones_values = mean_values[np.where(A!=0)]
+
+zeros_values = zeros_values[0:97]
+ones_values = ones_values[0:23]
+
+assert len(ones_values) == 23
+assert len(zeros_values) == 97
+
+zeros = np.zeros(len(zeros_values))
+ones = np.ones(len(ones_values))
+
+kstest_stat, pval = sp.stats.kstest(zeros_values, ones_values)
+
+kstest_stat = np.round(kstest_stat, 3)
+#pval = np.round(pval, decimals=8)
+
+Npositives = np.sum(np.tril(A, k=-1))
+Nnegatives = 120 - Npositives
+
+import matplotlib as mpl
+with mpl.rc_context({"font.size": 18}):
+    assert pval < 1e-7
+    plt.figure(figsize=(8, 8))
+    plt.set_cmap(cmap)
+    plt.plot(zeros, zeros_values, "o", color="b", label="Negatives")
+    plt.plot(ones, ones_values, "o", color="r", label="Positives")
+    plt.xticks(None)
+    #plt.xlabel("Ground Truth")
+    s = "{:,}".format(n_samples)
+    plt.ylabel(f"Average score\nover {s} samples")
+    titles = f"Negatives: {Nnegatives} Positives: {Npositives}"
+    
+    pval_str = "3.19e-09"
+    titles += f"\n4 AP-MS trials"
+    plt.title(titles)
+    plt.text(0, 0.06*5, f"2-sample KS test\nstat: {kstest_stat}\np-val {pval_str}")
+    plt.legend()
+    
+    plt.show()
+```
+
+```{python}
+
+```
+
+```{python}
+cmap
+```
+
+```{python}
+# stats
+alpha = 0.01
+def c_of_alpha(alpha):
+    return np.sqrt(-np.log(alpha/2)*0.5)
+
+c = c_of_alpha(alpha)
+
+reject = c*np.sqrt()
+
+K_alpha = 1 - alpha
+```
+
+```{python}
+
+```
+
+```{python}
+np.sqrt(120)*kstest_stat
+```
+
+```{python}
+sp.stats.kstest(zeros, ones)
+```
+
+```{python}
+# ?sp.stats.kstest
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(K4, 
+                                  np.array(np.var(exp.samples, axis=0)), 
+                                  cmap2= "hot",#cmap_seq,
+                                  vmin2=0, vmax2=0.1,
+                                  overwrite_diags=False)
+axs[0].set_title("K4")
+axs[1].set_title(f"Ensemble average variance of {'{:,}'.format(n_samples)} replicates")
+plt.show()
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(A, K12, cmap1=cmap, 
+                       cmap2=cmap, 
+                       vmin1=vmin1, vmin2=vmin1,
+                       vmax1=vmax1, vmax2=vmax1, overwrite_diags=False)
+
+axs[0].set_title("A")
+axs[1].set_title("K12")
+plt.show()
+```
+
+```{python}
+exp = sample_from_prior(key, nu12, p, n_samples, V12)
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(A, np.array(np.mean(exp.samples, axis=0)), overwrite_diags=False,
+                                 vmin2=-2, vmax2=2)
+axs[0].set_title("A")
+axs[1].set_title(f"Ensemble average over {'{:,}'.format(n_samples)} replicates")
+plt.show()
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(A, inv(np.eye(p)*2 + U12), overwrite_diags=False,
+                                 vmin2=-2, vmax2=2)
+axs[0].set_title("A")
+axs[1].set_title(f"Ensemble average over {'{:,}'.format(n_samples)} replicates")
+plt.show()
+```
+
+```{python}
+exp = sample_from_prior(key, 15, p, n_samples, Vvar4)
+```
+
+```{python}
+# 4 replicate Plot
+
+fig, axs = ground_truth_pair_plot(A, np.array(np.mean(exp.samples, axis=0)), overwrite_diags=False,
+                                 vmin2=-2, vmax2=2)
+axs[0].set_title("A")
+axs[1].set_title(f"Ensemble average over {'{:,}'.format(n_samples)} replicates")
+plt.show()
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(np.array(np.mean(exp.samples, axis=0)), 
+                                  np.array(np.var(exp.samples, axis=0)), 
+                                  cmap2= "hot",#cmap_seq,
+                                  vmin2=0, vmax2=0.1,
+                                  overwrite_diags=False)
+axs[0].set_title(f"Ensemble average value of {'{:,}'.format(n_samples)} samples\n4 replicates")
+axs[1].set_title(f"Ensemble average variance of {'{:,}'.format(n_samples)} samples\n4 replicates")
+plt.show()
+```
+
+The regions of less information contain higher average variance across the ensemble

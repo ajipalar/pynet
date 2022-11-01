@@ -29,11 +29,12 @@ from functools import partial
 
 import pyext.src.core as core
 
+
 class ExampleTrainingCase(core.KeyValueReport):
     def __init__(
         self,
-        d = 2,
-        shape = None,
+        d=2,
+        shape=None,
         bern_p=0.5,
         rseed=13,
         truth_seed=22,
@@ -56,7 +57,9 @@ class ExampleTrainingCase(core.KeyValueReport):
         self.mutable_key = jax.random.PRNGKey(rseed)
         self.truth_key = jax.random.PRNGKey(truth_seed)
 
-        self.ground_truth = jax.random.bernoulli(self.truth_key, truth_p, shape=self.shape)
+        self.ground_truth = jax.random.bernoulli(
+            self.truth_key, truth_p, shape=self.shape
+        )
         self.samples = []
         self.metrics = {}
         self.nsamples = nsamples
@@ -78,7 +81,6 @@ class ExampleTrainingCase(core.KeyValueReport):
     def get_variance_precision(self):
         return self.metrics["variance_precision"]
 
-
     # Updaters
 
     def update_sample(self):
@@ -87,10 +89,8 @@ class ExampleTrainingCase(core.KeyValueReport):
             self.mutable_key = key
             self.samples.append(self.step(k1))
 
-
-
     def update_metrics(self):
-        assert len(self.samples) == self.nsamples 
+        assert len(self.samples) == self.nsamples
         accuracies = []
         precisions = []
 
@@ -101,28 +101,72 @@ class ExampleTrainingCase(core.KeyValueReport):
             accuracies.append(sklearn.metrics.accuracy_score(y_ref, y_pred))
             precisions.append(sklearn.metrics.precision_score(y_ref, y_pred))
 
-            self.metrics['accuracies'] = accuracies
-            self.metrics['precisions'] = precisions
+            self.metrics["accuracies"] = accuracies
+            self.metrics["precisions"] = precisions
 
-            self.metrics['median_accuracy'] = np.median(accuracies)
-            self.metrics['variance_accuracy'] = np.var(accuracies)
+            self.metrics["median_accuracy"] = np.median(accuracies)
+            self.metrics["variance_accuracy"] = np.var(accuracies)
 
-            self.metrics['median_precision'] = np.median(precisions)
-            self.metrics['variance_precision'] = np.median(precisions)
+            self.metrics["median_precision"] = np.median(precisions)
+            self.metrics["variance_precision"] = np.median(precisions)
 
     def update_report(self):
-        attributes = ["shape", "bern_p", "rseed", "truth_seed", "truth_p", "nsamples", "key", "mutable_key", "truth_key",
-                ] 
+        attributes = [
+            "shape",
+            "bern_p",
+            "rseed",
+            "truth_seed",
+            "truth_p",
+            "nsamples",
+            "key",
+            "mutable_key",
+            "truth_key",
+        ]
 
-
-
-        keys = ["median_accuracy", "variance_accuracy", "median_precision", "variance_precision"]
-        report = {attr: self.__dict__[attr] for attr in attributes} | {key : self.metrics[key] for key in keys}
+        keys = [
+            "median_accuracy",
+            "variance_accuracy",
+            "median_precision",
+            "variance_precision",
+        ]
+        report = {attr: self.__dict__[attr] for attr in attributes} | {
+            key: self.metrics[key] for key in keys
+        }
         self.update_key_value_report_content(report)
         self.update_key_value_report_str()
 
     def show_report(self):
         self.show_key_value_report_str()
 
-    
 
+class CullinE3LigaseTrain:
+
+    self.metadata = {
+        "paper_url": "https://www.sciencedirect.com/science/article/pii/S1931312819302537?via%3Dihub",
+        "paper_title": "ARIH2 Is a Vif-Dependent Regulator of CUL5-Mediated APOBEC3G Degradation in HIV Infection",
+        "authors": [
+            "Ruth Hüttenhain",
+            "Jiewei Xu",
+            "Lily A.Burton",
+            "David E.Gordon",
+            "Judd F.Hultquist",
+            "Jeffrey R.Johnson",
+            "Laura Satkamp",
+            "Joseph Hiatt",
+            "David Y.Rhee",
+            "Kheewoong Baek",
+            "David C.Crosby",
+            "Alan D.Frankel",
+            "Alexander Marson",
+            "Wade Harper",
+            "Arno F.Alpi",
+            "Brenda A.Schulman",
+            "John D.Gross",
+            "Nevan J.Krogan",
+        ],
+    }
+    self.training_data = {}
+    self.protein_types = ["APOBEC3G", "CBFBeta", "ViF", "ELOC", "ELOB", "CUL5", "ARIH2", "RBX2", "NEDD8"]
+
+    def __init__(self):
+        ...

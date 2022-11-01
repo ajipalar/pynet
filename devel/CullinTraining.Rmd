@@ -1,0 +1,667 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .Rmd
+      format_name: rmarkdown
+      format_version: '1.2'
+      jupytext_version: 1.13.8
+  kernelspec:
+    display_name: Python 3 (ipykernel)
+    language: python
+    name: python3
+---
+
+```{python}
+from collections import namedtuple
+import jax
+import jax.numpy as jnp
+import jax.scipy as jsp
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.transforms import Affine2D
+import mpl_toolkits.axisartist.floating_axes as floating_axes
+import pandas as pd
+from pathlib import Path
+from functools import partial
+import itertools
+from itertools import combinations
+import re
+import requests
+import json
+import scipy as sp
+import scipy.stats
+import sklearn
+import sys
+import time
+import pyext.src.pynet_rng as rng
+import timeit
+import pyext.src.matrix as mat
+import pyext.src.stats as stats
+
+from src.wishart_synthetic_benchmark import (
+    ccscatter,
+    check_cov,
+    df_from_stats,
+    get_precision_matrix_stats,
+    get_prior_pred,
+    helper_vline_hist,
+    margins_plot,
+    quad_plot,
+    randPOSDEFMAT,
+    rprior,
+    rprior_pred,
+    sample_from_prior,
+    scatter_plot,
+    simulate_from_prior,
+    try_sampling,
+    ground_truth_pair_plot
+)
+
+from src.cullin_benchmark_test import (
+    CullinBenchMark,
+    accumulate_indicies,
+    bar_plot_df_summary,
+    binary_search,
+    biogrid_df_report,
+    check_biogrid_data,
+    check_bounds,
+    compare_reports,
+    find_bounds,
+    find_end,
+    find_start,
+    format_biogrid_df_report,
+    get_all_indicies,
+    get_biogrid_summary,
+    get_json_report_from_report,
+    make_bounds,
+    show_idmapping_results,
+    transform_and_validate_biogrid,
+    uniprot_id_mapping,
+)
+
+def get_experimental_coverage_df(biogrid_df, report):
+    
+    df = biogrid_df
+    nodes = report['unique_GeneId_set']
+    nodes = sorted(nodes)
+    d =pd.DataFrame(data = np.zeros((len(nodes), len(nodes))), index = nodes, columns = nodes, dtype=float)
+    
+    experiments = {key: i for i, key in enumerate(set(df["Experimental System"]))}
+    
+    j = 0
+    for i, row in biogrid_df.iterrows():
+        nodeA = row.iloc[1]
+        nodeB = row.iloc[2]
+        
+        if nodeB > nodeA:
+            t = nodeA
+            nodeA = nodeB
+            nodeB = t
+        
+        experiment = row["Experimental System"]
+        val = experiments[experiment]
+        
+        d.loc[nodeA, nodeB] += val
+        j +=1
+
+    return d
+
+def triangular_to_symmetric(A):
+    Lower = np.tril(A)
+    diag_indices = np.diag_indices(len(A))
+    Lower = Lower + Lower.T
+    Lower[diag_indices] = A[diag_indices]
+    return Lower
+
+def coverage_plot(d, w=12, h=12, title="Experimental Coverage of Cullin BG"):
+
+    
+    
+    fig, axs = plt.subplots(1, 2)
+    fig.set_figheight(h)
+    fig.set_figwidth(w)
+    
+    ax = axs[0]
+    mappable = ax.imshow(triangular_to_symmetric(d.values != 0))
+    ax.set_title(title)
+    #plt.colorbar(mappable, ax=ax)
+    ax = axs[1]
+    ax.imshow(d.values)
+    ax.set_title("Null")
+    plt.tight_layout()
+    plt.show()
+    
+def transform_cullin_benchmark_data(df, id_mapping):
+    out = np.zeros((len(df), 4))
+    out_ctrl = np.zeros((len(df), 12))
+    entrez = []
+    j=0
+    for i, row in df.iterrows():
+        out[j, :] = split(row["Spec"])
+        out_ctrl[j, :] = split(row["ctrlCounts"])
+        entrez.append(to_entrez(row["Prey"], id_mapping))
+        j+=1
+    
+    
+    for i in range(1, 5):
+        #assert f"r{i}" not in df.columns
+        df[f"r{i}"] = out[:, i-1]
+        
+    for i in range(1, 13):
+        #assert f"ctrl_{i}" not in df.columns
+        df[f"ctrl_{i}"] = out_ctrl[:, i-1]
+        
+    assert "Entrez" not in df.columns
+    df["Entrez"] = entrez
+    
+    return df
+
+def split(u):
+    a = u.split("|")
+    for i in a:
+        assert i.isdigit()
+    a = [int(i) for i in a]
+    for i in a:
+        assert 0 <= i < 256
+    a = np.array(a)
+    return a
+
+def to_entrez(u, id_mapping):
+    return id_mapping[u] if u in id_mapping else "-"
+
+def get_bounds_from_id_mapping(id_mapping, biogrid):
+    eids = set(val for key, val in id_mapping.items())
+
+    colA = "Entrez Gene Interactor A"
+    colB = "Entrez Gene Interactor B"
+
+    col = colA
+    eids_in_biogrid = set(map(lambda x: x if int(x) in biogrid.loc[:, col] else None, eids))
+    eids_in_biogrid.remove(None)
+    bounds_A = make_bounds(biogrid, col, eids_in_biogrid)
+
+    col = colB
+    eids_in_biogrid = set(map(lambda x: x if int(x) in biogrid.loc[:, col] else None, eids))
+    eids_in_biogrid.remove(None)
+    bounds_B = make_bounds(biogrid, col, eids_in_biogrid)
+
+
+    check_bounds(biogrid, bounds_A, eids, colnum=1)
+    check_bounds(biogrid, bounds_B, eids, colnum=2)
+    return bounds_A, bounds_B, eids_in_biogrid
+```
+
+```{python}
+# Flags
+
+GET_CULLIN_BG = True
+```
+
+```{python}
+# Global helper functions
+
+inv = sp.linalg.inv
+```
+
+```{python}
+# Global Plotting params
+
+divergent = "seismic"
+sequential = "Reds"
+```
+
+```{bash}
+shasum -c ../data/biogrid/checksum512.txt
+```
+
+```{python}
+check_biogrid_data()
+```
+
+```{bash}
+shasum -c ../data/biogrid/checksum512.txt
+```
+
+```{python}
+biogrid = pd.read_csv("../data/biogrid/BIOGRID-ALL-4.4.206.tab3.txt", delimiter="\t")
+```
+
+```{python}
+biogrid = transform_and_validate_biogrid(biogrid)
+```
+
+```{python}
+# Load in the Cullin Data
+cullin_benchmark = CullinBenchMark(dirpath=Path("../data/cullin_e3_ligase"))
+#cullin_benchmark.load_data()
+```
+
+```{python}
+# Do Uniprot ID mapping
+id_mapping, failed_ids, prey_set_idmapping_input = uniprot_id_mapping(cullin_benchmark)
+```
+
+```{python}
+show_idmapping_results(id_mapping, failed_ids, prey_set_idmapping_input)
+```
+
+```{python}
+# Check the Failed Cases
+failed_df = cullin_benchmark.data[cullin_benchmark.data['Prey'].apply(lambda x: x in failed_ids)]
+
+# The failed cases amount to only 20 Bait prey Pairs
+# The Saint Score < 0.14 for all cases
+# Therefore we ignore the 13 failed cases instead of mapping them
+# Except for L0R6Q1. Consider for later
+```
+
+```{python}
+# Set the Values for the Entrez Gene Id Columns
+
+eids = set(val for key, val in id_mapping.items())
+
+colA = "Entrez Gene Interactor A"
+colB = "Entrez Gene Interactor B"
+
+col = colA
+eids_in_biogrid = set(map(lambda x: x if int(x) in biogrid.loc[:, col] else None, eids))
+eids_in_biogrid.remove(None)
+bounds_A = make_bounds(biogrid, col, eids_in_biogrid)
+
+col = colB
+eids_in_biogrid = set(map(lambda x: x if int(x) in biogrid.loc[:, col] else None, eids))
+eids_in_biogrid.remove(None)
+bounds_B = make_bounds(biogrid, col, eids_in_biogrid)
+            
+
+check_bounds(biogrid, bounds_A, eids, colnum=1)
+check_bounds(biogrid, bounds_B, eids, colnum=2)
+```
+
+```{python}
+if GET_CULLIN_BG:
+    index_labels = get_all_indicies(biogrid, bounds_A, bounds_B, 1, 2)
+
+    # Look at the subset of biogrid
+
+    cullin_bg = biogrid.loc[index_labels]
+
+    # Validate the data frame
+    assert np.all(cullin_bg.iloc[:, 1].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
+    assert np.all(cullin_bg.iloc[:, 2].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
+
+    nnodes = len(eids_in_biogrid)
+    n_possible_edges = int(0.5*nnodes*(nnodes-1))
+
+    nself = len(cullin_bg[cullin_bg.iloc[:, 1]==cullin_bg.iloc[:, 2]])
+    not_self = cullin_bg.iloc[:, 1]!=cullin_bg.iloc[:, 2]
+
+    cullin_bg = cullin_bg[not_self]
+
+    #df = cullin_bg
+
+
+    # How many edges are unique?
+```
+
+```{python}
+cullin_report = biogrid_df_report(cullin_bg)
+```
+
+```{python}
+# Annotate the cullin benchmark with entrez genes and rows and columns
+cullin_benchmark_transformed = transform_cullin_benchmark_data(cullin_benchmark.data, id_mapping)
+```
+
+```{python}
+# Define the training set
+bait_name = "CBFBwt_MG132"
+s = cullin_benchmark_transformed["Bait"] == bait_name
+trainingset = cullin_benchmark_transformed[s]
+
+saint_cutoff = 0.7
+s = trainingset["SaintScore"] >= saint_cutoff
+
+trainingset = trainingset[s]
+```
+
+```{python}
+# Get the biogrid subset for the training set
+training_set_id_mapping = {key:id_mapping[key] for key in trainingset.iloc[1:len(trainingset), 1]} # ignore vifprotein
+s = False
+training_set_eid_set= set(trainingset["Entrez"])
+for key, entrezid in training_set_id_mapping.items():
+    s1 = cullin_bg["Entrez Gene Interactor A"] == float(entrezid)
+    s = s1 | s
+
+# Select the union
+for key, entrezid in training_set_id_mapping.items():
+    s1 = cullin_bg["Entrez Gene Interactor B"] == float(entrezid)
+    #s = s1 & s
+
+    
+
+# Superset of at least one interactor
+
+
+
+assert len(s) == len(cullin_bg)
+
+training_bg = cullin_bg[s]
+```
+
+```{python}
+training_bg[training_bg[colA] == 9616.0]
+```
+
+```{python}
+# Generate the report for the training data
+trainingset_report = biogrid_df_report(cullin_bg)
+```
+
+```{python}
+# Experimental Coverage
+trainingset_bg_coverage = get_experimental_coverage_df(training_bg, trainingset_report)
+```
+
+```{python}
+coverage_plot(trainingset_bg_coverage)
+```
+
+```{python}
+training_bg
+```
+
+```{python}
+# highlight the area of interaction using labels
+# remove the '-'
+try:
+    training_set_eid_set.remove("-")
+except KeyError:
+    ...
+training_set_eid_list = [float(i) for i in training_set_eid_set]
+trainingset_bg_coverage = trainingset_bg_coverage.loc[training_set_eid_list, training_set_eid_list]
+
+
+```
+
+```{python}
+w = 8
+h = 8
+
+plt.figure(figsize=(w, h))
+plt.title(f"Experimental Coverage of {bait_name} prey in biogrid")
+plt.imshow(trainingset_bg_coverage + trainingset_bg_coverage.T, vmin=0, cmap=sequential)
+#xlabels = 
+plt.show()
+```
+
+```{python}
+cols = list(eid_to_preygene.keys())
+cols = cols[1:len(cols)] # drop '-'
+cols = [float(i) for i in cols]
+
+scratch = training_bg_coverage.loc[cols, cols]
+
+fig1 = np.ones((p, p)) * 1000
+fig1[1:p, 1:p] = scratch
+fig, axs = ground_truth_pair_plot((fig1 + fig1.T) // 2, 
+                                  np.array(np.mean(exp.samples, axis=0)), 
+                                 overwrite_diags=False,
+                                 vmin1=0, vmax1=150,
+                                 vmin2=-12.5, vmax2=12.5,
+                                 cmap1=sequential, cmap2=divergent)
+
+
+
+axs[0].set_title(f"N Biogrid annotated interaction pairs")
+axs[1].set_title(f"Ensemble average value over {'{:,}'.format(n_samples)} replicates")
+
+xlabels1 = trainingset_bg_coverage.columns
+eid_to_preygene = {}
+for i, row in trainingset.loc[:, ["PreyGene", "Entrez"]].iterrows():
+    eid_to_preygene[row["Entrez"]] = row["PreyGene"]
+
+xlabels = [eid_to_preygene[str(int(eid))] for eid in cols]
+
+
+
+axs[0].set_xticks(ticks=np.arange(p), labels=["vifprotein"] + xlabels, rotation=-45)
+axs[0].set_yticks(ticks=list(range(p)), labels=["vifprotein"] + xlabels, rotation=45)
+
+axs[1].set_xticks(ticks=np.arange(p), labels=list(trainingset["PreyGene"]), rotation=-45)
+axs[1].set_yticks(ticks=np.arange(p), labels=list(trainingset["PreyGene"]), rotation=45)
+plt.show()
+```
+
+```{python}
+["-"] + ["a", 1, 7]
+```
+
+```{python}
+assert exp.samples.shape == (n_samples, 16, 16)
+assert scratch.shape == (15, 15)
+scratch2 = np.mean(exp.samples, axis=0)
+scratch2 = scratch2[1:16, 1:16]
+assert scratch2.shape == scratch.shape
+
+
+plt.scatter(scratch2[np.tril_indices(15, k=-1)], scratch.values[np.tril_indices(15, k=-1)])
+plt.ylabel("Biogrid Annotation Rate")
+plt.xlabel("Average edge value")
+```
+
+```{python}
+
+
+import matplotlib as mpl
+with mpl.rc_context({"font.size": 18}):
+
+    plt.figure(figsize=(8, 8))
+
+    assert exp.samples.shape == (n_samples, 16, 16)
+    assert scratch.shape == (15, 15)
+    scratch2 = np.mean(exp.samples, axis=0)
+    scratch2 = scratch2[1:16, 1:16]
+    assert scratch2.shape == scratch.shape
+
+
+    x = scratch2[np.tril_indices(15, k=-1)]
+    y = scratch.values[np.tril_indices(15, k=-1)]
+    plt.plot(x, y, "o",color="b")
+    plt.ylabel("Biogrid Annotation Rate")
+    plt.xlabel("Average pairwise value")
+    
+    r, pval = sp.stats.pearsonr(x, y)
+    
+    decimals = 2
+    r = np.round(r, decimals)
+    pval = np.round(pval, decimals)
+    s = "\N{greek small letter rho}"
+    s += f" {r}"
+    s += f"\np-val {pval}"
+    plt.text(-5.5, 120, s)
+    
+    #plt.xlabel("Ground Truth")
+
+    plt.legend()
+    
+    plt.show()
+```
+
+```{python}
+# Map Prey Gene names to columns
+
+# ?sp.stats.pearsonr
+
+```
+
+```{python}
+cols = list(eid_to_preygene.keys())
+cols = cols[1:len(cols)] # drop '-'
+cols = [float(i) for i in cols]
+```
+
+```{python}
+training_bg_coverage.loc[cols, cols]
+```
+
+```{python}
+eid_to_preygene
+```
+
+```{python}
+training_bg_coverage = get_experimental_coverage_df(cullin_bg, cullin_report)
+```
+
+```{python}
+# Get Biogrid for the training set
+
+index_labels = get_all_indicies(biogrid, bounds_A, bounds_B, 1, 2)
+
+# Look at the subset of biogrid
+
+cullin_bg = biogrid.loc[index_labels]
+
+# Validate the data frame
+assert np.all(cullin_bg.iloc[:, 1].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
+assert np.all(cullin_bg.iloc[:, 2].apply(lambda x: True if str(int(x)) in eids_in_biogrid else False))
+
+nnodes = len(eids_in_biogrid)
+n_possible_edges = int(0.5*nnodes*(nnodes-1))
+
+nself = len(cullin_bg[cullin_bg.iloc[:, 1]==cullin_bg.iloc[:, 2]])
+not_self = cullin_bg.iloc[:, 1]!=cullin_bg.iloc[:, 2]
+
+cullin_bg = cullin_bg[not_self]
+```
+
+```{python}
+# Operate on
+cols = ["r1", "r3", "r3", "r4"]
+
+df = trainingset
+U = df[cols] @ df[cols].T
+p = len(U)
+
+
+# log10 transformation(SC) + prior
+
+# Do the sampling
+V = inv(U / 4 + np.eye(p))
+key = jax.random.PRNGKey(3721)
+n_samples = 1000000
+exp = sample_from_prior(key, 15, p, n_samples, V)
+```
+
+```{python}
+# How many failed ids are in the training set?
+
+len(set(failed_ids).intersection(df["Prey"]))
+# Conclusion - all ids except vif mapped
+```
+
+```{python}
+# Get the experimental coverage in biogrid
+
+        
+d = get_experimental_coverage_df(cullin_bg, cullin_report)
+```
+
+```{python}
+# Annotate the cullin benchmark with entrez genes and rows and columns
+cullin_benchmark_transformed = transform_cullin_benchmark_data(cullin_benchmark.data, id_mapping)
+```
+
+```{python}
+coverage_plot(d, w=16, h=14,)
+```
+
+```{python}
+ground_truth_pair_plot(np.log10(U / 16), inv(U + np.eye(p)),
+                      vmin1=1, vmax1=4.5, vmin2=-1., vmax2=1.,
+                      cmap1=sequential, cmap2=divergent, title1="log 10 correlations", title2="Precision + Prior")
+
+```
+
+```{python}
+ground_truth_pair_plot(inv(U + np.eye(p)), inv(U/4 + np.eye(p)),
+                      vmin1=-1.5, vmax1=1.5, vmin2=-1.5, vmax2=1.5,
+                      cmap1=divergent, cmap2=divergent, title1="Precision + Prior", title2="Scaled Precision + Prior")
+```
+
+```{python}
+# 4 replicate Plot
+
+fig, axs = ground_truth_pair_plot(np.array(np.var(exp.samples, axis=0)), np.array(np.mean(exp.samples, axis=0)), 
+                                 overwrite_diags=False,
+                                 vmin1=0,
+                                 vmin2=-12.5, vmax2=12.5,
+                                 cmap1=sequential, cmap2=divergent)
+
+axs[0].set_title(f"Ensemble average variance")
+axs[1].set_title(f"Ensemble average value over {'{:,}'.format(n_samples)} replicates")
+plt.show()
+```
+
+```{python}
+cocrystal_sel = cullin_bg["Experimental System"] == "Co-crystal Structure"
+cullin_bg_cocrystal = cullin_bg[cocrystal_sel]
+```
+
+```{python}
+s = cullin_benchmark_transformed["Bait"] == bait_name
+s2 = cullin_benchmark_transformed["SaintScore"] >= saint_cutoff
+s3 = s & s2
+assert np.alltrue(cullin_benchmark_transformed.loc[s3,cols] == df[cols])
+```
+
+```{python}
+# Check the experimental coverage for the training set
+trainingset = cullin_benchmark_transformed[s3]
+trainingset_report = biogrid_df_report(cullin_bg)
+```
+
+```{python}
+# Must select a subset of biogrid, then do the report
+```
+
+```{python}
+trainingset_coverage = get_experimental_coverage_df(trainingset, cullin_benchmark_transformed)
+
+coverage_plot(trainingset_coverage)
+```
+
+```{python}
+# ?coverage_plot
+```
+
+```{python}
+# ?biogrid_df_report
+```
+
+```{python}
+bait_name
+```
+
+```{python}
+s = cullin_benchmark_transformed["Bait"] == bait_name
+s2 = cullin_benchmark_transformed["SaintScore"] >= saint_cutoff
+s3 = s & s2
+assert np.alltrue(cullin_benchmark_transformed.loc[s3,cols] == df[cols])
+```
+
+```{python}
+set(cullin_bg["Experimental System"])
+```
+
+```{python}
+fig, axs = ground_truth_pair_plot(V, V, 
+                                 overwrite_diags=False,
+                                 vmin1=0,
+                                 vmin2=-1.5, vmax2=1.5,
+                                 cmap1=sequential, cmap2=divergent)
+```

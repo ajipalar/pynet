@@ -35,7 +35,6 @@ def kw_or_pos(code="", kw_or_pos: list[str] = mutable):
         kw_or_pos = []
     return siglist(l=kw_or_pos, code=code)
 
-
 def kw_only(code="", kwds_only: list[str] = mutable):
     if kwds_only is mutable:
         kwds_only = []

@@ -56,8 +56,8 @@ from src.wishart_synthetic_benchmark import (
     sample_from_prior,
     scatter_plot,
     simulate_from_prior,
-    try_sampling
-    
+    try_sampling,
+    ground_truth_pair_plot
 )
 # -
 
@@ -1275,7 +1275,7 @@ cmap = "gnuplot2"
 ground_truth_pair_plot(np.log10(variances100mil), np.log10(np.array(variances1000)), cmap1=cmap, cmap2=cmap,
                       vmin1=0, vmax1=scale1, vmin2=0, vmax2=scale2)
 
-
+K_theta[diag]
 
 ground_truth_pair_plot(Ks.samples[9], K_theta, cmap1=cmap, cmap2=cmap,
                       vmin1=-1, vmax1=1, vmin2=-1, vmax2=1)
@@ -1369,8 +1369,6 @@ plt.ylabel("log inv U diagonal elements")
 plt.xlabel('log inv COV diagonal elements')
 plt.show()
 # -
-
-
 
 U50[diag]
 

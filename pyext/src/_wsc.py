@@ -21,7 +21,6 @@ def example1():
         return jnp.log(rho) + jnp.log(sigma)
     
     
-    
     model_template = ModelTemplate(init_position)
     point_name = 9
     add_point(model_template, point_name)
@@ -100,7 +99,6 @@ def example7():
     m.add_multivariate_normal_restraint(m.group_ids[0], x="y", mean="muy", cov="covy")
     #m.add_multivariate_normal_restraint(m.group_ids[0], x="y", mean="muy", cov="covy")  # this throws an error to user as it should
     m.add_multivariate_normal_restraint(m.group_ids[0], x="y", mean="muy", cov="covy", auto_rename=True)
-
     return m
 
 def example8():
@@ -108,14 +106,19 @@ def example8():
     w = ModFileWriter(m)
     s = w.to_restraint_lines()
     h = w.Rheader()
-
     return m, w, s, h
 
+def example9(nnodes=64):
+    m = ModelTemplate()
+    m.add_contiguous_nodes(0, nnodes)  #create a 64 node model
+    g = tuple(range(0, nnodes))
+    m.add_node_group(g)
+    m.add_dof(g, "A", jnp.zeros((nnodes, nnodes)))
+    return m, g
+    # Add a parameter to the model
 
 def run_examples():
     start=1
     stop = 8
     for i in range(start, stop):
         exec(f"example{i}()")
-    
-
