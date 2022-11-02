@@ -80,3 +80,13 @@ def _log_det_tri(T):
 
 def _trace_term(L, A):
         return jnp.trace(inv(L.T) @ A @ A.T @ L.T)
+
+def connectivity():
+    """
+    The connectivity restraint
+    """
+
+    nconnected_components = graph.connected_components(A) 
+
+
+

@@ -118,7 +118,7 @@ def pop(s: Stack, s_l) -> tuple[int, Stack]:
 def push(val, s: Stack) -> Stack:
     return Stack(s.val.at[s.i].set(val), s.i + 1)
 
-def dfs(v, A, m):
+def dfs(v, A, m, p):
     """
     Starting at node u, perform a depth first search
     Perform a depth-first search over A
@@ -128,6 +128,15 @@ def dfs(v, A, m):
     m : the maximum number of edges
 
     After specializing on m dfs is jittable
+    #1. let S be a stack
+    #2. S.push(v)
+    #3. while S is not empty
+        #4. v = S.pop()
+        #5. if v not labeled as discovered
+            #6. label v as discovered
+
+            #7. for all adjacent edges from v to w in G.adjacenct_edges(v) do
+                # 8. S.push(v)
     """
     
     stack = -1 * jnp.ones(m) # add a node, 
@@ -138,24 +147,36 @@ def dfs(v, A, m):
     #1. let S be a stack
     s = Stack(m * jnp.ones(m), 0)
 
+    discoved = jnp.zeros(p, dtype=bool)
+
+
     #2. S.push(v)
 
     s = push(v, s)
 
-    def body():
-        ...
+    State = namedtuple("State",
+                       "s s_l m discovered")
 
-    #3. while S is not empty
+    def true_fun(val):
+        # 6. label v as discovered
+        discovered = val.discovered.at[val.v].set(1)
 
-    val = lax.while_loop(stack_not_empty, body, init)
 
+
+    def body(val):
         #4. v = S.pop()
+        v, s = pop(val.s, val.s_l)
 
         #5. if v not labeled as discovered
             #6. label v as discovered
 
             #7. for all adjacent edges from v to w in G.adjacenct_edges(v) do
                 # 8. S.push(v)
+
+    #3. while S is not empty
+
+    val = lax.while_loop(stack_not_empty, body, init)
+
 
 
 def stack_not_empty(s: Stack) -> bool:

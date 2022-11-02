@@ -294,7 +294,7 @@ class ModelTemplate:
 
     def __init__(
         self, 
-        mover_domain,
+        mover_domain: dict = mutable,
         position: dict = mutable, 
         proposal: dict = mutable, 
         restraints: dict = mutable,
@@ -376,7 +376,7 @@ class ModelTemplate:
                                           init_positions=mutable,
                                           auto_rename=False,
                                           allow_singular = None,
-                                          restraint_base_name=R.wsh.name):
+                                          restraint_base_name=R.mvn.name):
         model_template = self
         do_checks = self.do_checks
         _assert_fun(isinstance(x, str), f'x is not a string', self.do_checks)
