@@ -87,22 +87,18 @@ def adjacent_nodes(u, A, p) -> tuple:
     Variants = namedtuple("Variants", "nodes degree j")
     Invariants = namedtuple("Invariants", "A p m u")
     State = namedtuple("State", "iv vi")
-
-    m = int(0.5 * p * (p-1))
+    Val = namedtuple("Val", "state i")
 
     iv = Invariants(A=A,
                     p=p,
-                    m=m,
+                    m=int(0.5 * p * (p-1)),
                     u=u)
 
-    nodes = (iv.p) * jnp.ones(iv.p)
-
-    vi = Variants(nodes=nodes,
+    vi = Variants(nodes= iv.p * jnp.ones(iv.p),
                   degree=0,
                   j=0)
 
     state = State(iv, vi)
-    Val = namedtuple("Val", "state i")
 
     def cond_fun(val):
         p1 = val.state.iv.A[val.state.iv.u, val.i] == 1
@@ -169,8 +165,6 @@ def dfs(v, A, m, p):
                 # 8. S.push(v)
     """
     
-    stack = -1 * jnp.ones(m) # add a node, 
-    idx = 0  # stack index
 
     # G, v
 
@@ -204,10 +198,10 @@ def dfs(v, A, m, p):
     vi = Variants(s=Stack(p * jnp.ones(iv.s_l, dtype=int), 0),
                   discovered = jnp.zeros(iv.p, dtype=bool),
                   v=0)
-    #2. S.push(v)
-    s = push(v, vi.s)
 
-    vi = Variants(s=s, discovered=vi.discovered, v=v)
+    vi = Variants(s=push(v, vi.s),           #2. S.push(v)
+                  discovered=vi.discovered,  # none 
+                  v=v)
     state = State(iv, vi)
 
     def true_fun(state):
