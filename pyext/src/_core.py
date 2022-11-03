@@ -1019,11 +1019,16 @@ def _add_restraint(
     """
     #print("enter add")
     # 1. If the scope_key in mapping is not in the position dict then the key is added with value init_position 
+    if scope_key not in model_template.position:
+        model_template[scope_key] = {}
 
     if init_positions is mutable:
         init_positions = {}
         for key in mapping:
-            init_positions[key] = 1.
+            if key in model_template.position[scope_key]: 
+                init_positions[key] = model_template.position[scope_key][key] 
+            else:
+                init_positions[key] = 1.
 
     if is_variable is mutable:
         is_variable = {}
