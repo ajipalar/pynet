@@ -49,7 +49,7 @@ def test_dfs(src: Module):
     
     discovered = [1, 3, 4, 4]
     for i,j in enumerate(state.discovered):
-        assert j == discovered[i], f"{i, j, discovered[i]}
+        assert j == discovered[i], f"{i, j, discovered[i]}"
 
 
 
@@ -60,3 +60,6 @@ class GraphTests(IMP.test.TestCase):
 
     def test_adjacent_nodes(self):
         test_adjacent_nodes(self.src)
+
+    def test_dfs(self):
+        test_dfs(self.src)
