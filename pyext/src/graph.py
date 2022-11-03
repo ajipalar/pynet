@@ -138,7 +138,7 @@ def dequeue(q: Queue, q_l):
 
 Stack = namedtuple("Stack", "val i")
 
-def pop(s: Stack, s_l) -> tuple[int, Stack]:
+def pop(s: Stack) -> tuple[int, Stack]:
     return s.val[s.i-1], Stack(s.val, s.i-1)
 
 def push(val, s: Stack) -> Stack:
@@ -201,58 +201,66 @@ def dfs(v, A, m, p):
 
     vi = Variants(s=push(v, vi.s),           #2. S.push(v)
                   discovered=vi.discovered,  # none 
-                  v=v)
+                  v=vi.v)
+
     state = State(iv, vi)
 
-    def true_fun(state):
-        # 6. label v as discovered
-        def cond_fun(state):
-            ...
-
-        def body_fun(state):
-            ...
+    def s_not_empty(state) -> bool:
+        return state.vi.s.i > 0
 
 
-        discovered = state.vi.discovered.at[state.vi.v].set(True)
-        state = lax.while_loop(cond_fun, body_fun, state)
-
-
-    def forbody(i, state):
-        T = namedtuple('T', 'adj_nodes state')
-        adj_nodes = adjacent_nodes(state.vi.v, state.iv.A, state.iv.p) # p length array
-        t = T(adj_nodes, state)
-
-
-        def cond_fun(t):
-            return t
-        
-        def while_loop(state):
-            ...
-
-        state = lax.while_loop(cond_fun, while_loop, state)
-
-
-
-                # 8. S.push(v)
-
-    def body(state):
+    def dfs_loop(state):
         #4. v = S.pop()
-        v, s = pop(state.vi.s, state.iv.s_l)
+        v, s = pop(state.vi.s)
         vi = Variants(s=s, 
-                      discovered=state.vi.discovered)
+                      discovered=state.vi.discovered,
+                      v=v)
         state = State(vi, state.iv)
         return lax.cond(not state.vi.discovered[state.vi.v], true_fun, lambda x: x, state)
         
 
-        #5. if v not labeled as discovered
-            #6. label v as discovered
+    def true_fun(state):
+        W = namedtuple("WV", "degidx adj deg")
 
-            #7. for all adjacent edges from v to w in G.adjacenct_edges(v) do
-                # 8. S.push(v)
 
-    #3. while S is not empty
+        def while_condf(v):
+            state, w = v
+            return w.degidx < w.deg
 
-    val = lax.while_loop(stack_not_empty, body, init)
+        def body_fun(v):
+            state, w = v
+            
+            u = w.adj[w.degidx]
+            s = push(u, state.vi.s)
+
+            state = State(iv=state.iv,
+                          vi=Variants(s, state.vi.discovered, state.vi.v))
+
+            w = W(degidx=w.degidx + 1,
+                  adj=w.adj,
+                  deg=w.deg)
+
+            return state, w
+
+
+        # 6. label v as discovered
+        discovered = state.vi.discovered.at[state.vi.v].set(True)
+        state = State(iv=state.iv,
+                      vi=Variants(state.vi.s,
+                                  discovered,
+                                  state.vi.v))
+
+        adj_nodes, degree = adjacent_nodes(state.vi.v, state.iv.A, state.iv.p)
+
+        w = W(degidx=0,
+              adj=adj_nodes,
+              deg=degree)
+        state, _ = lax.while_loop(while_condf, body_fun, (state, w))
+        return state
+
+    state = lax.while_loop(s_not_empty, dfs_loop, state)
+    return state
+
 
 
 

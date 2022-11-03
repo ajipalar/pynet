@@ -36,6 +36,22 @@ def test_adjacent_nodes(src: Module):
     for i, j in enumerate(arr):
         assert arr[i] == i + 1
 
+def test_dfs(src: Module):
+    p = 4
+    A = np.zeros((p, p))
+    A[0, 1] = 1
+    A[0, 3] = 1
+    A[0, 0] = 1000
+    A = A + A.T
+    m = int(0.5 * p * (p - 1))
+
+    state = src.dfs(0, A, m, p)
+    
+    discovered = [1, 3, 4, 4]
+    for i,j in enumerate(state.discovered):
+        assert j == discovered[i], f"{i, j, discovered[i]}
+
+
 
 
 class GraphTests(IMP.test.TestCase):
