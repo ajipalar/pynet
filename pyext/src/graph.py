@@ -89,16 +89,23 @@ def adjacent_nodes(u, A, p) -> tuple:
     State = namedtuple("State", "iv vi")
     Val = namedtuple("Val", "state i")
 
+    m = p * (p - 1) // 2 
+ 
     iv = Invariants(A=A,
                     p=p,
-                    m=int(0.5 * p * (p-1)),
+                    m=m,
                     u=u)
 
-    vi = Variants(nodes= iv.p * jnp.ones(iv.p),
+    nodes = p * jnp.ones(p, dtype=int)
+
+    vi = Variants(nodes=nodes,
                   degree=0,
                   j=0)
 
-    state = State(iv, vi)
+    state = State(iv=iv, 
+                  vi=vi)
+
+    #adjacent_nodes = jax.tree_util.Partial(adjacent_nodes)
 
     def cond_fun(val):
         p1 = val.state.iv.A[val.state.iv.u, val.i] == 1
@@ -123,7 +130,7 @@ def adjacent_nodes(u, A, p) -> tuple:
                        val)
         return val.state
     
-    state = lax.fori_loop(0, state.iv.p, body, state)
+    state = lax.fori_loop(0, p, body, state)
     #nodes = nodes.at[u].set(-1)
     return jnp.sort(state.vi.nodes), state.vi.degree
 
@@ -183,27 +190,30 @@ def dfs(v, A, m, p):
     # Allocate a stack
 
     Invariants = namedtuple("Invariants",
-                            "p s_l A m")
+                            "p A m")
     Variants = namedtuple("Variants",
                           "s discovered v")
 
     State = namedtuple("State",
                        "iv vi")
+    s_l = p * (p - 1) 
+
+    s = p * jnp.ones(s_l, dtype=int)
+    discovered = jnp.zeros(p, dtype=bool)
+    
+    s = Stack(s, 0)
+    s = push(v, s)
+
+    vi = Variants(s=s,
+                  discovered=discovered,  # none 
+                  v=v)
 
     iv =  Invariants(p=p,
-                     s_l=p * (p - 1),
                      A=A,
                      m=m)
-                     
-    vi = Variants(s=Stack(p * jnp.ones(iv.s_l, dtype=int), 0),
-                  discovered = jnp.zeros(iv.p, dtype=bool),
-                  v=0)
 
-    vi = Variants(s=push(v, vi.s),           #2. S.push(v)
-                  discovered=vi.discovered,  # none 
-                  v=vi.v)
-
-    state = State(iv, vi)
+    state = State(iv=iv, 
+                  vi=vi)
 
     def s_not_empty(state) -> bool:
         return state.vi.s.i > 0
@@ -215,8 +225,9 @@ def dfs(v, A, m, p):
         vi = Variants(s=s, 
                       discovered=state.vi.discovered,
                       v=v)
-        state = State(vi, state.iv)
-        return lax.cond(not state.vi.discovered[state.vi.v], true_fun, lambda x: x, state)
+        state = State(iv=iv,
+                      vi=vi)
+        return lax.cond(state.vi.discovered[state.vi.v]==False, true_fun, lambda x: x, state)
         
 
     def true_fun(state):
@@ -250,7 +261,7 @@ def dfs(v, A, m, p):
                                   discovered,
                                   state.vi.v))
 
-        adj_nodes, degree = adjacent_nodes(state.vi.v, state.iv.A, state.iv.p)
+        adj_nodes, degree = adjacent_nodes(state.vi.v, state.iv.A, p)
 
         w = W(degidx=0,
               adj=adj_nodes,

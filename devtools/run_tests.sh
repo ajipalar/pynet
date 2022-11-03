@@ -1,5 +1,5 @@
 #!/bin/bash
-module load Sali
+module load sali
 conda activate pynetp3.10.0
 
 pwd

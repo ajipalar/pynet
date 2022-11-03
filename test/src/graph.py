@@ -4,6 +4,7 @@ import IMP.test
 import numpy as np
 import jax.numpy as jnp
 from typing import Any
+from functools import partial
 
 Module = Any
 
@@ -45,12 +46,15 @@ def test_dfs(src: Module):
     A = A + A.T
     m = int(0.5 * p * (p - 1))
 
-    state = src.dfs(0, A, m, p)
-    
-    discovered = [1, 3, 4, 4]
-    for i,j in enumerate(state.discovered):
-        assert j == discovered[i], f"{i, j, discovered[i]}"
+    dfs = partial(src.dfs, m=m, p=p)
 
+    state = dfs(0, A)
+    
+    discovered_list = [1, 3, 4, 4]
+    found = np.where(state.vi.discovered == True)
+    for i, val in enumerate(state.vi.discovered):
+        s = f"i={i} val={int(val)} discovered_list={discovered_list[i]}\n{state.vi.discovered}\n{A}"
+        assert int(val) == discovered_list[i], s
 
 
 
