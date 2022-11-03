@@ -1,1 +1,2 @@
 alias ptest="py -m test.local.test_poissonsqr"
+alias ltest="./devtools/localtest.sh"
