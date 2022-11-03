@@ -71,35 +71,65 @@ def add_nodes(model, n):
     return model
 
 
-def adjacent_nodes(u, A, p):
+def adjacent_nodes(u, A, p) -> tuple:
     """
-    returns an ordered p-length array
-    where the entries equal to p represent no edge
-    
+    Find the adjacent nodes of an edge
 
-    convention -1 is trash
+    Args:
+      u : int a node in the graph
+      A : the p x p adjacency matrix
+      p : int 
 
-    The returned array has -1 where there 
+    Returns:
+      arr : a p length array whose entries are the adjacent vertices
+      degree : the degree of the node
     """
+    Variants = namedtuple("Variants", "nodes degree j")
+    Invariants = namedtuple("Invariants", "A p m u")
+    State = namedtuple("State", "iv vi")
 
     m = int(0.5 * p * (p-1))
 
-    nodes = (p) * jnp.ones(p)
+    iv = Invariants(A=A,
+                    p=p,
+                    m=m,
+                    u=u)
 
-    def body(i, val):
-        return lax.cond(val.A[u, i]==1, 
-                       lambda val: V(val.A, val.nodes.at[val.j].set(i), val.j + 1),
-                       lambda val: V(val.A, val.nodes, val.j),
+    nodes = (iv.p) * jnp.ones(iv.p)
+
+    vi = Variants(nodes=nodes,
+                  degree=0,
+                  j=0)
+
+    state = State(iv, vi)
+    Val = namedtuple("Val", "state i")
+
+    def cond_fun(val):
+        p1 = val.state.iv.A[val.state.iv.u, val.i] == 1
+        p2 = val.state.iv.u != val.i
+        return p1 & p2
+
+    def true_fun(val):
+        nodes = val.state.vi.nodes.at[val.state.vi.j].set(val.i)
+        j = val.state.vi.j + 1
+        degree = val.state.vi.degree + 1
+        vi = Variants(nodes, degree, j)
+        state = State(iv, vi)
+        
+        return Val(state, val.i)
+
+
+    def body(i, state):
+        val = Val(state, i)
+        val = lax.cond(cond_fun(val), 
+                       true_fun, 
+                       lambda x: x,
                        val)
+        return val.state
     
-    V = namedtuple("V", "A nodes j")
-    val = V(A, nodes, 0)
-
-    val = lax.fori_loop(0, p, body, val)
+    state = lax.fori_loop(0, state.iv.p, body, state)
     #nodes = nodes.at[u].set(-1)
-    nodes = val.nodes
-    nodes = nodes.at[jnp.where(nodes==u)].set(p) # remove the self node
-    return jnp.sort(nodes)
+    return jnp.sort(state.vi.nodes), state.vi.degree
 
 def enqueue(val, q: Queue):
     return Queue(q.val.at[q.i].set(val), q.i + 1)
@@ -145,27 +175,80 @@ def dfs(v, A, m, p):
     # G, v
 
     #1. let S be a stack
-    s = Stack(m * jnp.ones(m), 0)
+     # A node can only be discovered once
+     # There are p nodes
+     # During any discovery up to p-1 additional nodes may be added to the stack
+     # Before adding nodes onto the stack a node is removed
+     # therefore the max stack size is p * (p-1) - p
+     # duplicate vertices may be placed on the stack
+     # let n be the number of vertices and m be the maximum number of edges given n
+     # what is the maximum number of duplicate vertices?
+     # Fully connected graph, each vertex has n-1 adjacent vertices
+     # So 
 
-    discoved = jnp.zeros(p, dtype=bool)
+    # Allocate a stack
 
-
-    #2. S.push(v)
-
-    s = push(v, s)
+    Invariants = namedtuple("Invariants",
+                            "p s_l A m")
+    Variants = namedtuple("Variants",
+                          "s discovered v")
 
     State = namedtuple("State",
-                       "s s_l m discovered")
+                       "iv vi")
 
-    def true_fun(val):
+    iv =  Invariants(p=p,
+                     s_l=p * (p - 1),
+                     A=A,
+                     m=m)
+                     
+    vi = Variants(s=Stack(p * jnp.ones(iv.s_l, dtype=int), 0),
+                  discovered = jnp.zeros(iv.p, dtype=bool),
+                  v=0)
+    #2. S.push(v)
+    s = push(v, vi.s)
+
+    vi = Variants(s=s, discovered=vi.discovered, v=v)
+    state = State(iv, vi)
+
+    def true_fun(state):
         # 6. label v as discovered
-        discovered = val.discovered.at[val.v].set(1)
+        def cond_fun(state):
+            ...
+
+        def body_fun(state):
+            ...
+
+
+        discovered = state.vi.discovered.at[state.vi.v].set(True)
+        state = lax.while_loop(cond_fun, body_fun, state)
+
+
+    def forbody(i, state):
+        T = namedtuple('T', 'adj_nodes state')
+        adj_nodes = adjacent_nodes(state.vi.v, state.iv.A, state.iv.p) # p length array
+        t = T(adj_nodes, state)
+
+
+        def cond_fun(t):
+            return t
+        
+        def while_loop(state):
+            ...
+
+        state = lax.while_loop(cond_fun, while_loop, state)
 
 
 
-    def body(val):
+                # 8. S.push(v)
+
+    def body(state):
         #4. v = S.pop()
-        v, s = pop(val.s, val.s_l)
+        v, s = pop(state.vi.s, state.iv.s_l)
+        vi = Variants(s=s, 
+                      discovered=state.vi.discovered)
+        state = State(vi, state.iv)
+        return lax.cond(not state.vi.discovered[state.vi.v], true_fun, lambda x: x, state)
+        
 
         #5. if v not labeled as discovered
             #6. label v as discovered
