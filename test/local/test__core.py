@@ -7,6 +7,9 @@ import collections
 import jax
 import jax.numpy as jnp
 import numpy as np
+import sys
+
+sys.path.append("pyext/src")
 
 from ..src import _core as td
 import pyext.src._core as src_module

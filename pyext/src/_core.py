@@ -342,6 +342,9 @@ class ModelTemplate:
         _assert_fun(start < stop, self.do_checks)
         for i in range(start, stop):
             add_point(self, i, do_checks=self.do_checks)
+    
+    def add_node_indices(self, node_indices):
+        add_node_indices(self, node_indices)
 
     def add_restraint(self, scope_key, mapping: dict, logprob_fn, options: dict = mutable):
         """
