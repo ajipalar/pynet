@@ -46,7 +46,6 @@ def test_add_point(src):
     assert m.position[0] == {}
     assert len(m.restraints) == 0
 
-
 def test_add_contiguous_nodes(src):
     s = helper_setup()
     m = src.ModelTemplate()

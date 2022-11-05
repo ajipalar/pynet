@@ -27,6 +27,8 @@ from functools import partial
 from collections import namedtuple
 from jax.tree_util import tree_flatten, tree_unflatten
 
+from ToyModelGlobals import (inv, split, SampleParams, SampleState, InfState)
+
 
 # +
 def select(nodes, A):
