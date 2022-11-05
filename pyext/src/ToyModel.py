@@ -1,10 +1,10 @@
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-import pyext.src.lpdf as lpdf
-import pyext.src.lpmf as lpmf
-import pyext.src.matrix as mat
-import pyext.src.pynet_rng as rng
+import lpdf as lpdf
+import lpmf as lpmf
+import matrix as mat
+import pynet_rng as rng
 import matplotlib.pyplot as plt
 import numpy as np
 from itertools import combinations, permutations
@@ -348,7 +348,7 @@ def update_sampling_state(sample_state):
     #print(log_alpha)
     
     alpha = jnp.exp(log_alpha)
-    jax.debug.print(f"{alpha}")
+    #jax.debug.print(f"{alpha}")
     
     u = jax.random.uniform(k0, minval=0, maxval=1)
     
@@ -549,7 +549,6 @@ def mc_summary_stats(state, infstate):
 
 mc_summary_stats(ostate, oinf)
 
-out_infstate
 
 # +
 init_infstate = init_inference_state(1000, 100)
@@ -594,28 +593,4 @@ jax.lax.cond(0, dosaves, dontsave, val)
 def ftest(x):
     mytupe = namedtuple("X", 'x, y')
     return mytupe(x, 0)
-
-
-x = jnp.arange(-10, 10)
-y = jsp.stats.logistic.cdf(x)
-plt.plot(x, y, 'r.')
-
-s = 0
-for i in range(100):
-    ky = jax.random.PRNGKey(i)
-    s += jax.random.randint(ky, shape=(1,), minval=0, maxval=1)
-print(s)
-
-# exponential distribution
-x = jnp.arange(0, 10)
-ypdf = jsp.stats.expon.pdf(x, scale=2)
-ylpdf = jsp.stats.expon.logpdf(x, scale=2)
-plt.plot(x, ypdf)
-plt.plot(x, ylpdf)
-
-inv(y2 @ y2.T)
-
-projectAtog1(Atrue).at[jnp.diag_indices(p1)].set(2)
-
-norm_squares(data_prec1)
 
