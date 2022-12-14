@@ -64,6 +64,8 @@ Functions the model may need
 
 import numpy as np
 import numpy.typing as npt
+import jax
+import jax.numpy as jnp
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from typing import TypeAlias, Union, Callable, Any
@@ -123,6 +125,43 @@ RestraintNumberToBaseName = {form.value:name for name, form in R.__members__.ite
 RestraintBaseNameToNumber = {val: key for key, val in RestraintNumberToBaseName.items()} 
 
 # Some helper funcitons
+
+def get_projection_indices(indices: tuple) -> tuple:
+    """
+    Get the indexing tuple to project a larger matrix
+    to a smaller one
+    """
+    assert isinstance(indices, tuple)
+    indicies = tuple(sorted(indices))
+    l = len(indices)
+    rows = []
+    columns = []
+    for index in indices:
+        rows += [index] * l
+    for i in range(l):
+        columns += list(indices)
+
+    rows = tuple(rows)
+    columns = tuple(columns)
+
+    assert len(rows) == len(columns) == l * l
+    return rows, columns
+
+def project(matrix, projection_indices: tuple, size_l: int):
+    """
+    project a large matrix to a smaller one - jittable
+    """
+    return matrix[projection_indices].reshape((size_l, size_l))
+
+
+    
+
+    
+
+
+        
+
+    
 
 
 def safe_update(key, val, d):
