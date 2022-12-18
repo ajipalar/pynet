@@ -508,8 +508,10 @@ class ModelTemplate:
             for node in node_ids:
                 assert node < l
 
-        pi_ = get_projection_indices(node_ids)
-        self.position[group_id] = {'nodes': node_ids, 'nv': l, 'pi_': pi_} 
+        xs, ys = get_projection_indices(node_ids)
+        xs = jnp.array(xs)
+        ys = jnp.array(ys)
+        self.position[group_id] = {'nodes': jnp.array(node_ids), 'nv': l, 'pi_': (xs, ys)} 
         if init_adjacency:
             self.position[group_id]['A'] = jnp.zeros((l, l))
 
