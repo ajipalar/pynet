@@ -66,6 +66,7 @@ import numpy as np
 import numpy.typing as npt
 import jax
 import jax.numpy as jnp
+from jax.tree_util import Partial, tree_flatten
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from typing import TypeAlias, Union, Callable, Any
@@ -479,6 +480,49 @@ class ModelTemplate:
                                        auto_rename=auto_rename,
                                        is_variable=is_variable)
 
+    def add_group(self, group_id: str, node_ids: tuple,
+                  init_adjacency=False):
+        """
+        Adds a node group to the model position
+
+        group_id : str the model group id
+        node_ids : tuple i.e., (0, 1, 4) ordered
+        init_adjacency : bool
+          if true initializes the adjacency matrix to the 0 matrix
+
+        Examples
+
+        m.add_group('root', tuple(range(100)))
+        """
+
+        l = len(node_ids)
+        assert l > 0
+        _assert_fun(group_id not in self.position, f"{group_id} already in position", self.do_checks)
+        assert isinstance(node_ids, tuple)
+        assert isinstance(group_id, str)
+        assert node_ids == tuple(sorted(node_ids))
+        for node in node_ids:
+            assert node > -1, f"{node}"
+            assert isinstance(node, int)
+        if group_id == 'root':
+            for node in node_ids:
+                assert node < l
+
+        pi_ = get_projection_indices(node_ids)
+        self.position[group_id] = {'nodes': node_ids, 'nv': l, 'pi_': pi_} 
+        if init_adjacency:
+            self.position[group_id]['A'] = jnp.zeros((l, l))
+
+    def add_parameter(self, group_id: str, param_id: str, init_value):
+        """
+        Adds a parameter to a group
+        """
+
+        assert param_id not in self.position[group_id]
+        assert isinstance(param_id, str)
+        self.position[group_id][param_id] = init_value
+
+
     def add_node_group(self, indices, init_params: dict = mutable):
         if init_params is mutable:
             init_params = {}
@@ -620,9 +664,8 @@ class ModFileWriter:
                 rparam_line = self.to_rparam_line(rparams)
                 lines += f"R    {pid}    {name}    {form}    {rparam_line}\n"
         return lines
+
         
-
-
 # Functions that add things to the model template
 def add_point(model_template, point_name: str, init_value: dict=mutable, do_checks=True):
     """Adds a point to the model position"""
@@ -909,6 +952,56 @@ def _assert_fun(pred, msg: str, do_checks=True):
     if do_checks:
         assert pred, msg
 
+def build_model_score(m: ModelTemplate):
+
+    restraint_ids = []
+    restraints = []
+    for scope in m.restraints:
+        assert isinstance(scope, str)
+        
+        for r_name in m.restraints[scope]:
+            assert isinstance(r_name, str)
+            rid = f"{scope}_{r_name}"
+            restraint_ids.append(rid)
+            restraints.append(Partial(m.restraints[scope][r_name]))
+
+    assert len(restraints) == len(restraint_ids)
+    n_restraints = len(restraint_ids)
+    
+    # loop through the restraints
+
+
+    # Perform a textual definition
+    doc = """
+    def get_restraint_scores(x, flist):
+        y0 = flist[0](x)
+        y1 = flist[1](x)
+        ...
+        yn = flist[n](x)
+        return jnp.array([y0, y1, ... , yn])
+    """
+    
+    s = pyile.unroll_restraint_loop(n_restraints, 'get_restraint_scores')
+    # Unroll the loop
+    s_l = locals().copy()
+    s_g = globals().copy()
+    print(f"!!! Debug !!!\n{s}")
+
+    exec(s, s_g, s_l)
+    # Bring the funciton into the local scope
+
+    get_restraint_scores = s_l['get_restraint_scores']
+    get_restraint_scores.__doc__ = doc
+    get_restraint_scores = partial(get_restraint_scores, flist=restraints)
+
+    def get_model_score(restraint_scores) -> float:
+        """
+        The model score is the sum of the restraints 
+        """
+        return jnp.sum(restraint_scores)
+
+    return get_model_score, get_restraint_scores, restraint_ids 
+
 def _build_model_score_fn(flist):
     assert len(flist) > 1, f"have more than one restraint before building"
     f0 = flist[0]
@@ -1092,7 +1185,9 @@ def _add_restraint(
 
     # 3. capture the scope_key by closure
     def restraint(position) -> float:
-        return scope_restraint(**position[scope_key])
+        jax.debug.print("scope_key: {}", scope_key)
+        scope = position[scope_key]
+        return scope_restraint(**scope)
 
     docstring = _create_docstring_from_mapping(**locals())
     restraint = _update_function_docstring(restraint, docstring)
