@@ -1,6 +1,8 @@
 import re
 import pandas as pd
+import json
 from dataclasses import dataclass, KW_ONLY
+from collections import namedtuple
 
 @dataclass
 class HHResults:
@@ -22,16 +24,16 @@ class HHResults:
     p_value: list
     score: list
     cols: list
-    q_start: list
-    q_end: list
-    t_start: list
-    t_end: list
+    query_start: list
+    query_end: list
+    template_start: list
+    template_end: list
 
     def validate(self):
-        assert len(self.q_end) \
-           ==  len(self.t_end)  \
-           ==  len(self.q_start)  \
-           ==  len(self.t_start)  \
+        assert len(self.query_end) \
+           ==  len(self.template_end)  \
+           ==  len(self.query_start)  \
+           ==  len(self.template_start)  \
            ==  len(self.pdb_id)  \
            ==  len(self.chain_id) \
            ==  len(self.prob) \
@@ -39,13 +41,101 @@ class HHResults:
            ==  len(self.e_value) \
            ==  len(self.cols) \
            ==  len(self.score)
- 
+
+    def select(self, start, stop):
+        """
+        Select all the lists from start to stop
+        """
+        self.pdb_id = self.pdb_id[start:stop]
+        self.chain_id = self.chain_id[start:stop]
+        self.description = self.description[start:stop]
+        self.prob = self.prob[start:stop]
+        self.e_value = self.e_value[start:stop]
+        self.p_value = self.p_value[start:stop]
+        self.score = self.score[start:stop]
+        self.cols=self.cols[start:stop]
+        self.query_start = self.query_start[start:stop]
+        self.query_end = self.query_end[start:stop]
+        self.template_start = self.template_start[start:stop]
+        self.template_end = self.template_end[start:stop]
+
+    def to_numeric(self):
+        """
+        Converts the string representation of the HHR hits to numeric representation 
+        """
+
+        self.prob = [float(j) for j in self.prob]
+        self.e_value = [float(j) for j in self.e_value]
+        self.p_value = [float(j) for j in self.p_value]
+        self.score = [float(j) for j in self.score]
+
+        for i in range(len(self.cols)):
+            assert self.cols[i].strip(" ").isnumeric(), f"cols {self.cols[i]}"
+            assert self.query_start[i].strip(" ").isnumeric()
+            assert self.query_end[i].strip(" ").isnumeric()
+            assert self.template_start[i].strip(" ").isnumeric()
+            assert self.template_end[i].strip(" ").isnumeric()
+
+        self.cols = [int(j) for j in self.cols]
+        self.query_start = [int(j) for j in self.query_start]
+        self.query_end = [int(j) for j in self.query_end]
+        self.template_start = [int(j) for j in self.template_start]
+        self.template_end = [int(j) for j in self.template_end]
+
+RegExPiece = namedtuple("RegExPiece",
+                        "no pdb_id chain_id prob e_value p_value score cols hmm") 
 
 
 
+regex_piece = RegExPiece(no =      "^ *[0-9]{1,3}",
+                         pdb_id =  "[A-Za-z0-9]{4}",
+                         chain_id= "[A-Za-z0-9]+",
+                         prob =    "[0-9]{1,3}\.[0-9]",
+                         e_value = "[0-9\.E\-\+]{1,7}",
+                         p_value = "[0-9\.E\-\+]{2,7}",
+                         score =   "[0-9\.E\-]{3,6}",
+                         cols =    "[0-9]{1,5}",
+                         hmm =     "[0-9]{1,5}")
 
+FirstFields = namedtuple("FirstFields",
+                         "pdb_id chain_id")
+SecondFields = namedtuple("SecondFields",
+                          "prob e_value p_value score")
+ThirdFields = namedtuple("ThirdFields",
+                         "cols query_start query_end template_start template_end")
+class RegEx:
+    """
+    The HHR_Re class defines the functionality for
+    compiling and matching regular expressions for
+    .hhr files. These are the log files from hhblits.
+    They can be found in data/interim/cullin_e3_ligase/hhblits_out/
+    They have the suffix .log instead of the suffix .hhr
+    
+    Class Attributes
+
+      Attributes that begin with 
+
+    """
+
+    pdb_id_chain_id = re.compile((
+        f"{regex_piece.no} ({regex_piece.pdb_id})_"
+        f"({regex_piece.chain_id}) +"))
+    prob_e_value_p_value_score = re.compile(".{34} +" + (
+        f"({regex_piece.prob}) +"
+        f"({regex_piece.e_value}) +"
+        f"({regex_piece.p_value}) +"
+        f"({regex_piece.score}) +"
+        f"0\.0 +"))
+    cols_qstart_qend_tstart_tend = re.compile(".{63} +0\.0 +" + (
+        f"({regex_piece.cols}) +({regex_piece.hmm})-({regex_piece.hmm}) +"
+        f"({regex_piece.hmm})-({regex_piece.hmm}) *\([0-9]+\)"))
+
+    # Define the pieces  
 
 class HHR:
+    """
+    Depricated dataclass. Use HHResults
+    """
     def __init__(self,
                  uid: str, match_columns, 
                  no_of_seqs,
@@ -59,8 +149,8 @@ class HHR:
                  note: list, prob: list,
                  e_value: list, p_value: list,
                  score: list, cols: list,
-                 q_start: list, q_end: list,
-                 t_start: list, t_end: list):
+                 query_start: list, query_end: list,
+                 template_start: list, template_end: list):
         self.uid = uid
         self.match_columns = match_columns
         self.no_of_seqs = no_of_seqs
@@ -76,10 +166,10 @@ class HHR:
         self.p_value = p_value
         self.score = score
         self.cols = cols
-        self.q_start = q_start
-        self.q_end = q_end
-        self.t_start = t_start
-        self.t_end = t_end
+        self.query_start = query_start
+        self.query_end = query_end
+        self.template_start = template_start
+        self.template_end = template_end
 
 def parse_log(handle, is_uniprot_accesion_id=None):
     """
@@ -102,8 +192,8 @@ def parse_log(handle, is_uniprot_accesion_id=None):
            "note": [], "prob": [],
            "e_value": [], "p_value": [],
            "score": [], "cols": [],
-           "q_start": [], "q_end": [],
-           "t_start": [], "t_end": []}
+           "query_start": [], "query_end": [],
+           "template_start": [], "template_end": []}
 
     with open(handle, 'r') as f:
         line1 = f.readline().strip("\n")
@@ -158,63 +248,51 @@ def parse_log(handle, is_uniprot_accesion_id=None):
         line9 = f.readline().strip("\n")
         assert line9== " No Hit" + " "*29 + "Prob E-value P-value  Score" \
                 + "    SS Cols Query HMM  Template HMM", line9
-
-        log_output = re.compile("^ *[0-9]+ ([A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9])" \
-                + "_([A-Za-z0-9]+) (.{18-23}) +([0-9]+\.[0-9]+) +([0-9]+\.[0-9]+(E\-[0-9]+)*)" \
-                + " +([0-9]+\.[0-9]+) + [0-9]+\.[0-9]+ +([0-9]+) +([0-9])+\-([0-9]+) +" \
-                + "([0-9]+)\-([0-9]+) +\([0-9]+\) *")
-
-        r_pdb =     re.compile("^ *[0-9]+ ([A-Za-z0-9]{4})")
-        r_chain =   re.compile("^ *[0-9]+ [A-Za-z0-9]{4}_([A-Za-z0-9]+)")
-        r_prob =    re.compile(".{34} +([0-9]{1,3}\.[0-9])")
-        r_e_value = re.compile(".{40} ([0-9\.E\- ]{7}) +[0-9]")
-        r_p_value = re.compile(".{48} ([0-9\.E\- ]{7})  [0-9\.E\- ]{6}")
-        r_score   = re.compile(".{56} ([0-9\.E\- ]{6})")
-        r_cols =    re.compile(".{69} ([0-9 ]{4})  [0-9]{1,4}-[0-9]{1,4}  ")
-        r_qhmm =    re.compile(".{74} ([0-9 ]{1,4})-([0-9 ]{1,4}) +[0-9 ]{1,4}-[0-9]{1,4} *\(")
-        r_Thmm =    re.compile(".{84} ([0-9 ]{1,5})-([0-9 ]{1,4}) *\(")
-
+       
+        n_matches = 0
         for line_num, hitline in enumerate(f):
 
             hitline = hitline.strip("\n")
             #assert '\n' not in hitline
             #assert m.match(hitline), (line_num, hitline)
-           
-            if r_pdb.match(hitline):
-                print(line_num, hitline)
-                log_out_split  = log_output.split(hitline)
-                _, pdb_id, _   =      r_pdb.split(hitline)
-                _, chain_id, _ =    r_chain.split(hitline)
-                _, prob, _     =     r_prob.split(hitline)
-                _, e_value, _  =  r_e_value.split(hitline)
-                _, p_value, _  =  r_p_value.split(hitline)
-                _, score , _   =    r_score.split(hitline)
-                _, cols  , _   =     r_cols.split(hitline) 
-                _, q_start, q_end, _ = r_qhmm.split(hitline)
-                _, t_start, t_end, _ = r_Thmm.split(hitline)
 
-                #r_description = re.compile("^ *[0-9]+ [A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]_[A-Za-z0-9]+" \
-                #+ " (.{" + f"{24 - n_chain_id_chars}" + "}) ")
+            if RegEx.pdb_id_chain_id.match(hitline): 
+                n_matches += 1
+                print(hitline)
+#                log_out_split  = log_output.split(hitline)
 
-                #_, description, _ = r_description.split(hitline)
+                _,  *first_fields, _ = RegEx.pdb_id_chain_id.split(hitline)
+                _, *second_fields, _ = RegEx.prob_e_value_p_value_score.split(hitline)
+                _, *third_fields, _ = RegEx.cols_qstart_qend_tstart_tend.split(hitline)
 
-                out["pdb_id"].append(pdb_id)
-                out["chain_id"].append(chain_id)
-                out["prob"].append(prob)
-                out["e_value"].append(e_value)
-                out["p_value"].append(p_value)
-                out["score"].append(score)
-                out["cols"].append(cols)
-                out["q_start"].append(q_start)
-                out["q_end"].append(q_end)
-                out["t_start"].append(t_start)
-                out["t_end"].append(t_end)
+                first_fields = FirstFields(*first_fields)
+                second_fields = SecondFields(*second_fields)
+                third_fields = ThirdFields(*third_fields)
+
+                # update the dictionary
+
+                out["pdb_id"].append(first_fields.pdb_id)
+                out["chain_id"].append(first_fields.chain_id)
+                out["prob"].append(second_fields.prob)
+                out["e_value"].append(second_fields.e_value)
+                out["p_value"].append(second_fields.p_value)
+                out["score"].append(second_fields.score)
+                out["cols"].append(third_fields.cols)
+                out["query_start"].append(third_fields.query_start)
+                out["query_end"].append(third_fields.query_end)
+                out["template_start"].append(third_fields.template_start)
+                out["template_end"].append(third_fields.template_end)
+        assert n_matches > 8, f"matches {n_matches}\nhandle {handle}"
 
         return out
 
-def dev():
+@dataclass
+class DevEnv:
+    path: str
+
+def _get_dev_env():
     path = "../../data/interim/cullin_e3_ligase/hhblits_out/A0FGR8_query_pdb70.log"
-    return path
+    return DevEnv(path=path)
 
 def example1():
     path = "../../data/interim/cullin_e3_ligase/hhblits_out/A0FGR8_query_pdb70.log"
