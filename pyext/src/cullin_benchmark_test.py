@@ -49,6 +49,79 @@ class CullinBenchMark:
         if create_unique_prey:
             self.create_unique_prey()
 
+    def parse_spec_counts(self, drop_spec_columns=False):
+        """
+        Parse the spectral counts data to their own columns.
+        r1, r2, r3, r4. For replicate 1 replicate 2...
+        c1, c2, c3, c4. For control 1 control 2 ...
+
+        Params:
+          drop_spec_columns - drops the 'Spec' and 'ctrlCounts' columns
+        """
+
+        for i, row in self.data.iterrows():
+            replicates = row["Spec"].split("|")
+            controls = row["ctrlCounts"].split("|")
+
+            for j, r in enumerate(replicates):
+                assert r.isdigit(), f"{i, r}"
+                key = f"r{j + 1}"
+                r = int(r)
+                assert r >= 0
+                self.data.loc[i, key] = r 
+
+            for k, c in enumerate(controls):
+                assert c.isdigit(), f"{i, c}"
+                key = f"c{k + 1}"
+                c = int(c)
+                assert c >= 0
+                self.data.loc[i, key] = c
+
+        for v in range(1, j + 2):
+            key = f"r{v}"
+
+            s = self.data[key]
+            s = pd.to_numeric(s, downcast="integer")
+            self.data[key] = s
+
+        assert v == j + 1
+
+        for v in range(1, k + 2):
+            key = f"c{v}"
+            s = self.data[key]
+            s = pd.to_numeric(s, downcast="integer")
+            self.data[key] = s
+
+        assert v == k + 1
+
+        if drop_spec_columns:
+            del self.data["Spec"]
+            del self.data["ctrlCounts"]
+
+        assert np.alltrue(np.sum(self.data.loc[:, [f"r{n}" for n in range(1, 5)]], axis=1) == self.data.loc[:, "SpecSum"])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+            
+
+    
+
     def load_data(self):
         data_path = self.path / "1-s2.0-S1931312819302537-mmc2.xlsx"
         self.data = pd.read_excel(data_path)
