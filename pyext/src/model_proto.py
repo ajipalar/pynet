@@ -4,11 +4,19 @@ A numpy compatible model prototype not focused on performance
 
 import numpy as np
 import scipy as sp
+from scipy.special import comb
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
 from collections import deque
 from itertools import combinations, chain
+import matplotlib.pyplot as plt
+from functools import partial
+
+import lpdf
+import pynet_rng
+
+
 
 def _assert_A(A):
     """
@@ -278,7 +286,282 @@ def log_pdf_As__Cs_lambda_s(As, Cs, lambda_s: float):
     return np.log(lambda_s)  -  a*lambda_s
 
 
+def log_pdf__M_D_I_restraint_builder(Ss, log_pdf_ts):
+    """
+    The prior density p(M|D, I) is a product of terms exp^g(s) 
+    log p(M|D, I) = Sum g_s(A_s, C_s, S_s, t_s, mu_s, lambda_s)
+    across the sth spanning composite. This function builds the sth term
 
+    """
+
+    log_pdf_Cs__Ss_ts = log_pdf_Cs__Ss_ts_builder(Ss)
+
+    def g_s(As, Cs, ts, mu_s, lambda_s):
+
+        log_prob_ts = log_pdf_ts(ts)
+        log_prob_Cs__Ss_ts = log_pdf_Cs__Ss_ts(Cs, Ss)
+        log_prob_As__Cs_lambda_s = log_pdf_As__Cs_lambda_s(As, Cs, lambda_s)
+
+        return np.array([log_prob_As__Cs_lambda_s,
+                         log_prob_Cs__Ss_ts,
+                         log_prob_ts])  # missing p(mus)
+
+    docstring = """The sth log prior restraint"""
+
+    g_s.__doc__ = docstring
+    return g_s
+
+def r(Sigma_inv_s, As) -> float:
+    """
+    The root mean square deviation funciton between As and Sigma_inv_s
+    evaluated where off diagonal As == 0
+    """
+
+    As = As[1:, 1:]
+    n = len(As)
+    assert n > 1
+    As = np.tril(As, k=-1)
+    U = np.triu(np.ones((n, n)))
+    As = As + U
+    assert sum(np.diag(As)) == n
+    i_s, j_s = np.where(As == 0)
+
+    mag_z = len(i_s)
+
+    assert np.all(i_s > j_s)
+    
+    r = np.sqrt(np.sum(Sigma_inv_s[i_s, j_s]) / mag_z)
+
+    return r
+
+def log_pdf_yrs__mus_Sigma_inv_s(yrs, mu_s, Sigma_inv_s):
+    """
+        
+    """
+    return lpdf.multivariate_normal(yrs, mu_s, Sigma_inv_s)
+
+def log_pdf_Sigma_inv_s__As_alpha_s(Sigma_inv_s, As, alpha_s) -> float:
+    """
+    The exponential coupling distribution distance restraint
+    """
+
+    return np.log(alpha_s) - r(Sigma_inv_s, As) * alpha_s
+
+def move_As(key, As):
+    ...
+
+def move_Sigma_inv_s(key, Sigma_inv_s):
+    ...
+
+def move_ts(key, ts):
+    ...
+
+def _move_edges_j(key, A, prob, n_edges, n):
+    """
+    jittable implementation - see move_edges
+    Params:
+      n - length of A
+    """
+    A = jnp.array(A)
+    keys = jax.random.split(key, 3)
+    j_s = jax.random.randint(keys[0], shape=(n_edges,), minval=0, maxval=n)
+    i_s = jax.random.randint(keys[1], shape=(n_edges,), minval=j_s + 1, maxval=n) 
+    vals = jax.random.bernoulli(keys[2], shape=(n_edges,), p=prob)
+    A = A.at[i_s, j_s].set(vals)
+    L = jnp.tril(A, k=-1)
+    A = L + L.T
+    return A
+
+def _move_mu__j(key, mean, sigma, n):
+    """
+    
+    """
+    return mean + sigma*jax.random.normal(key, shape=(n,)) 
+
+def move_Cs(Ss, ts):
+
+    prey = np.where(Ss >= ts)
+    return prey
+    
+
+
+def _move_Sigma_inv(key, Sigma_inv_s, n):
+    """
+    jittable implementation
+    Params:
+      n - length of Sigma_inv_s
+    """
+
+    new_Sigma = pynet_rng.wishart(key, V, n, p)
+
+
+
+
+
+def move_edges(key, A, prob, n_edges: int):
+    """
+    Sample n edges at a time each with a probability of prob
+
+    Params: 
+      A an adjacency matrix
+      prob : float the probability of an edge occuring
+      shape    : the length of A
+      n_edges  : the number of edges to move
+      key  : A jax prng key
+
+    Returns:
+      A : a new adjacency matrix
+    """
+    n = len(A)
+    assert 2 < n
+    assert 0 < n_edges <= n * (n - 1) / 2
+
+    A = _move_edges_j(key, A, prob, n_edges, n) # jittable
+    
+    return A
+
+
+def plot_sample_space(Ss, textx=8, texty=250):
+    n_possible_prey = len(Ss)
+    n_k = np.array([int(comb(n_possible_prey, k)) for k in range(1, n_possible_prey + 1)])
+    x = np.arange(n_possible_prey) + 1
+                
+    plt.style.use('ggplot')
+    plt.plot(x, n_k, 'b.')
+    plt.xlabel('n prey in composite')
+    plt.ylabel('n composites')
+    plt.title((f"Sample space ("u"\u03A9"
+    f") of possible composites"
+    f"\n{n_possible_prey} possible prey"))
+
+
+    text = u'|\u03A9|=' + "{:,}".format(sum(n_k))
+    plt.text(textx, texty, text)
+    plt.show()
+
+def plot_solution_space(Ss):
+    outcome_frequency, score_set = enumerate_Ss(Ss)
+    n_solutions = len(set(Ss))
+    n_total_outcomes = sum(outcome_frequency)
+    solution_probability = outcome_frequency / n_total_outcomes
+    plt.style.use('ggplot')
+    plt.title('Solution space')
+    plt.plot(score_set, 'r.', label='min SAINT score')
+    plt.plot(solution_probability, 'b.', label='solution probability')
+    plt.xlabel('solution number')
+    text = f"n-solutions: {n_solutions}"
+    plt.legend()
+    plt.text(0, 0.85, text)
+
+def plot_samples(Ss):
+
+
+    lpmf = log_pdf_Cs__Ss_ts_builder(Ss)
+
+    n_examples = 10000
+
+    key = jax.random.PRNGKey(13)
+    k1, k2, k3 = jax.random.split(key, 3)
+    ts_unif = jax.random.uniform(k1, shape=(n_examples,))
+    ts_norm = 0.6 + jax.random.normal(k2, shape=(n_examples,))*0.09
+    ts_60 = jax.random.uniform(k3, minval=0.59, maxval=1.0, shape=(n_examples,))
+    uniform_scores = [lpmf(C(Ss, t_unif), Ss) for t_unif in ts_unif]
+    normal_scores = [lpmf(C(Ss, t_norm), Ss) for t_norm in ts_norm]
+    uniform_60_scores = [lpmf(C(Ss, t_60), Ss) for t_60 in ts_60]
+    w = 6
+    h = 2
+    nbins = 50
+    fig, ax = plt.subplots(nrows=1, ncols=2, sharex=True, sharey=False,
+    figsize=(w, h))
+    plt.style.use('ggplot')
+
+    plt.subplot(121)
+    plt.title('Uniform sampling')
+    plt.hist(np.array(ts_unif), bins=nbins)
+    plt.subplot(122)
+    plt.title('Normal sampling')
+    plt.hist(np.array(ts_norm), bins=nbins)
+    fig.text(0.5, -0.1, 'SAINT inclusion threshold', ha='center')
+    plt.show()
+
+def plot_triple_samples(Ss):
+        
+    lpmf = log_pdf_Cs__Ss_ts_builder(Ss)
+
+    n_examples = 10000
+
+    key = jax.random.PRNGKey(13)
+    k1, k2, k3 = jax.random.split(key, 3)
+    ts_unif = jax.random.uniform(k1, shape=(n_examples,))
+    ts_norm = 0.6 + jax.random.normal(k2, shape=(n_examples,))*0.09
+    ts_60 = jax.random.uniform(k3, minval=0.59, maxval=1.0, shape=(n_examples,))
+
+    uniform_scores = [lpmf(C(Ss, t_unif), Ss) for t_unif in ts_unif]
+    normal_scores = [lpmf(C(Ss, t_norm), Ss) for t_norm in ts_norm]
+    uniform_60_scores = [lpmf(C(Ss, t_60), Ss) for t_60 in ts_60]
+                                                
+                                                    
+    nbins=50                                                        
+    w=10
+    h=2
+    fig, ax = plt.subplots(nrows=1, ncols=3, sharex=True, sharey=False,
+    figsize=(w, h))
+    plt.style.use('ggplot')
+    plt.subplot(131)
+    plt.title('Uniform sampling')
+    plt.hist(np.array(uniform_scores), bins=nbins)
+    plt.subplot(132)
+    plt.title('Normal sampling')
+    plt.hist(np.array(normal_scores), bins=nbins)
+    plt.subplot(133)
+    plt.title('Uniform Sampling (0.59, 1.0]')
+    plt.hist(np.array(uniform_60_scores), bins=nbins)
+    fig.text(0.5, -0.1, 'Composite identity score', ha='center')
+    fig.text(0.03, 0.5, 'frequency', va='center', rotation='vertical')
+    plt.show()
+
+def plot_score_saint(Ss):
+    lpmf = log_pdf_Cs__Ss_ts_builder(Ss)
+    ts = np.arange(0, 1, 0.01)
+    lpmfs = [lpmf(C(Ss, t), Ss) for t in ts]
+    plt.plot(ts, lpmfs)
+    plt.xlabel('SAINT threshold')
+    plt.ylabel('Composite identity Score')
+
+
+def plot_As_solution_space(n):
+    """
+    plot the solution space of an adjacency matrix As
+    as a function of the size of the composite (its length) n
+    """
+
+    
+    # the index is the number of edges
+    # the value is the number of solutions
+    m = int(n*(n- 1) / 2)
+    n_solutions = [comb(m, k) for k in range(0, m + 1)] 
+#    assert sum(n_solutions) == 2**m, f"{sum(n_solutions), 2**size_As}"
+
+    plt.title(f"Adjacency matrix solution space\nN={n}")
+
+    plt.style.use('ggplot')
+    plt.plot(n_solutions)
+    plt.xlabel('n edges')
+    plt.ylabel('n adjacency matrices')
+    return n_solutions
+
+
+
+def proposal(key, n, n_examples, p=0.5):
+
+    A = jax.random.bernoulli(key, p=p, shape=(n, n))
+    A = jnp.tril(A, k=-1)
+    A = A + A.T
+    return A
+
+def nedges(A):
+    A = jnp.tril(A, k=-1)
+    return jnp.sum(A)
 
 
 
