@@ -18,10 +18,13 @@ import scipy.stats
 import sys
 import time
 
+import lpmf
+
 
 class CullinBenchMark:
     def __init__(
-        self, dirpath: Path, load_data=True, validate=True, create_unique_prey=True
+        self, dirpath: Path, load_data=True, validate=True, create_unique_prey=True,
+        create_unique_bait=True
     ):
         self.path = dirpath
         self.data = pd.DataFrame()
@@ -48,6 +51,9 @@ class CullinBenchMark:
 
         if create_unique_prey:
             self.create_unique_prey()
+
+        if create_unique_bait:
+            self.create_unique_bait()
 
     def parse_spec_counts(self, drop_spec_columns=False):
         """
@@ -100,28 +106,6 @@ class CullinBenchMark:
 
         assert np.alltrue(np.sum(self.data.loc[:, [f"r{n}" for n in range(1, 5)]], axis=1) == self.data.loc[:, "SpecSum"])
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
-            
-
-    
-
     def load_data(self):
         data_path = self.path / "1-s2.0-S1931312819302537-mmc2.xlsx"
         self.data = pd.read_excel(data_path)
@@ -132,23 +116,24 @@ class CullinBenchMark:
         self.baits = []
         self.prey = {}
 
-    def get_protein_identifiers(self):
-        ...
+    def create_unique_bait(self):
+        baits = set(self.data["Bait"]) 
+        self.baits = list(baits)
 
-    def get_entrez_gid_from_uniprot_id(self):
-        ...
+   # def get_protein_identifiers(self):
+   #     ...
 
-    def get_gid_from_gene_name(self):
-        ...
+   # def get_entrez_gid_from_uniprot_id(self):
+   #     ...
 
-    def get_unidentified_proteins(self):
-        ...
+   # def get_gid_from_gene_name(self):
+   #     ...
 
-    def spec_counts_data(self):
-        ...
+   # def get_unidentified_proteins(self):
+   #     ...
 
-    def reproduce_published_results(self):
-        ...
+   # def reproduce_published_results(self):
+   #     ...
 
     def validate_spec(self):
         for i, j in self.data.iterrows():
@@ -874,3 +859,10 @@ def get_bounds_from_id_mapping(id_mapping, biogrid):
     check_bounds(biogrid, bounds_A, eids, colnum=1)
     check_bounds(biogrid, bounds_B, eids, colnum=2)
     return bounds_A, bounds_B, eids_in_biogrid
+
+
+
+
+
+
+
