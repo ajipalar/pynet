@@ -1,0 +1,581 @@
+"""
+This module contains the source code for the corresponding notebook
+X.X-model-training.ipynb where X.X is the version
+"""
+from collections import namedtuple
+from functools import partial
+import jax
+import jax.numpy as jnp
+import jax.scipy as jsp
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from pathlib import Path
+import scipy as sp
+
+# custom modules
+import cullin_benchmark_test as cb_test
+from dev_model_proto import *
+import get_cullin_e3_ppi_from_pdb70 as ppi_pdb70
+import lpdf
+import ulpdf
+import model_proto as mp
+import pynet_rng
+
+# Note book globals
+cb_path = Path("../../data/raw/cullin_e3_ligase/")
+cb = cb_test.CullinBenchMark(cb_path)
+cb_train = cb_test.CullinBenchMark(cb_path)
+
+#The bait id for the training data
+bait_id = "CBFBwt_MG132"
+sel1 = cb.data["Bait"] == bait_id
+#The saint score threshold
+sel2 = cb.data["SaintScore"] >= 0.3
+
+cb.data = cb.data.loc[sel1, :]
+title = u"Bait - CBF\u03B2"
+title2 = title + u"\nSAINT score \u2265 0.3"
+nb_style = "ggplot"
+
+cb_train.data = cb_train.data.loc[(sel1 & sel2), :]
+
+
+n_examples = 1000
+p = 0.1
+key = jax.random.PRNGKey(13)
+
+cb.parse_spec_counts()
+cb_train.parse_spec_counts()
+
+def get_n_edges_and_disconnectivity(key, p, n_examples): 
+    n_edges = np.zeros(n_examples)
+    disconnectivity = np.zeros(n_examples)
+
+    for i in range(n_examples):
+        key, k1 = jax.random.split(key)
+        A = mp.proposal(k1, 44, n_examples, p=p)
+        A = np.array(A, dtype=int)
+        nedges = mp.nedges(A)
+        n_edges[i] = nedges
+        disconnectivity[i] = mp.d(A, np.arange(44))
+
+    return n_edges, disconnectivity
+
+
+
+# 1 Define M
+
+# 1 Define M
+
+N = 44
+n_prey = 43
+
+M = {"As": np.zeros((N, N), dtype=int),
+          "Sigma_inv_s": np.eye(n_prey),
+          "lambda_s": 0.5,
+          "alpha_s": 0.5,
+          "Cs": np.arange(44),
+          "ts": 0.0,
+          "mus": np.zeros(n_prey)}
+
+def get_Ss(cb_train):
+    Ss = np.array(cb_train.data["SaintScore"])
+    assert Ss.shape == (43,), Ss.shape
+    return Ss
+
+def get_D(cb_train):
+    D = {"ds": cb_train.data.loc[:, ["r1", "r2", "r3", "r4"]].values}
+    assert D["ds"].shape == (43, 4)
+    return D 
+
+def get_I(cb_train):
+    Ss = get_Ss(cb_train)
+    I = {"Ss": Ss}
+    return I
+
+def get_Y(cb_train):
+    D = get_D(cb_train)
+    Y = D["ds"]
+    assert Y.shape == (43, 4)
+    return Y
+
+def get_centered_Y(cb_train):
+    Y = get_Y(cb_train)
+    mean = np.mean(Y, axis=1).reshape((43, 1))
+    centered_Y = Y - mean
+    var = np.var(Y, axis=1).reshape((43, 1))
+    assert centered_Y.shape == (43, 4)
+    return centered_Y
+
+def get_Scatter(cb_train, diag_scaler=0.1):
+    """
+    Params:
+      diag_scaler: I * diag_scaler is added to the scatter matrix to
+        make it positive definite 
+    """
+    centered_Y = get_centered_Y(cb_train)
+    Scatter = centered_Y @ centered_Y.T
+    assert Scatter.shape == (43, 43)
+    Scatter = Scatter + jnp.eye(43) * diag_scaler
+    return Scatter
+
+def get_Sigma_inv_prior_guess(cb_train, diag_scaler=0.1):
+    """
+
+    """
+    Scatter = get_Scatter(cb_train, diag_scaler) 
+    assert np.all(1 - np.isnan(sp.linalg.cholesky(Scatter)))
+    Sigma_inv_prior_guess = jsp.linalg.inv(Scatter)
+    return Sigma_inv_prior_guess
+
+def get_scale_matrix_V(cb_train, scatter_diag_scaler):
+    """
+    The scatter matrix is S0 + I*scatter_diag_scaler
+    """
+    Sigma_inv_prior_guess = get_Sigma_inv_prior_guess(cb_train, scatter_diag_scaler)
+    assert len(Sigma_inv_prior_guess) == 43
+    V = (1/43) * Sigma_inv_prior_guess
+    return V
+    
+
+
+# 2 Define the score function
+
+# p(M| D, I) prop p(D | M, I)p(M|I)
+#   p(M|I)
+#     p(As|Cs, lambda_s)p(Cs|Ss, ts)p(ts)p(mus)
+
+
+V = get_scale_matrix_V(cb_train, scatter_diag_scaler=0.1)
+z = mp._move_Sigma_inv(key, V, 43, 43)
+
+# Prior predictive distribtuion for this scatter matrix
+
+
+def log_pdf_ts(ts):
+    return sp.stats.norm.logpdf(ts, loc=0.6, scale=0.08)
+
+g_s = mp.log_pdf__M_D_I_restraint_builder(Ss, log_pdf_ts)
+
+def log_prior(M):
+    """
+    Returns an array of log scores
+      - As | Cs, lambda_s
+      - Cs | Ss, ts
+      - ts | I
+    """
+    return g_s(M["As"], M["Cs"], M["ts"], M["mus"], M["lambda_s"])
+
+    #  p(D| M, I)
+
+def log_like(D, M) -> float:
+    s = 0
+    Y = D['ds']
+    f = mp.log_pdf_yrs__mus_Sigma_inv_s
+    mu_s = M['mus']
+    Sigma_inv = M['Sigma_inv_s']
+    As = M['As']
+    alpha_s = M['alpha_s']
+                                                                    
+    for i in range(4):
+        s += f(Y[:, i], mu_s, Sigma_inv)
+        log_Sigma_inv = mp.log_pdf_Sigma_inv_s__As_alpha_s(Sigma_inv,
+          As,
+          alpha_s)
+    return np.array([s, log_Sigma_inv])
+
+def log_score(D, M):
+
+    lp = log_prior(M)
+    ll = log_like(D, M)
+    
+    return np.sum(lp) + np.sum(ll), ll, lp
+
+def initialize_model(cb_train, 
+                     alpha_s=0.5, 
+                     lambda_s=0.5,
+                     As=None,
+                     Sigma_inv_s=None,
+                     Cs=None,
+                     mus=None,
+                     ):
+    """
+    Initialize M0 for training
+    """
+
+    assert len(set(cb_train.data["Prey"])) == 43
+    N = 44
+    n_prey = 43
+
+    edges = ["As"]
+    nuisance = ["Sigma_inv_s", "Cs", "ts", "mus"]
+    constants = ["lambda_s", "alpha_s"]
+
+    if not As:
+        As = np.zeros((N, N), dtype=int)
+
+    if not Sigma_inv_s:
+        Sigma_inv_s = np.eye(n_prey)
+
+    if not Cs:
+        Cs = np.arange(N)
+
+    if not mus:
+        mus = np.zeros(n_prey)
+
+    M0 = {"As": As, 
+          "Sigma_inv_s": Sigma_inv_s,
+          "Cs": Cs,
+          "lambda_s": lambda_s,
+          "alpha_s": alpha_s,
+          "ts": ts,
+          "mus": mus}
+
+    return M0
+
+                                                                                                                # 3 Define the sampling
+
+                                                                                                                # 3.1 Define the movers
+                                                                                                                  # As
+                                                                                                                    # Sigma_inv - wish
+                                                                                                                      # mus - rand
+                                                                                                                        # 
+
+                                                                                                                        # 3.2 Use MH Monte Carlo
+
+                                                                                                                        # 3.3 Use simulated Annealing
+
+
+                                                                                                                        # 3.4 Sample
+
+                                                                                                                        # 3.5 Plot results
+
+# Visualize the data
+
+def plot_saint_fdr(cb, title: str):
+    plt.style.use(nb_style)
+    plt.title(title)
+    plt.plot(cb.data['SaintScore'], label='SAINT score')
+    plt.plot(cb.data['BFDR'],  label="FDR")
+    plt.legend()
+    plt.xlabel('Prey ID')
+
+def plot_edge_density(rseed, p, n_examples, nbins=25):
+    key = jax.random.PRNGKey(rseed)
+    n_edges, _ = get_n_edges_and_disconnectivity(key, p, n_examples)
+    plt.style.use(nb_style) # reference the module level global variable
+    plt.hist(n_edges, bins=nbins)
+    plt.xlabel('n edges')
+    plt.ylabel('frequency')
+    plt.title(f'Bernoulli edge probability p={p}\nN={n_examples}')
+    plt.show()
+
+def plot_disconnectivity(rseed, p, n_examples, nbins=20, bin_range=(0, 10)):
+    key = jax.random.PRNGKey(rseed)
+    _, disconnectivity = get_n_edges_and_disconnectivity(key, p, n_examples)
+    plt.style.use(nb_style)
+    plt.hist(disconnectivity, bins=20, range=bin_range)
+    plt.xlabel('n disconnected prey')
+    plt.ylabel('frequency')
+    plt.title('Bernoulli proposal p=0.5')
+    plt.show()
+
+def plot_hyper_param_predictive_check(sim_values, 
+                                      real_values,
+                                      real_operator,
+                                      n_prey,
+                                      nsamples,
+                                      xlabel,
+                                      title,
+                                      w=4, 
+                                      h=3, 
+                                      sim_label='Simulated data',
+                                      real_label='Real data',
+                                      style="classic"
+                                      ):
+
+    plt.figure(figsize=(w, h))
+    plt.style.use(style)
+    plt.hist(sim_values, bins=30, label=sim_label)
+    for i in range(4):
+
+        if i == 3:
+            plt.vlines(real_operator(real_values[:, i]), 0, 100, 'b', label=real_label)
+        else:
+            plt.vlines(real_operator(real_values[:, i]), 0, 100, 'b')
+        plt.xlabel(xlabel)
+    plt.legend()
+    plt.title(title)
+    plt.ylabel('Frequency')
+    plt.show()
+
+# Prior predictive distribtuion for this scatter matrix
+
+class MoverTraining:
+    def __init__(self, 
+                 cb_train, 
+                 rseed=13, 
+                 nsamples=1000,
+                 diag_scaler=0.1,
+                 style=nb_style, 
+                 fig_height = 6,
+                 fig_width = 6):
+
+        self.cb_train = cb_train
+        self.rseed = rseed
+        self.nsamples = nsamples
+        self.diag_scaler = diag_scaler
+        self.style=style
+        self.fig_height = fig_height
+        self.fig_width = fig_width
+
+        self.key = jax.random.PRNGKey(rseed)
+        self.keys = jax.random.split(self.key, nsamples)
+
+        self.mean_sim = np.zeros(nsamples)
+        self.var_sim = np.zeros(nsamples)
+        self.sum_sim = np.zeros(nsamples)
+
+        self.Scatter = get_Scatter(cb_train, diag_scaler=diag_scaler)
+
+        for i in range(nsamples):
+            y_sim = jax.random.multivariate_normal(self.keys[i], mean=np.zeros(43), cov=self.Scatter)
+            self.mean_sim[i] = np.mean(y_sim)
+            self.var_sim[i] = np.var(y_sim)
+            self.sum_sim[i] = np.sum(y_sim)
+
+        self.centered_Y = get_centered_Y(cb_train)
+
+
+        self.mean_plot = partial(plot_hyper_param_predictive_check, 
+                            real_values=self.centered_Y,
+                            real_operator=np.mean,
+                            n_prey=43,
+                            nsamples=nsamples,
+                            xlabel=f'Centered spectral count mean', 
+                            title=u'Constant \u03A3 matrix\nN samples ' + f'{self.nsamples}',
+                            style=self.style)
+        
+        self.var_plot = partial(plot_hyper_param_predictive_check, 
+                           real_values=self.centered_Y,
+                           real_operator=np.var,
+                           n_prey=43,
+                           nsamples=nsamples,
+                           xlabel=f'Centered spectral count variance',
+                           title=u'Constant \u03A3 matrix\nN samples ' + f'{self.nsamples}',
+                           style=self.style)
+        
+        self.sum_plot = partial(plot_hyper_param_predictive_check, 
+                           real_values=self.centered_Y,
+                           real_operator=np.sum,
+                           n_prey=43,
+                           nsamples=nsamples,
+                           xlabel=f'Cenetered spectral count sum',
+                           title=u'Constant \u03A3 matrix\nN samples ' + f'{self.nsamples}',
+                           style=self.style)
+
+    def plot_mean_sim(self):
+        self.mean_plot(self.mean_sim)
+
+    def plot_var_sim(self):
+        self.var_plot(self.var_sim)
+
+    def plot_sum_sim(self):
+        self.sum_plot(self.sum_sim)
+    
+    
+Ss = get_Ss(cb_train) 
+
+def q_cond_lpdf(Mi, Mj, p, wish_dof) -> float:
+    """
+    This funciton gives the log probability of moving from one point to another point
+    according to the proposal distribution for the CBFB training set.
+
+    The log conditional density of the proposal distribution q
+    gives the probability of moving from one state to another state
+
+    q(Mi| Mi)
+
+    Params:
+      Ma  : The model dictionary at the ith step 
+      Mb  : The model dictionary at the jth step
+      p   : The dimensionality of the precision matrix. For the CBFB training
+            p=43. p is provided so that this function may be jit compiled
+
+      wish_dof : aka nu. The wishart degrees of freedom where nu > p - 1
+                 and p is the length of the scatter matrix
+    """
+
+    p1 = lpdf.norm(mu_i, loc=mu_j, scale=1)
+    p2 = lpdf.uniform(ts_i) # don't really have to evaluate this. 
+    V_j = Sigma_inv_s_j / p 
+    p3 = ulpdf.wishart(cov_inv_i, wish_dof, V_j, p) 
+
+    # Moving edges required selecting n_edges to move 
+    # and flipping them independantly according to a Bernoulli trial
+    # let x_i be a list of n_edges and x_j be another list of n_edges
+    # p(x) is Binomial(n_edges, p) however we are interested in p(x_i|x_j)
+    # Let y = x_i == x_j
+    # 0 <= sum(y) <= n_edges
+    # TBD 
+
+
+
+
+
+def move_model(key, 
+        M0, 
+        edge_prob,
+        move_n_edges,
+        wish_dof,
+        n_prey):
+    """
+    This function must be jit compiled. Otherwise python will reference the
+    dictionary incorectly. 
+                    
+                        
+    Take a step in parameter space
+    Params:
+      key - jax PRNG key
+      M0  - The model dictionary at the current time step
+    proposal_params - a dictionary to configure the proposal distribution
+    Returns:
+      M1  - The proposed model dictionary
+    """
+    keys = jax.random.split(key, 4)
+    mu_s_0 = M0['mus']
+    Sigma_inv_s = M0['Sigma_inv_s']
+    As_0 = M0['As']
+                                                                                       
+    # Move mu_s_1 | mu_s_0
+
+    
+    mu_s_1 = mu_s_0 + jax.random.normal(keys[0], shape=(n_prey,))
+      
+    # Move ts_1  | ts_0
+
+    ts_1 = jax.random.uniform(keys[1])
+    Sigma_inv_s_1 = pynet_rng.wishart(keys[2], V=Sigma_inv_s / n_prey, n=wish_dof, p=43)
+
+    # Move As_1  | As_0
+    As_1 = mp._move_edges_j(keys[3], As_0, prob=edge_prob,
+    n_edges=move_n_edges, len_A=n_prey + 1)
+    # alpha_s constant
+    M0['mus'] = mu_s_1
+    M0['As'] = As_1
+    M0['Sigma_inv_s'] = Sigma_inv_s_1
+    M0['ts'] = ts_1
+
+    return M0
+
+
+
+def stepf(i, keys, n, mean_sim, var_sim, sum_sim):
+    Sigma_inv_i = pynet_rng.wishart(keys[i + 1], V=V, n=n, p=43)
+    Sigma_i = jsp.linalg.inv(Sigma_inv_i)
+    y_sim = jax.random.multivariate_normal(keys[i], mean=jnp.zeros(43), cov=Sigma_i)
+                    
+    x_ = jnp.mean(y_sim)
+    v_ = jnp.var(y_sim)
+    s_ = jnp.sum(y_sim)
+                                    
+    mean_sim = mean_sim.at[i].set(x_)
+    var_sim = var_sim.at[i].set(v_)
+    sum_sim = sum_sim.at[i].set(s_)
+    return i, keys, n, mean_sim, var_sim, sum_sim
+
+def do_sampled_sigma_experiment(nsamples, n, rseed):
+    """
+    Used to understand the effect of the degrees of freedom nu on the movers
+    Params:
+      nsamples:
+      n:  nu the degrees of freedom
+      rseed
+    """
+
+    key = jax.random.PRNGKey(rseed)
+    keys = jax.random.split(key, nsamples + 1)
+    
+    step = jax.jit(stepf)
+
+    m = jnp.zeros(nsamples)
+    v = jnp.zeros(nsamples)
+    ss = jnp.zeros(nsamples)
+    values = 0, keys, n, m, v, ss
+    for i in range(nsamples):
+        _, *x = values
+        values = i, *x
+        _, *x = step(*values)
+        values = i, *x
+
+    _, keys, _, m, v, ss = values
+    return m, v, ss
+
+def get_log_score_fun(log_score, D):
+    return partial(log_score, D=D)
+
+def mh_step(key, M, log_prob_fun, proposal):
+        
+    key, key2 = jax.random.split(key)
+            
+    M1 = jit_move(key, M)
+    log_score_0, *_ = log_prob_fun(M=M)
+                        
+    log_score_1, *_ = log_prob_fun(M=M1)
+                                
+                                    
+    M, accepted, log_score = jit_step(key2, M, log_score_1, log_score_0, move_model)
+                                            
+    return M, u <= a, log_score
+
+
+def _mh_step__j(key2, M, log_score_1, log_score_0):
+        
+    a = jnp.exp(log_score_1 - log_score_0)
+            
+    u = jax.random.uniform(key2)
+                    
+    M, log_score = jax.lax.cond(u > a, lambda : (M, log_score_0), lambda :(M1, log_score_1))
+                            
+    return M, u <= a, log_score
+
+
+def sample_MH(key, x, ulpdf, q, q_cond_lpdf):
+    """
+    Perfrom a single local step in parameter space according to the
+    proposal distribution q. Accept or reject based on the Metropolis Criterion.
+    q is assumed to be asymetric q(x1|x0) != q(x0|x1). Therefore the conditional density for q
+    is required to account for detailed balance.
+    Params:
+      key - the jax PRNGKey
+      x   - the model variable
+      ulpdf the unormalized log probability density funciton
+      q     the proposal distribtuion
+      q_cond_lpdf 
+    """
+    keys = jax.random.split(key)
+    x1 = q(keys[0], x)
+
+    alpha = min(1, np.exp(ulpdf(x1) + q_cond_lpdf(x1, x) - ulpdf(x) - q_condf_lpdf(x, x1))) 
+    u = jax.random.uniform(keys[1])
+    accepted = u <= alpha
+    if accepted:
+        x = x1
+    return accepted, x
+
+
+def build_re_mcmc_chain(rseed, n_mcmc_steps, betas, ulpdf, ulpdf_q, x0, q, swap_interval):
+    n_replicas = len(betas)
+
+    if k > 0 and k % swap_interval == 0:
+        # Attempt RE Swap
+        ...
+
+    else:
+        # Do local sampling
+
+
+
+
+
