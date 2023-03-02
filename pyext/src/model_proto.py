@@ -364,7 +364,7 @@ def get_possible_edges(len_A):
     assert possible_edges.shape == (len_A * (len_A - 1) // 2, 2), possible_edges.shape
     return possible_edges
 
-def _select_n_random_edges(key, possible_edges, n_edge, len_A):
+def _select_n_random_edges(key, possible_edges, n_edges, len_A):
     """
     Select n_edges out of possible_edges without replacement.
 
@@ -379,7 +379,7 @@ def _select_n_random_edges(key, possible_edges, n_edge, len_A):
       i_s, j_s : an array pair of the ith and jth nodes corresponding to the edges
     """
 
-    edges = jax.random.choice(key, possible_edges, shape=(n_edges,))
+    edges = jax.random.choice(key, possible_edges, shape=(n_edges,), replace=False)
 
     return edges
 
@@ -388,7 +388,7 @@ def flip_with_prob(key_i, x_i, prob_i):
     predicate = u < prob_i
     return jax.lax.cond(predicate, lambda x: flip(x), lambda x: x, x_i) 
 
-def flip(xi):
+def flip(xi, edge_dtype=jnp.int32):
     """
     Flips the value xi. xi is 0 or 1
     Function is intended to be vmapped and jit compiled
@@ -398,7 +398,7 @@ def flip(xi):
       flipp_ed xi : the flipped element
     """
 
-    return jax.lax.cond(xi, lambda xi : 0, lambda xi : 1, xi) 
+    return jax.lax.cond(xi, lambda xi : edge_dtype(0), lambda xi : edge_dtype(1), xi) 
 
 def flip_edges(key, edge_vector, flip_probs, len_edge_vector):
     """

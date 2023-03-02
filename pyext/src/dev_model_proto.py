@@ -5,15 +5,19 @@ import jax.numpy as jnp
 from functools import partial
 
 n = 10
-A = np.zeros((n, n), dtype=np.int8)
+A = np.zeros((n, n), dtype=np.int32)
 A[(1, 2, 3, 4, 5), (0, 0, 0, 1, 2)] = 1
 A = np.tril(A, k=-1)
 A = A + A.T
-Cs = np.array([0, 1, 3], dtype=np.int8)
+Cs = np.array([0, 1, 3], dtype=np.int32)
+A = jnp.array(A)
+len_A = len(A)
+assert len_A == n
 
 Ss = np.array([1, 0.7, 0.6, 0.8, 0.5, 0.3, 0.2, 0.1, 0.4, 0.05])
 assert len(Ss) == n
 key = jax.random.PRNGKey(13)
+pe = mp.get_possible_edges(n)
 
 def test_flip():
     flip = mp.flip
@@ -112,6 +116,62 @@ def test__select_n_random_edges(
     assert jnp.all(edges > -1)
     assert jnp.all(jedges > -1)
 
+def test_flip_adjacency__j():
+    f = mp.flip_adjacency__j
+    f = partial(f, possible_edges=pe,n_edges=10, len_A=len(A))
+
+    jf = jax.jit(f)
+
+    a = f(key, A, 0.5)
+    b = jf(key, A, 0.5)
+
+    c = f(key, A, 0)
+    d = jf(key, A, 0)
+    e = f(key, A, 0.0)
+    g = f(key, A, 0.0)
+
+    assert jnp.all(a == b)
+    assert jnp.all(c == d)
+    assert jnp.all(c == A)
+    assert jnp.all(c == e)
+    assert jnp.all(g == e)
+
+    h = f(key, A, 1.)
+    i = jf(key, A, 1.)
+    j = f(key, A, 1)
+    k = jf(key, A, 1)
+
+    assert jnp.all(h == i)
+    assert jnp.all(i == j)
+    assert jnp.all(j == k)
+
+    # flip all edges
+
+    f = mp.flip_adjacency__j
+    f = partial(f, possible_edges=pe, n_edges=len_A * (len_A - 1) // 2, len_A=len_A)
+
+    jf = jax.jit(f)
+
+    a = f(key, A, prob=1.)
+    b = jf(key, A, prob=1.)
+    
+    assert jnp.all(a == b)
+
+    tril_indices = jnp.tril_indices(len_A, k=-1)
+
+    La = a[tril_indices]
+    LA = A[tril_indices]
+
+    # flipped every edge
+    assert jnp.all(La != LA), (La, LA)
+
+
+
+
+
+    
+
+
 
     
 
@@ -124,7 +184,17 @@ def do_tests():
     test__select_n_random_edges(1, 10)
     test__select_n_random_edges(0, 9)
     test__select_n_random_edges(1, 9)
-    test__select_n_random_edges(6, 3)
+    expected_failure = False
+    
+    try:
+        test__select_n_random_edges(7, 3)
+    except ValueError:
+        expected_failure = True
+
+    assert expected_failure
+
+    test_flip_adjacency__j()
+
 
 
 
