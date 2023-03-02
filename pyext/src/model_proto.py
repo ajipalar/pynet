@@ -356,23 +356,6 @@ def move_Sigma_inv_s(key, Sigma_inv_s):
 def move_ts(key, ts):
     ...
 
-def _move_edges_j(key, A, prob, n_edges, len_A):
-    """
-    jittable implementation - see move_edges
-    Params:
-      len_A
-
-    Returns:
-      A - the updated adjacency matrix
-    """
-    A = jnp.array(A)
-    keys = jax.random.split(key)
-    vals = jax.random.bernoulli(keys[0], shape=(n_edges,), p=prob)
-    i_s, j_s = _select_n_random_edges(keys[1], n_edges, len_A)
-    A = A.at[i_s, j_s].set(vals)
-    L = jnp.tril(A, k=-1)
-    A = L + L.T
-    return A
 
 def get_possible_edges(len_A):
     possible_edges = jnp.array(list(combinations(
