@@ -356,21 +356,116 @@ def move_Sigma_inv_s(key, Sigma_inv_s):
 def move_ts(key, ts):
     ...
 
-def _move_edges_j(key, A, prob, n_edges, n):
+def _move_edges_j(key, A, prob, n_edges, len_A):
     """
     jittable implementation - see move_edges
     Params:
-      n - length of A
+      len_A
+
+    Returns:
+      A - the updated adjacency matrix
     """
     A = jnp.array(A)
-    keys = jax.random.split(key, 3)
-    j_s = jax.random.randint(keys[0], shape=(n_edges,), minval=0, maxval=n)
-    i_s = jax.random.randint(keys[1], shape=(n_edges,), minval=j_s + 1, maxval=n) 
-    vals = jax.random.bernoulli(keys[2], shape=(n_edges,), p=prob)
+    keys = jax.random.split(key)
+    vals = jax.random.bernoulli(keys[0], shape=(n_edges,), p=prob)
+    i_s, j_s = _select_n_random_edges(keys[1], n_edges, len_A)
     A = A.at[i_s, j_s].set(vals)
     L = jnp.tril(A, k=-1)
     A = L + L.T
     return A
+
+def get_possible_edges(len_A):
+    possible_edges = jnp.array(list(combinations(
+        range(len_A-1,-1,-1), 2)))
+
+    assert possible_edges.shape == (len_A * (len_A - 1) // 2, 2), possible_edges.shape
+    return possible_edges
+
+def _select_n_random_edges(key, possible_edges, n_edge, len_A):
+    """
+    Select n_edges out of possible_edges without replacement.
+
+    Params:
+      key    : the jax.random.PRNGKey
+      n_edges: The number of edges to select
+      possible_edges: An (m x 2) array of possible edges
+                      where m is n * (n - 1) / 2
+      len_A  : The length of the adjacency matrix from which
+               edges are to be selected.
+    Returns:
+      i_s, j_s : an array pair of the ith and jth nodes corresponding to the edges
+    """
+
+    edges = jax.random.choice(key, possible_edges, shape=(n_edges,))
+
+    return edges
+
+def flip_with_prob(key_i, x_i, prob_i):
+    u = jax.random.uniform(key_i)
+    predicate = u < prob_i
+    return jax.lax.cond(predicate, lambda x: flip(x), lambda x: x, x_i) 
+
+def flip(xi):
+    """
+    Flips the value xi. xi is 0 or 1
+    Function is intended to be vmapped and jit compiled
+    Params:
+      xi : an element of the array x
+    Returns
+      flipp_ed xi : the flipped element
+    """
+
+    return jax.lax.cond(xi, lambda xi : 0, lambda xi : 1, xi) 
+
+def flip_edges(key, edge_vector, flip_probs, len_edge_vector):
+    """
+    jittable
+    Params:
+      key : a jax PRNGKey
+      edge_vector : a vector whose elements are 0 or 1
+      len_edge_vector : the length of the edge vector
+      flip_prob: a jnp.array of flip_probabilities 
+                 
+
+    Return:
+      flipped_vector : the updated vector with the flipped elements
+    """
+
+    keys = jax.random.split(key, len_edge_vector)
+    return jax.vmap(flip_with_prob)(keys, edge_vector, flip_probs)
+
+def flip_adjacency__j(key, A, prob: float, possible_edges, n_edges: int, len_A: int):
+    """
+    1. Randomly select n_edges from adjacency matrix A
+    2. With probability p, flip an edge (if its 0 flip to 1 and vice versa)
+    3. Return the updated matrix
+
+    The advantage of this approach for the mover is that
+    when constructing the proposal distribution q the evaluation of
+    q(xi|xj) is easy as it is prob^n_flipped_edges
+
+    Params:
+      key
+      A
+      prob : the probability of flipping an edge
+      possible_edges : an array of possible edges. See get_possible_edges()
+      n_edges : int the length of A
+    Returns:
+      A - an updated adjacency matrix. Note the diagonal is 0 due to the tril implementation
+    """
+    keys = jax.random.split(key) # (2, 2)
+    edge_arr = _select_n_random_edges(keys[0],  possible_edges, n_edges, len_A) # (n_edges, 2)
+    i_s = edge_arr[:, 0] # (n_edges,)
+    j_s = edge_arr[:, 1] # (n_edges,)
+    edges = A[i_s, j_s] # (n_edges,)
+
+    flip_probs = jnp.ones(n_edges) * prob # (n_edges,)
+    flipped_edges = flip_edges(keys[1], edges, flip_probs, n_edges) # (n_edges,) 
+    A = A.at[i_s, j_s].set(flipped_edges) # (len_A, len_A)
+    L = jnp.tril(A, k=-1) # diag are zeros
+    A = L + L.T
+    return A
+
 
 def _move_mu__j(key, mean, sigma, n):
     """
@@ -385,14 +480,17 @@ def move_Cs(Ss, ts):
     
 
 
-def _move_Sigma_inv(key, Sigma_inv_s, n):
+def _move_Sigma_inv(key, V, n, p):
     """
     jittable implementation
     Params:
-      n - length of Sigma_inv_s
+      p - length of V
+      n - wishart degrees of freedom. n > p - 1
     """
 
     new_Sigma = pynet_rng.wishart(key, V, n, p)
+    return new_Sigma
+
 
 
 
@@ -419,6 +517,18 @@ def move_edges(key, A, prob, n_edges: int):
     A = _move_edges_j(key, A, prob, n_edges, n) # jittable
     
     return A
+
+
+def move_model(key, M0, proposal_params: dict):
+    """
+    Take a step in parameter space
+    Params:
+      key - jax PRNGKey
+      M0  - the model dictionary at the current time step
+      proposal_params - configure the proposal distribtuion
+    """
+
+    return M1
 
 
 def plot_sample_space(Ss, textx=8, texty=250):
