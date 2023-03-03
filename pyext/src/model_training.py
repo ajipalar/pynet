@@ -21,6 +21,7 @@ import lpdf
 import ulpdf
 import model_proto as mp
 import pynet_rng
+import re
 
 # Note book globals
 cb_path = Path("../../data/raw/cullin_e3_ligase/")
@@ -78,6 +79,10 @@ M = {"As": np.zeros((N, N), dtype=int),
           "Cs": np.arange(44),
           "ts": 0.0,
           "mus": np.zeros(n_prey)}
+def get_saint_threshold(cb, thresh):
+    sel = cb.data["SaintScore"] >= thresh
+    return cb.data.loc[sel, :]
+    
 
 def get_Ss(cb_train):
     Ss = np.array(cb_train.data["SaintScore"])
@@ -234,24 +239,6 @@ def initialize_model(cb_train,
 
     return M0
 
-                                                                                                                # 3 Define the sampling
-
-                                                                                                                # 3.1 Define the movers
-                                                                                                                  # As
-                                                                                                                    # Sigma_inv - wish
-                                                                                                                      # mus - rand
-                                                                                                                        # 
-
-                                                                                                                        # 3.2 Use MH Monte Carlo
-
-                                                                                                                        # 3.3 Use simulated Annealing
-
-
-                                                                                                                        # 3.4 Sample
-
-                                                                                                                        # 3.5 Plot results
-
-# Visualize the data
 
 def plot_saint_fdr(cb, title: str):
     plt.style.use(nb_style)
@@ -423,13 +410,13 @@ def q_cond_lpdf(Mi, Mj, p, wish_dof) -> float:
 
 
 
-
 def move_model(key, 
         M0, 
-        edge_prob,
+        flip_probability,
         move_n_edges,
         wish_dof,
-        n_prey):
+        all_possible_edges_As,
+        len_As):
     """
     This function must be jit compiled. Otherwise python will reference the
     dictionary incorectly. 
@@ -437,13 +424,20 @@ def move_model(key,
                         
     Take a step in parameter space
     Params:
-      key - jax PRNG key
-      M0  - The model dictionary at the current time step
-    proposal_params - a dictionary to configure the proposal distribution
+      key : jax PRNG key
+      M0  : The model dictionary at the current time step
+      flip_probability : the Bernoulli probability of flipping an edge
+      move_n_edges: The number of Bernoulli edge flip trials to perform 
+      wish_dof : the wishart degrees of freed aka nu
+      all_possible_edges_As : an (m, 2) array of all possible edges from As
+          where m = len_As * (len_As - 1) // 2
+      len_As   : the length of adjacency matrix As 
     Returns:
       M1  - The proposed model dictionary
     """
-    keys = jax.random.split(key, 4)
+    n_prey = len_As - 1
+
+    keys = jax.random.split(key, 3)
     mu_s_0 = M0['mus']
     Sigma_inv_s = M0['Sigma_inv_s']
     As_0 = M0['As']
@@ -456,12 +450,14 @@ def move_model(key,
     # Move ts_1  | ts_0
 
     ts_1 = jax.random.uniform(keys[1])
+    # Move Simga_inv_s_1 | Sigma_inv_s
     Sigma_inv_s_1 = pynet_rng.wishart(keys[2], V=Sigma_inv_s / n_prey, n=wish_dof, p=43)
 
-    # Move As_1  | As_0
-    As_1 = mp._move_edges_j(keys[3], As_0, prob=edge_prob,
-    n_edges=move_n_edges, len_A=n_prey + 1)
-    # alpha_s constant
+    # Move As_1  | As_0  # The number of flips is distributed binomially(n_flips, flip_probability, move_n_edges)
+    As_1 = mp.flip_adjacency__j(key, As_0, flip_probability, all_possible_edges_As, move_n_edges, len_As)
+
+    # alpha_s is constant
+    # lambda_s is constant
     M0['mus'] = mu_s_1
     M0['As'] = As_1
     M0['Sigma_inv_s'] = Sigma_inv_s_1
@@ -574,7 +570,274 @@ def build_re_mcmc_chain(rseed, n_mcmc_steps, betas, ulpdf, ulpdf_q, x0, q, swap_
 
     else:
         # Do local sampling
+        ...
 
+def plot_wishart_dof_effect(x1,
+    x2,
+    x_const,
+    mover_training,
+    nbins=30, 
+    xmin=-100, 
+    xmax=100, 
+    density=True,
+    alpha=0.5, 
+    style='classic', 
+    label1='n=43',
+    label2='n=50', 
+    ylabel='density', 
+    xlabel='Centered mean spectral count',
+    title='Effect of n (degrees of freedom) on the sample mean',
+    real_label = 'real data',
+    ymin=0, 
+    ymax = 0.08,
+    textstr=u'Bait: CBF\u03B2\nn-prey=43\nn-replicates=4\nN simulated replicates=1000',
+    textx=-90,
+    texty=0.06,
+    vlines_operator=np.mean):
+      
+    hist = partial(plt.hist, bins=nbins, range=(xmin, xmax), density=density, alpha=alpha)
+
+    plt.style.use(style)
+
+    hist(x1, label=label1)
+    hist(x2, label=label2)
+    hist(x_const, label='const')
+    plt.ylabel(ylabel)
+    plt.xlabel(xlabel)
+    plt.title(title)
+
+    plt.vlines(vlines_operator(mover_training.centered_Y, axis=0), label=real_label, ymin=ymin, ymax=ymax)
+    plt.text(textx, texty, textstr)
+    plt.legend()
+    plt.show()
+
+class CullinBenchMarkAnalysis:
+    def __init__(self, df):
+
+        self.data = df
+        self.prey_set = set(df["Prey"])
+        self.bait_set = set(df["Bait"])
+        self.nprey = len(self.prey_set)
+        self.nbait = len(self.bait_set)
+        self.uniprot_re = (
+            r"[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}"
+        )
+        self.is_uniprot = re.compile(self.uniprot_re)
+
+        nuid = 0
+        not_uid = []
+        for prey in self.prey_set:
+            if self.is_uniprot.match(prey):
+                nuid += 1
+            else:
+                not_uid.append(prey)
+
+        self.nuid = nuid
+        self.not_uid_set = set(not_uid)
+        assert len(self.not_uid_set) == len(not_uid)
+        self.nnuid = len(self.not_uid_set)
+
+        elob_in_prey = False
+        cbfb_in_prey = False
+        cul5_in_prey = False
+
+        for prey_gene in set(self.data["PreyGene"]):
+            if prey_gene == "ELOB_HUMAN":
+                elob_in_prey = True
+            if prey_gene == "PEBB_HUMAN":
+                cbfb_in_prey = True
+            if prey_gene == "CUL5_HUMAN":
+                cul5_in_prey = True
+
+        self.elob_in_prey_set = elob_in_prey
+        self.cbfb_in_prey_set = cbfb_in_prey
+        self.cul5_in_prey_set = cul5_in_prey
+
+        self.all_bait_in_prey_set = self.elob_in_prey_set and self.cbfb_in_prey_set and self.cul5_in_prey_set
+
+        if self.all_bait_in_prey_set:
+            self.n_total_proteins = self.nprey
+        else:
+            assert False, "baits are not in prey set"
+
+        self.n_possible_edges = self.n_total_proteins * (self.n_total_proteins - 1) // 2
+
+        viral_prey_set = []
+        potential_viral_prey = ["envpolyprotein",
+                                "gagpolyprotein",
+                                "nefprotein",
+                                "polpolyprotein",
+                                "revprotein",
+                                "tatprotein",
+                                "vifprotein"]
+        
+        potential_mouse_prey = ["IGHG1_MOUSE"]
+        mouse_prey = []
+
+
+        for prey in self.not_uid_set:
+            if prey in potential_viral_prey:
+                viral_prey_set.append(prey)
+            elif prey in potential_mouse_prey:
+                mouse_prey.append(prey)
+            else:
+                assert False, f"Unmapped prey {prey}"
+
+        self.viral_prey_set = set(viral_prey_set)
+        self.nviral = len(viral_prey_set)
+
+        self.mouse_prey = mouse_prey
+        self.nmouse_prey = len(mouse_prey)
+
+        self.vif_in_prey_set = False 
+        self.tat_in_prey_set = False 
+        self.rev_in_prey_set = False 
+        self.poly_in_prey_set = False 
+        self.nef_in_prey_set = False 
+        self.gag_in_prey_set = False 
+        self.env_in_prey_set = False 
+    
+        self.IGH1_in_prey_set = False
+        
+        n_viral_bool = 0
+
+        if "vifprotein" in self.viral_prey_set:
+            self.vif_in_prey_set = True
+            n_viral_bool +=1
+        if "tatprotein" in self.viral_prey_set:
+            self.tat_in_prey_set = True
+            n_viral_bool +=1
+        if "revprotein" in self.viral_prey_set:
+            self.tat_in_prey_set = True
+            n_viral_bool +=1
+        if "nefprotein" in self.viral_prey_set:
+            self.tat_in_prey_set = True
+            n_viral_bool +=1
+        if "polpolyprotein" in self.viral_prey_set:
+            self.tat_in_prey_set = True
+            n_viral_bool +=1
+        if "gagpolyprotein" in self.viral_prey_set:
+            self.tat_in_prey_set = True
+            n_viral_bool +=1
+        if "envpolyprotein" in self.viral_prey_set:
+            self.tat_in_prey_set = True
+            n_viral_bool +=1
+
+        assert n_viral_bool == len(self.viral_prey_set), (n_viral_bool, self.viral_prey_set)
+
+
+        organisms = []
+
+        
+
+        for prey_gene in self.data["PreyGene"]:
+            split_gene = prey_gene.split("_")
+            if prey_gene in self.viral_prey_set:
+                organisms.append("VIRAL")
+            elif split_gene[1] == "HUMAN":
+                organisms.append("HUMAN")
+
+            elif split_gene[1] == "MOUSE":
+                organisms.append("MOUSE")
+
+            elif split_gene[1] not in  ("HUMAN", "MOUSE"):
+                assert False, f"unexpected prey {prey_gene}"
+
+            else:
+                assert False, f"missed case {prey_gene}"
+
+        self.data.loc[:, "organism"] = organisms
+
+        self.nviral_conditions = sum(self.data["organism"] == "VIRAL")
+        self.nmouse_conditions = sum(self.data["organism"] == "MOUSE")
+        self.nhuman_conditions = sum(self.data["organism"] == "HUMAN")
+
+
+        self.nconditions = len(self.data)
+
+        assert self.nviral_conditions + self.nmouse_conditions + self.nhuman_conditions == self.nconditions
+
+
+
+        self.nviral_prey = len(self.viral_prey_set)
+
+        human_prey_set = set(self.data.loc[self.data["organism"] == "HUMAN", "Prey"])
+        self.human_prey_set = human_prey_set
+        self.nhuman_prey = len(self.human_prey_set)
+
+
+        mouse_prey_set = set(self.data.loc[self.data['organism'] == "MOUSE", "Prey"])
+        self.mouse_prey_set = mouse_prey_set
+        self.nmouse_prey = len(mouse_prey_set)
+
+
+        assert self.nviral_prey + self.nhuman_prey + self.nmouse_prey == self.nprey
+
+
+
+
+
+
+
+
+    def __repr__(self):
+        def h(x):
+            return '{:,}'.format(x)
+
+        def r(x):
+            return np.round(x, 2)
+
+        def p(a, b):
+            return (a / b ) * 100
+
+        def z(a, b):
+            return f"{h(a)}    ({r(p(a, b))})%"
+
+        nprey = h(self.nprey)
+        nbait = h(self.nbait)
+        nuid =  h(self.nuid)
+        nnuid = h(self.nnuid)
+        ntotalproteins = h(self.n_total_proteins)
+        npp = h(self.n_possible_edges)
+
+        s=f"""n conditions    {self.nconditions}
+  viral    {z(self.nviral_conditions, self.nconditions)}    
+  human    {z(self.nhuman_conditions, self.nconditions)} 
+  mouse    {z(self.nmouse_conditions, self.nconditions)}
+
+n unique prey: {nprey}
+  viral    {z(self.nviral_prey, self.nprey)} 
+  human    {z(self.nhuman_prey, self.nprey)}
+  mouse    {z(self.nmouse_prey, self.nprey)}
+
+
+n bait    {nbait}
+n uid     {nuid}
+n nuid    {nnuid}
+
+----Human Bait-----
+ELOB in prey set     {self.elob_in_prey_set}
+CBFB in prey set     {self.cbfb_in_prey_set}
+CUL5 in prey set     {self.cul5_in_prey_set}
+
+---Viral Proteins----
+VIF  in prey set     {self.vif_in_prey_set}
+TAT  in prey set     {self.tat_in_prey_set}
+REV  in prey set     {self.rev_in_prey_set}
+POLY in prey set     {self.poly_in_prey_set}
+NEF  in prey set     {self.nef_in_prey_set}
+GAG_POLY in prey set {self.gag_in_prey_set}
+ENV_POLY in prey set {self.env_in_prey_set}
+------Mouse---------
+IGHG1 in prey set    {self.IGH1_in_prey_set}
+
+All bait in prey set {self.all_bait_in_prey_set}
+
+n total proteins       {ntotalproteins}
+n possible pairs       {npp}
+
+        """
+        return s
 
 
 
