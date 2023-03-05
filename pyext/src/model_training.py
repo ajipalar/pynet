@@ -12,6 +12,12 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import scipy as sp
+import re
+import os
+import sys
+import requests
+import subprocess
+import Bio
 
 # custom modules
 import cullin_benchmark_test as cb_test
@@ -21,7 +27,7 @@ import lpdf
 import ulpdf
 import model_proto as mp
 import pynet_rng
-import re
+import HHBlits
 
 # Note book globals
 cb_path = Path("../../data/raw/cullin_e3_ligase/")
@@ -623,6 +629,7 @@ class CullinBenchMarkAnalysis:
             r"[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}"
         )
         self.is_uniprot = re.compile(self.uniprot_re)
+        self.vif_uid = "P69723"
 
         nuid = 0
         not_uid = []
@@ -779,6 +786,21 @@ class CullinBenchMarkAnalysis:
 
 
 
+    def create_uid_column(self):
+        """
+        Creates a column that is guaranteed to be uniprot ids
+        Maps viral proteins to the uniprot ids
+        """
+        uids = []
+        for prey_name in self.data.loc[:, "Prey"]:
+            if self.is_uniprot.match(prey_name):
+                uids.append(prey_name)
+            elif prey_name == "vifprotein":
+                uids.append(self.vif_uid)
+            else:
+                assert False, f"{prey_name} not a uniprot ID"
+
+        self.data.loc[:, "UID"] = uids
 
     def __repr__(self):
         def h(x):
@@ -840,5 +862,108 @@ n possible pairs       {npp}
         return s
 
 
+def assemble_ground_truth(
+    dir_name: str,
+    uid_list: list[str],
+    min_seq_id_with_query: float,
+    min_seq_coverage_with_query: float,
+    min_e_value: float,
+    direct_interaction_criterion='500A_buried_surface_area',
+    pdb70_path="~/databases/pdb70/pdb70",
+    overwrite_dir=False,
+    make_dir=False,
+    get_fastas_1=False,
+    get_hhr_2=False
+    ):
+    """
+    Assembles a ground truth set based on various criteria
+    
+    Params:
+      dir_name: the name of the benchmark analysis. Also the
+                the name of the directory to write to
+      uid_list: a list of uniprot ids
+      pdb70_path: the path to pdb70
+      
+      HHBlits Params:
+        min_seq_id_with_query: the minimal sequence identity to the query
+        min_seq_coverage_with_query: the minimal sequence coverage to query
+        min_e_value:                 the minimal e value
+      
+      direct_interaction_criterion: The criterion for defining direct interactions
+
+      overwrite_dir: overwrite the directory if it already exists
+      make_dir     : make the directory
+      get_fastas_1 : get the fasta sequences from uniprot 
+      get_hhr_2    : run hhblits on the fastas
+    """
+    nproteins = len(uid_list)
+    assert nproteins > 1
+    assert 0 <= min_seq_id_with_query <= 100
+    assert 0 <= min_e_value <= 1
+    npossible_interactions = nproteins * (nproteins - 1) // 2
+
+    if overwrite_dir:
+        os.rmdir(dir_name)
+
+    if make_dir:
+
+        os.mkdir(dir_name)
+        os.chdir(dir_name)
+        os.mkdir("uniprot_seqs")
+        os.mkdir("hhblits_out")
+
+    else:
+        os.chdir(dir_name)
+
+    # Run the shell script for HHblits
+
+    # Get the sequences and write them to a fasta_file
+
+    fasta_fname = f"{nproteins}_proteins.fasta" 
+    for i, uid in enumerate(uid_list):
+        if get_fastas_1:
+            cmd_str = f"wget https://rest.uniprot.org/uniprotkb/{uid}.fasta" 
+            subprocess.run(cmd_str, shell=True, check=True)
+            subprocess.run(f"mv {uid}.fasta uniprot_seqs", shell=True, check=True)
+        
+        #cmd_str = f"cat {uid}.fasta >> uniprot_seqs/{fasta_fname}"
+        #subprocess.run(cmd_str, shell=True)
+
+        # Do an hhblits search
+
+        if get_hhr_2:
+
+            cmd_str = f"hhblits -i uniprot_seqs/{uid}.fasta " 
+            cmd_str += f"-oa3m hhblits_out/{uid}.a3m " 
+            cmd_str += f"-qid {min_seq_id_with_query} "
+            cmd_str += f"-cov {min_seq_coverage_with_query} "
+            cmd_str += f"-e {min_e_value} "
+            cmd_str += f"-d {pdb70_path} "
+            cmd_str += f"> hhblits_out/{uid}.hhr"
+    
+            subprocess.run(cmd_str, shell=True, check=True)
+
+    
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # Pairwise compare shared pdbs
+
+
+    
+
+    
