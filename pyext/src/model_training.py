@@ -870,6 +870,7 @@ def assemble_ground_truth(
     min_seq_id_with_query: float,
     min_seq_coverage_with_query: float,
     min_e_value: float,
+    hhblits_cpu=2,
     direct_interaction_criterion='500A_buried_surface_area',
     pdb70_path="~/databases/pdb70/pdb70",
     overwrite_dir=False,
@@ -952,6 +953,7 @@ def assemble_ground_truth(
 
             cmd_str = f"hhblits -i uniprot_seqs/{uid}.fasta " 
             cmd_str += f"-oa3m hhblits_out/{uid}.a3m " 
+            cmd_str += f"-cpu {hhblits_cpu} "
             cmd_str += f"-qid {min_seq_id_with_query} "
             cmd_str += f"-cov {min_seq_coverage_with_query} "
             cmd_str += f"-e {min_e_value} "
@@ -960,52 +962,89 @@ def assemble_ground_truth(
     
             subprocess.run(cmd_str, shell=True, check=True)
 
-        if get_pdb_pair_ids_3:
-            # Get the PDB ids with at least two potential
-            # homologs
-            pdb_ids = {}
-            all_hits = []
-            for file in Path("hhblits_out").iterdir():
-                if file.suffix == ".hhr":
-                    file_str = str(file)
-                    hhr_dict: dict = HHBlits.parse_log(str(file))
-                    # parse the pdb file and it to the growing list
-                    uid = hhr_dict['uid']
-                    assert uid not in pdb_ids, uid
+            # output .hhr file
 
-                    hits = []
+    if get_pdb_pair_ids_3:
+        # Get the PDB ids with at least two potential
+        # homologs
+        pdb_ids = {}
+        all_hits = []
+        for file in Path("hhblits_out").iterdir():
+            if file.suffix == ".hhr":
+                file_str = str(file)
+                hhr_dict: dict = HHBlits.parse_log(str(file))
+                # parse the pdb file and it to the growing list
+                uid = hhr_dict['uid']
+                assert uid not in pdb_ids, uid
 
-                    potential_hits = hhr_dict["pdb_id"]
-                    assert len(potential_hits) > 0
+                hits = []
 
-                    for i, prob in enumerate(hhr_dict["prob"]):
-                        potential_homolog= False
-                        prob = float(prob)
-                        assert 0 <= prob <= 100
-                        if prob >= 50:
-                            potential_homolog = True
-                        elif (prob >= 30) and (i < 3):
-                            potential_homolog = True
+                potential_hits = hhr_dict["pdb_id"]
+                assert len(potential_hits) > 0
 
-                        if potential_homolog:
-                            hit = potential_hits[i]
-                            hits.append(hit)
+                for i, prob in enumerate(hhr_dict["prob"]):
+                    potential_homolog= False
+                    prob = float(prob)
+                    assert 0 <= prob <= 100
+                    if prob >= 50:
+                        potential_homolog = True
+                    elif (prob >= 30) and (i < 3):
+                        potential_homolog = True
 
-                    hits = list(set(hits))
-                    pdb_ids[uid] = hits
-                    all_hits = all_hits + hits
+                    if potential_homolog:
+                        hit = potential_hits[i]
+                        hits.append(hit)
 
-            
-            all_hits = list(set(all_hits))
-            all_hits = list(sorted(all_hits))
-            if not Path("pdb_hits").is_dir():
-                os.mkdir("pdb_hits")
+                hits = list(set(hits))
+                pdb_ids[uid] = hits
+                all_hits = all_hits + hits
 
-            with open("pdb_hits/pdbs.json", "w") as f:
-                json.dump(pdb_ids, f)
+        
+        all_hits = list(set(all_hits))
+        all_hits = list(sorted(all_hits))
+        if not Path("pdb_hits").is_dir():
+            os.mkdir("pdb_hits")
 
-            with open("pdb_hits/all_hits", "w") as f:
-                for pdb_id in all_hits:
-                    f.write(pdb_id + "\n")
+        with open("pdb_hits/pdbs.json", "w") as f:
+            json.dump(pdb_ids, f)
+
+        with open("pdb_hits/all_hits", "w") as f:
+            for pdb_id in all_hits:
+                f.write(pdb_id + "\n")
+
+        # count the pdb ids where at least two uniprot ids were found
+
+        pdb_id__uids = {}
+        for uid, pdb_id_list in pdb_ids.items():
+            for pdb_id in pdb_id_list:
+                if pdb_id not in pdb_id__uids:
+                    pdb_id__uids[pdb_id] = [uid]
+                else:
+                    pdb_id__uids[pdb_id].append(uid)
+
+
+        counts = {}
+        for pdb_id, uids in pdb_id__uids.items():
+            n = len(uids)
+            assert n == len(set(uids))
+            counts[pdb_id] = n
+
+        with open("pdb_hits/counts.tsv", "w") as f:
+            for pdb_id, count in counts.items():
+                f.write(f"{pdb_id}    {count}\n")
+
+        with open("pdb_hits/homologs.json", "w") as f:
+            json.dump(pdb_id__uids, f)
+
+
+
+
+
+
+
+
+
+
+        
 
     # Pairwise compare shared pdbs
