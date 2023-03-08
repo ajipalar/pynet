@@ -171,7 +171,7 @@ class HHR:
         self.template_start = template_start
         self.template_end = template_end
 
-def parse_log(handle, is_uniprot_accesion_id=None):
+def parse_log(handle, is_uniprot_accesion_id=None, verbose=False):
     """
     Parse an HHBlits .log file into a python object
     Assumes the query is based on a uniprot id
@@ -179,6 +179,9 @@ def parse_log(handle, is_uniprot_accesion_id=None):
 
     if not is_uniprot_accesion_id:
         is_uniprot_accesion_id = re.compile(r"[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}")
+
+    if not verbose:
+        print = lambda x: None
 
     out = {"uid": None, 
            "description": None,
@@ -222,7 +225,8 @@ def parse_log(handle, is_uniprot_accesion_id=None):
         line4 = f.readline().strip("\n")
         a, n = line4.split(" "*10)
         assert a=="Neff", a
-        assert n.isnumeric()
+        for char in n:
+            assert char in ".1234567890", (n, char, handle)
         out["neff"]=n
 
         line5 = f.readline().strip("\n")

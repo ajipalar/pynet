@@ -14,9 +14,11 @@ from pathlib import Path
 import scipy as sp
 import re
 import os
+import shutil
 import sys
 import requests
 import subprocess
+import json
 import Bio
 
 # custom modules
@@ -873,7 +875,9 @@ def assemble_ground_truth(
     overwrite_dir=False,
     make_dir=False,
     get_fastas_1=False,
-    get_hhr_2=False
+    get_hhr_2=False,
+    get_pdb_pair_ids_3=False,
+    hhr_prob=50.0
     ):
     """
     Assembles a ground truth set based on various criteria
@@ -885,7 +889,11 @@ def assemble_ground_truth(
       pdb70_path: the path to pdb70
       
       HHBlits Params:
+        see https://github.com/soedinglab/hh-suite/wiki
         min_seq_id_with_query: the minimal sequence identity to the query
+                               From the HHBlits manual - hhblits can detect
+                               homology below the twilight zone of 20%
+                               go to 10%
         min_seq_coverage_with_query: the minimal sequence coverage to query
         min_e_value:                 the minimal e value
       
@@ -895,6 +903,14 @@ def assemble_ground_truth(
       make_dir     : make the directory
       get_fastas_1 : get the fasta sequences from uniprot 
       get_hhr_2    : run hhblits on the fastas
+      hhr_prob     : HHBlits outputs a list of PDB entires with an ascociated
+                     Hits should be considered when 
+                        1) hit has > 50% probability
+                        2) hit has > 30% probability and is in top 3
+
+                        Probability accounts for secondary structure and e-value does not
+
+                     
     """
     nproteins = len(uid_list)
     assert nproteins > 1
@@ -912,7 +928,8 @@ def assemble_ground_truth(
         os.mkdir("uniprot_seqs")
         os.mkdir("hhblits_out")
 
-    else:
+    cwd = Path.cwd()  
+    if cwd.stem != dir_name:
         os.chdir(dir_name)
 
     # Run the shell script for HHblits
@@ -943,27 +960,52 @@ def assemble_ground_truth(
     
             subprocess.run(cmd_str, shell=True, check=True)
 
-    
+        if get_pdb_pair_ids_3:
+            # Get the PDB ids with at least two potential
+            # homologs
+            pdb_ids = {}
+            all_hits = []
+            for file in Path("hhblits_out").iterdir():
+                if file.suffix == ".hhr":
+                    file_str = str(file)
+                    hhr_dict: dict = HHBlits.parse_log(str(file))
+                    # parse the pdb file and it to the growing list
+                    uid = hhr_dict['uid']
+                    assert uid not in pdb_ids, uid
 
+                    hits = []
 
+                    potential_hits = hhr_dict["pdb_id"]
+                    assert len(potential_hits) > 0
 
+                    for i, prob in enumerate(hhr_dict["prob"]):
+                        potential_homolog= False
+                        prob = float(prob)
+                        assert 0 <= prob <= 100
+                        if prob >= 50:
+                            potential_homolog = True
+                        elif (prob >= 30) and (i < 3):
+                            potential_homolog = True
 
+                        if potential_homolog:
+                            hit = potential_hits[i]
+                            hits.append(hit)
 
+                    hits = list(set(hits))
+                    pdb_ids[uid] = hits
+                    all_hits = all_hits + hits
 
+            
+            all_hits = list(set(all_hits))
+            all_hits = list(sorted(all_hits))
+            if not Path("pdb_hits").is_dir():
+                os.mkdir("pdb_hits")
 
+            with open("pdb_hits/pdbs.json", "w") as f:
+                json.dump(pdb_ids, f)
 
-
-
-
-
-
-
-
-
+            with open("pdb_hits/all_hits", "w") as f:
+                for pdb_id in all_hits:
+                    f.write(pdb_id + "\n")
 
     # Pairwise compare shared pdbs
-
-
-    
-
-    
