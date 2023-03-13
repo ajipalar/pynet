@@ -3,6 +3,7 @@ import model_proto as mp
 import jax
 import jax.numpy as jnp
 from functools import partial
+from collections import namedtuple
 
 n = 10
 A = np.zeros((n, n), dtype=np.int32)
@@ -165,11 +166,39 @@ def test_flip_adjacency__j():
     # flipped every edge
     assert jnp.all(La != LA), (La, LA)
 
+def test_bfs_jax():
+
+    explored = mp.create_empty_jlist(len_A, jnp.int32)
+    q = mp.create_empty_queue(len_A - 1, jnp.int32)
+    q = mp.enqueue_jax(q, 0)
+    adj = mp.get_adjacent_nodes_jax(A, 0, len_A)
+
+    mp._bfs_jax_true_fun(1, explored, q)
+    val = 0, explored, q, adj
+    mp._bfs_jax_fori_loop_body(0, val)
+
+    mp._bfs_jax_fori_loop_piece(adj, explored, q)
+    mp._bfs_jax_while_body(explored, q, A, len_A)
+    print("_bfs_jax_while_body PASSED")
+
+    mp._bfs_jax_while_loop_piece(explored, q, A, len_A)
+    mp.bfs_jax(A, 0, len_A)
+
+    f = partial(mp.bfs_jax, len_A=len_A)
+
+    for i in range(len_A):
+        jlist = mp.bfs_jax(A, i, len_A)
+        cc = mp.bfs(A, i)
+        jjlist = jax.jit(f)(A, i)
+
+        j = np.array(sorted(list(jlist.arr[0:jlist.lead_idx])))
+        c = np.array(sorted(list(cc)))
+        jj = np.array(sorted(list(jjlist.arr[0:jjlist.lead_idx])))
+
+        assert np.alltrue(j == c), f"i={i}\nj={j}\nc={c}"
+        assert np.alltrue(c == jj), f"i={i}\njj={jj}\nc={c}"
 
 
-
-
-    
 
 
 
@@ -194,6 +223,7 @@ def do_tests():
     assert expected_failure
 
     test_flip_adjacency__j()
+    test_bfs_jax()
 
 
 

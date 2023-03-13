@@ -1,5 +1,15 @@
 """
 A numpy compatible model prototype not focused on performance
+
+Traceable functions require shape information
+statically known at compile time
+
+Static arguments must be traced from the top level
+functions through all sub functions.
+
+A function parameter is annotated as static
+with the static_param_name naming convention
+
 """
 
 import numpy as np
@@ -8,14 +18,57 @@ from scipy.special import comb
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsp
-from collections import deque
+from collections import deque, namedtuple
 from itertools import combinations, chain
 import matplotlib.pyplot as plt
 from functools import partial
+from jax.tree_util import Partial
 
 import lpdf
 import pynet_rng
 
+# mini jax `objects`
+AdjacentNodes = namedtuple("AdjacentNodes", "arr n_adjacent_nodes")
+Queue = namedtuple("Queue", "arr tail_idx length")
+JList = namedtuple("JList", "arr lead_idx")
+
+def create_empty_jlist(length, dtype):
+    """
+    Creates an empty JList
+    The array is implements with large default values
+    """
+    return JList(jnp.ones(length, dtype=dtype) * length + 2, lead_idx=0)
+
+def append_jlist(jlist, val):
+    arr = jlist.arr.at[jlist.lead_idx].set(val) 
+    return JList(arr, jlist.lead_idx + 1)
+
+def pop_jlist(jlist):
+    """
+    pop an element off the end of the list
+    Returns:
+      val : the popped element
+      jlist : a jlist the same size as the original
+    """
+    val = jlist.arr[jlist.lead_idx-1]
+    return val, JList(jlist.arr, jlist.lead_idx - 1)
+
+def in_jlist(x, jlist) -> bool:
+    """
+    Tests if the value x is in jlist
+    """
+
+    lead_idx = jlist.lead_idx
+    in_ = False
+    def body(i, val):
+        in_ , jlist , x= val
+        in_ = (x == jlist.arr[i]) | in_
+        return in_, jlist, x
+
+    val = in_, jlist, x
+    val = jax.lax.fori_loop(0, lead_idx, body, val) 
+    in_, jlist, x = val
+    return in_
 
 
 def _assert_A(A):
@@ -105,6 +158,62 @@ def get_adjacent_nodes(A, node):
 
     return adjacent_nodes
 
+def get_adjacent_nodes_jax(A, node_index: int, len_A, node_dtype=jnp.int32):
+    """
+    Traceable version of `get_adjacent_nodes`
+    
+    Params:
+      A - an adjacency matrix
+      node_index - the node from which adjacent nodes are to be found
+      len_A - the number of rows/columns in A
+    Returns:
+      AdjacentNodes: namedtuple  
+        arr: a sorted_array of adjacent_nodes
+        n_adjacent_nodes: the number of adjacent nodes
+    """
+
+    # The max size is len_A-1
+    # The garbage values are placed at the end of the array
+    # The garbage values are  len_A * 9999 + 1
+
+    default_values = len_A + 1 
+
+    adjacent_nodes = jnp.ones(len_A-1, dtype=node_dtype) * default_values
+
+    left_to_diag_len = node_index
+    diag_to_bot_len = len_A - node_index - 1
+    # Get the adjacent nodes by row
+    
+    def by_row(i, val):
+        adjacent_nodes, A = val
+        query_val = A[node_index, i]
+        adj_val = jax.lax.cond(query_val == 1,
+                               lambda i: i,
+                               lambda i: default_values,
+                               i)
+
+        adjacent_nodes = adjacent_nodes.at[i].set(adj_val)
+        return adjacent_nodes, A
+
+    adjacent_nodes, A = jax.lax.fori_loop(0, left_to_diag_len, by_row, (adjacent_nodes, A))
+
+    def by_col(i, val):
+        adjacent_nodes, A = val
+        query_val = A[i, node_index]
+        adj_val = jax.lax.cond(query_val == 1,
+                               lambda i: i,
+                               lambda i: default_values,
+                               i)
+        adjacent_nodes = adjacent_nodes.at[left_to_diag_len + i].set(adj_val)
+    
+        return adjacent_nodes, A
+
+    # Get the adjacent nodes by column
+    adjacent_nodes, A = jax.lax.fori_loop(node_index+1, len_A, by_col, (adjacent_nodes, A))
+    adjacent_nodes = jnp.sort(adjacent_nodes)
+
+    n_adjacent_nodes = jnp.sum(adjacent_nodes != default_values) 
+    return AdjacentNodes(adjacent_nodes, n_adjacent_nodes)
 
 def bfs(A, root: int):
     """
@@ -137,7 +246,129 @@ def bfs(A, root: int):
                 q.append(node)
     return explored
 
-def C(Ss, ts):
+
+
+def create_empty_queue(length, dtype):
+    # Queue
+    # The queue has a size equal to the number of elements in the queue
+    # The queue has a length equal to len(arr)
+    arr = jnp.zeros(length, dtype=dtype)
+    # The empty queue's leader is at position 0 
+    leader_idx = 0
+    # The empty queue's tail is at position 0
+
+    return Queue(arr=arr, tail_idx=0, length=length)
+
+def enqueue_jax(q, val):
+    """
+    A queue is a first in first out data structure
+    This function is meant to traced by JAX and jit compiled 
+    If the queue is full (q.length) and enqueue_jax is called,
+    enqeue_jax is undefined and the queue is invalid
+    """
+    return Queue(q.arr.at[q.tail_idx].set(val), q.tail_idx + 1, q.length)
+
+def dequeue_jax(q):
+    """
+    dequeue a Queue. traceable 
+    """
+    arr = jax.lax.fori_loop(1, q.length, lambda i, arr: arr.at[i-1].set(arr[i]), q.arr) 
+    return q.arr[0], Queue(arr, q.tail_idx-1, q.length)
+
+
+
+
+BFS_WHILE_PARAMS = namedtuple("BFS_WHILE_PARAMS",
+                              "explored q A len_A")
+
+def _bfs_jax_while_loop_piece(explored, q, A, len_A):
+    body_fun = Partial(_bfs_jax_while_body, len_A=len_A)
+    return jax.lax.while_loop(
+            lambda x: x[1].tail_idx > 0,
+            lambda x: body_fun(*x),
+            (explored, q, A))
+
+
+def _bfs_jax_while_body(explored, q, A, len_A):
+#    jax.debug.breakpoint()
+    v, q = dequeue_jax(q)
+
+    adj = get_adjacent_nodes_jax(A, v, len_A)
+    _, explored, q, adj = _bfs_jax_fori_loop_piece(
+            adj, explored, q)
+#    jax.debug.breakpoint()
+
+    return explored, q, A 
+
+
+
+def _bfs_jax_fori_loop_body(i, val):
+    """ (node, (explored, q)) -> (explored, q) """
+    _, explored, q, adj = val
+    node = adj.arr[i]
+    init = node, explored, q
+    #jax.debug.breakpoint()
+
+    in_: bool = in_jlist(node, explored) 
+    init = jax.lax.cond(
+        in_, 
+        lambda x: init, # do nothing
+        lambda x: _bfs_jax_true_fun(*init), # update explored  q
+        init)
+    _, explored, q = init
+    #jax.debug.breakpoint()
+    return node, explored, q, adj
+
+def _bfs_jax_fori_loop_piece(adj: AdjacentNodes, explored: JList, q: Queue):
+    """ (adj, explored, q) -> (explored, q)"""
+    val = 0, explored, q, adj
+    return jax.lax.fori_loop(0, adj.n_adjacent_nodes,
+                             _bfs_jax_fori_loop_body,
+                             val)
+
+def _bfs_jax_true_fun(node: int, explored: JList, q: Queue):
+    """ (T) -> (T) """
+    explored = append_jlist(explored, node)
+    q = enqueue_jax(q, node)
+    return node, explored, q
+
+
+    
+def bfs_jax(A, root: int, len_A, node_dtype=jnp.int32):
+    """
+    A jittable breadth first search
+
+    Params:
+      A: an adjacency matrix
+    Returns:
+      explored: the set of nodes connected to the root
+    """
+    
+    # An array of explored nodes
+    explored = create_empty_jlist(len_A, dtype=node_dtype) 
+
+    # Assign the bait (root) as found
+    explored = append_jlist(explored, root)
+
+
+    # While the queue is not empty
+#    jax.lax.while_loop(lambda q: q.tail_index != 0, while_loop_body, 
+
+    q = create_empty_queue(length=len_A, dtype=node_dtype)
+    q = enqueue_jax(q, root)
+
+    explored, q, A = _bfs_jax_while_loop_piece(explored, q, A, len_A)
+#    jax.debug.breakpoint()
+    return explored
+    
+
+
+
+
+
+
+
+def C(Ss, ts, node_dtype=jnp.int32):
     """
     The composite construction function
     Given an array of saint scores Ss in the As coordinate system and
@@ -150,7 +381,7 @@ def C(Ss, ts):
     prey = np.where(Ss >= ts)[0]
     prey = prey + 1  # index to As coordinates
     n_prey = len(prey)
-    Cs = np.zeros(n_prey + 1, dtype=int)
+    Cs = np.zeros(n_prey + 1, dtype=node_dtype)
     Cs[1:] = prey
     return Cs
 
@@ -657,9 +888,166 @@ def nedges(A):
     return jnp.sum(A)
 
 
+def build_re_mcmc(       
+                  n_mcmc_steps: int, 
+                  betas, 
+                  p_lpdf, 
+                  q_lpdf, 
+                  score_array_len: int,
+                  x, 
+                  q_rv, 
+                  swap_interval: int,
+                  save_every: int):
+
+    """
+    Build a replica exchange mcmc kernal
+    Kernal inputs - rseed
+    outputs       - scores at each replica
+
+    q - the proposal distribution
+    p   is the posterior
+    
+    Params:
+      n_mcmc_steps -   total number of moves to make for each chain
+      betas        -   an array of inverse temperatures, the length of
+                       which determines the number of replicas
+      
+      p_lpdf           :: (x,) -> ScoreArray
+                       the log probability density/mass function. May be unnormalized
+      q_lpdf           :: (x,) -> ScoreArray
+                       the log probability density/mass function of the proposal. 
+                       May be unnormalized
+      score_array_len  The score length 
+      x                initial coordinates
+      q_rv             :: (key, x) -> x
+      swap_interval    how often to attempt a swap 
+      save_interval    how often to save the coordinates
+    Returns:
+      re_mcmc_kernal :: (key,) -> MCMC_Results
+    """
+
+    
+    n_replicas = len(betas)
+    assert betas.shape == (n_replicas,), f"betas is not an array of inverse temperatures"
+    assert n_replicas > 1, f"N replicas {n_replicas}"
+    assert isinstance(n_mcmc_step, int)
+    assert isinstance(score_array_len, int)
+    assert isinstance(swap_interval, int)
+
+    def mcmc_kernal(key, x, beta):
+        """
+        The mcmc kernal 
+        """
+        keys = jax.random.split(key, 2)
+        u = jax.random.uniform(keys[0])
+    
+    def sample_MH(key, x, beta):
+        """
+        Perfrom a single local step in parameter space according to the
+        proposal distribution q. Accept or reject based on the Metropolis Criterion.
+        q is assumed to be asymetric q(x1|x0) != q(x0|x1). Therefore the conditional density for q
+        is required to account for detailed balance.
+        Params:
+          key - the jax PRNGKey
+          x   - the model variable
+          ulpdf the unormalized log probability density funciton
+          q     the proposal distribtuion
+          q_cond_lpdf 
+        """
+        keys = jax.random.split(key)
+        x1 = q(keys[0], x)
+    
+        u1_score_array = ulpdf(x1)
+        u0_score_array = ulpdf(x)
+    
+        q0_cond_score_array = q_cond_lpdf(x0, x1)
+        q1_cond_score_array = q_cond_lpdf(x1, x0)
+    
+        alpha = min(1, np.exp(ulpdf(x1) + q_cond_lpdf(x1, x) - ulpdf(x) - q_cond_lpdf(x, x1))) 
+        alpha = min(1, np.exp(u1_score_array[0] + q1_cond_score_array[0] - u0_score_array[0] - q0_cond_score_array[0])) 
+        u = jax.random.uniform(keys[1])
+        accepted = u <= alpha
+        if accepted:
+            x = x1
+        return accepted, x
+    def re_mcmc_kernal(rseed):
+        """
+        The Replica exchange Markov chain Monte Carlo algorithm
+        (int,) :: -> MCMC_Results
+        Params:
+          rseed    - int
+        Returns:
+          MCMC_Results
+        """
+
+        # create an array to save the RE scores accross all temperatures
+
+        scores = jnp.zeros((n_replicas, n_mcmc_steps, score_array_len)) 
+        accepted = jnp.zeros((n_replicas, n_mcmc_steps), dtype=bool) 
+
+        n_swaps = n_mcmc_steps // swap_interval
+        
+        # swapper (0, 1), (t1), (t2)
+        swaps_accepted = jnp.zeros((n_swaps, 3))
+
+        for mcmc_step in range(0, n_mcmc_steps):
+            if True:
+                ...
+                # perform RE swap
+
+            else:
+                # evolve the single chains
+                for r_index in range(n_replicas):
+                    ...
+                    
 
 
 
 
 
+
+
+
+
+
+    
+
+
+            
+            
+            
+            
+            
+            
+    n_replicas = len(betas)
+
+    re_score_tensor = jnp.zeros()   # (n_temperatures, n_samples, n_restraints)
+    acceptance_ratios = jnp.zeros() # (n_temperatures)
+    swaps = jnp.zeros() # (n_samples // swap_interval,  )
+
+    key = jax.random.PRNGKey(rseed)
+
+    
+    # Evolve N systems according to MCMC
+
+    # Swap every swap interval
+
+    # cycling the temperatures  
+
+    # observe the scores and keep track of the swaps
+
+    # save the trajectories.
+
+
+    if k > 0 and k % swap_interval == 0:
+        # Attempt RE Swap
+        ...
+
+    else:
+        # Do local sampling
+        ...
+
+    network_model_samples
+
+    
 
